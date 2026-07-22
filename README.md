@@ -37,6 +37,41 @@ cp -R "../SmartReview-ProtoC/node_modules" "./node_modules"
 yarn dev
 ```
 
+## Deploy to a separate URL (GitHub Pages)
+
+Target site: **https://jualzate87.github.io/SmartReview-AIc2/**
+
+Run this once from your own terminal (agent push is often blocked):
+
+```bash
+cd "/Users/jalzate/AI projects/SmartReview-ProtoC2"
+
+# 1) Create the public repo + push main
+gh repo create jualzate87/SmartReview-AIc2 --public --source=. --remote=origin --push
+
+# 2) Build + publish gh-pages (also pushes main)
+./deploy.sh
+
+# 3) First time only — enable Pages:
+#    https://github.com/jualzate87/SmartReview-AIc2/settings/pages
+#    Source: Deploy from a branch → gh-pages / (root)
+```
+
+After that, redeploy anytime with:
+
+```bash
+./deploy.sh
+```
+
+Live URL next to the others:
+
+| Proto | URL |
+|-------|-----|
+| A | https://jualzate87.github.io/SmartReturn-Review/ |
+| A2 | https://jualzate87.github.io/SmartReturn-Review-A2/ |
+| C | https://jualzate87.github.io/SmartReview-AIc/ |
+| **C2** | **https://jualzate87.github.io/SmartReview-AIc2/** |
+
 ## How to Use
 
 Open the project in Cursor and start chatting with the AI assistant. You can describe what you want in plain language, or use slash commands for specific tasks.
