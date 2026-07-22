@@ -61,9 +61,9 @@
   flex: 1;
   overflow-y: auto;
   padding: var(--space-container-padding-medium);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-component-gap-small);
+  /* Block layout so sections keep natural height and scroll.
+     Flex + default flex-shrink was crushing sections into an overlap. */
+  display: block;
   min-height: 0;
 }
 
@@ -113,6 +113,12 @@
   border: 1px solid var(--color-divider-tertiary);
   border-radius: 6px;
   overflow: hidden;
+  margin-bottom: var(--space-component-gap-small);
+  flex-shrink: 0;
+}
+
+.section:last-child {
+  margin-bottom: 0;
 }
 
 .bucketDone {
@@ -132,11 +138,14 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-height: 44px;
   border: none;
   background: var(--color-container-background-secondary, #f4f5f8);
   padding: 10px 12px;
   cursor: pointer;
   text-align: left;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .sectionChevron {
