@@ -1,0 +1,108 @@
+/* ProtoC — Welcome / orientation overlay */
+.overlay {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: linear-gradient(180deg, #f4f7f9 0%, #eef2f6 100%);
+  overflow-y: auto;
+}
+
+.card {
+  width: 100%;
+  max-width: 620px;
+  background: var(--color-container-background-primary, #ffffff);
+  border: 1px solid var(--color-border-primary, #e0e7ec);
+  border-radius: var(--radius-large, 16px);
+  box-shadow: 0 8px 32px rgba(33, 38, 42, 0.08);
+  padding: var(--space-container-padding-large, 40px);
+}
+
+/* Lockup — Intuit Assist icon + heading + subheading, centered (IDS GenUX Welcome pattern) */
+.lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-x-small, 8px);
+  margin-bottom: 28px;
+}
+
+.assistIcon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+}
+
+.title {
+  /* Use --font-family-* (full stack), not --font-name-* — name tokens are
+     unquoted multi-word values and resolve as invalid font lists → serif fallback. */
+  font-family: var(--font-family-heading, "Avenir Next forINTUIT", Avenir, Helvetica, Arial, sans-serif);
+  font-size: var(--font-size-heading-4, 28px);
+  font-weight: var(--font-weight-heading, 600);
+  line-height: 1.3;
+  color: var(--color-text-primary, #393a3d);
+  margin: 0;
+}
+
+.lede {
+  font-family: var(--font-family-component, sans-serif);
+  font-size: var(--font-size-body-2, 16px);
+  color: var(--color-text-secondary, #6b6c72);
+  margin: 0;
+}
+
+.steps {
+  list-style: none;
+  margin: 0 0 32px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  background: var(--color-container-background-secondary, #f7f9fb);
+  border: 1px solid var(--color-border-secondary, #e8edf0);
+  border-radius: var(--radius-medium, 12px);
+}
+
+.stepNum {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-action-info, #205ea3);
+  color: var(--color-text-inverse, #ffffff);
+  font-family: var(--font-family-component, sans-serif);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stepTitle {
+  font-family: var(--font-family-component, sans-serif);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #21262a);
+}
+
+.stepDesc {
+  font-family: var(--font-family-component, sans-serif);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #5d686f);
+}

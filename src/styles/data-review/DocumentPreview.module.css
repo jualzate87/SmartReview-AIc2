@@ -1,0 +1,123 @@
+/* Document preview — fills parent container, scrollable with zoom */
+.container {
+  background: var(--color-container-background-primary, #ffffff);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  border-bottom: 1px solid #adbac2;
+}
+
+/* Scrollable image area — plain block layout, not flex. A flex row with
+   justify-content:center clips a child wider than the container instead of
+   making it scrollable (centering wins over overflow), which broke panning
+   at higher zoom levels. The zoomed content's width:N% is computed against
+   .imageArea's own content box (the stable 100% reference); .imageAreaInner
+   only handles vertical centering and never constrains width, so it can grow
+   past 100% and the browser's native scrollbars take over correctly. */
+.imageArea {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 10px;
+  min-height: 0;
+  background: #ffffff;
+  position: relative;
+}
+
+.imageAreaInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+}
+
+.documentImage {
+  border: 1px solid #000000;
+  display: block;
+  /* intrinsic size — zoom is controlled by wrapper width, image fills wrapper */
+  width: 100%;
+  height: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+/* Zoom toolbar — same pattern as LeftPanel1040 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 45px;
+  padding: 4px 10px;
+  background: #e2e9ed;
+  flex-shrink: 0;
+}
+
+.toolbarControls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.zoomLevel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #21262a;
+  border-radius: 4px;
+  padding: 0 8px;
+  height: 24px;
+  font-family: var(--font-family-component) !important;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 16px;
+  color: #21262a;
+  white-space: nowrap;
+  min-width: 44px;
+}
+
+.toolbarBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #21262a;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  width: 24px;
+  height: 24px;
+}
+
+.toolbarBtn:hover {
+  opacity: 0.7;
+}
+
+.toolbarBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.toolbarBtnActive {
+  background: var(--color-container-background-tertiary);
+  border-radius: var(--radius-action, 4px);
+  box-shadow: inset 0 0 0 1px var(--color-container-border-primary);
+  opacity: 1;
+}
+
+.toolbarBtnActive:hover {
+  opacity: 1;
+}
+
+/* Loupe — fixed so it tracks the pointer over the scrollable preview */
+.loupe {
+  position: fixed;
+  z-index: 40;
+  border-radius: 50%;
+  border: 2px solid var(--color-text-primary, #21262a);
+  box-shadow:
+    0 0 0 2px var(--color-container-background-primary, #ffffff),
+    0 4px 16px rgba(0, 0, 0, 0.28);
+  background-color: var(--color-container-background-primary, #ffffff);
+  background-repeat: no-repeat;
+  pointer-events: none;
+  overflow: hidden;
+}

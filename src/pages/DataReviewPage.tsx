@@ -1,0 +1,1880 @@
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
+import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close } from '@design-systems/icons'
+import { Button } from '@ids-ts/button'
+import '@ids-ts/button/dist/main.css'
+import { IconControl } from '@ids-ts/icon-control'
+import '@ids-ts/icon-control/dist/main.css'
+import NotesPane from './data-review/NotesPane'
+import type { Note } from './data-review/NotesPane'
+import HandoffSummary from './data-review/HandoffSummary'
+import WrapUpDecision from './data-review/WrapUpDecision'
+import handoffStyles from '../styles/data-review/HandoffSummary.module.css'
+import { buildHandoffSnapshot, type HandoffMode, type HandoffSnapshot } from '../data/handoffSnapshot'
+import {
+  PREPARER_NAME,
+  REVIEWER_NAME,
+  setReviewActor,
+  getReviewActor,
+} from '../hooks/useSyncedReviewState'
+import intuitAssistIcon from '../assets/icons/intuit-assist.svg'
+import LeftPanel1040 from './data-review/LeftPanel1040'
+import ReviewTab from './data-review/ReviewTab'
+import DocumentPreview from './data-review/DocumentPreview'
+import Int1099FormPreview from './data-review/Int1099FormPreview'
+import { getSourceDocPreview } from './data-review/sourceDocImages'
+import DetailFields, { W2_PAYER_TABS } from './data-review/DetailFields'
+import type { W2Employer } from './data-review/DetailFields'
+import DetailFields1099, { INT_PAYER_TABS, intVerifiedDocKey } from './data-review/DetailFields1099'
+import type { IntPayer } from './data-review/DetailFields1099'
+import DetailFieldsDiv, { DIV_PAYER_TABS, divVerifiedDocKey } from './data-review/DetailFieldsDiv'
+import type { DivPayer } from './data-review/DetailFieldsDiv'
+import {
+  buildTabVerifiedKeys,
+  buildTypeReviewed,
+  getNextUnreviewedSourceDoc,
+  getUnreviewedSourceDocs,
+  isDocReviewed,
+} from './data-review/docReviewStatus'
+import DetailFields1099R, { R_PAYER_TABS } from './data-review/DetailFields1099R'
+import DetailFieldsNec, { NEC_PAYER_TABS } from './data-review/DetailFieldsNec'
+import PeelTab from './data-review/PeelTab'
+import PriorYear1040Fields from './data-review/PriorYear1040Fields'
+import QuestionnaireResponsesPanel from './data-review/QuestionnaireResponsesPanel'
+import type { QuestionnaireResponseId } from './data-review/questionnaireData'
+import type { OutputFormId } from './data-review/outputForms'
+import { resolveOutputFormFromAction } from './data-review/outputForms'
+import AgentReportPane from './data-review/AgentReportPane'
+import CoachTip, { markCoachTipShown, readCoachTipShown, type CoachTipId } from './data-review/CoachTip'
+import AgentLoadingPane from './data-review/AgentLoadingPane'
+import WelcomePane from './data-review/WelcomePane'
+import Phase1Banner from './data-review/Phase1Banner'
+import Phase1IssueBanner from './data-review/Phase1IssueBanner'
+import Phase2Banner from './data-review/Phase2Banner'
+import {
+  PHASE1_FLAG_KEYS,
+  countPhase1Remaining,
+  countPhase1FlagsForDivPayer,
+  countPhase1FlagsForIntPayer,
+  countPhase1FlagsForW2Payer,
+  field1040ToDetail,
+  get1040HighlightField,
+  getNextVerifyItem,
+  getTabFlagCounts,
+  getTabInitialFlagCounts,
+  getInitialW2PayerFlagCount,
+  getInitialDivPayerFlagCount,
+  getInitialIntPayerFlagCount,
+  getInitialRPayerFlagCount,
+  isPhase1FlagResolved,
+  navigationForDetailField,
+} from './data-review/phase1FieldSync'
+import { getPhase2Progress } from './data-review/phase2FlagSync'
+import { PHASE1_FLAG_MESSAGES } from './data-review/phase1FlagMessages'
+import { computeLiveReturn } from '../data/liveReturn'
+import { navigationForSourceDoc } from '../data/sourceDocuments'
+import img1040PriorPage1 from '../assets/jessica-1040-2024-variant-1.png'
+import img1040PriorPage2 from '../assets/jessica-1040-2024-variant-2.png'
+import styles from '../styles/data-review/DataReviewPage.module.css'
+import dragStyles from '../styles/data-review/DragHandle.module.css'
+
+function VerticalGripIcon() {
+  return (
+    <svg width="4" height="20" viewBox="0 0 4 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="2" cy="4"  r="1.5" fill="#93A3AB"/>
+      <circle cx="2" cy="10" r="1.5" fill="#93A3AB"/>
+      <circle cx="2" cy="16" r="1.5" fill="#93A3AB"/>
+    </svg>
+  )
+}
+
+/** Source-doc panel slide timing — matches --duration-appear/disappear-emphasize-fast */
+const SOURCE_PANEL_ENTER_MS = 500
+const SOURCE_PANEL_EXIT_MS = 500
+/** Summary show/hide — matches --duration-transform-emphasize-fast */
+const SUMMARY_TOGGLE_MS = 500
+/** Collapsed "Show Summary" edge tab width */
+const SHOW_SUMMARY_HANDLE_WIDTH = 44
+/** Hard floor for Summary so Return Breakdown labels aren’t truncated.
+ *  Below this width the first column gets ellipsized (“eaten”). */
+const LEFT_PANEL_MIN_WIDTH = 795.7
+/** Absolute min Sources width when both panels are open */
+const RIGHT_PANEL_MIN_WIDTH = 360
+/** Matches DragHandle.module.css .handleVertical width */
+const PANEL_DRAG_HANDLE_WIDTH = 16
+
+export default function DataReviewPage() {
+  // Source-doc review state — flags, reviewed fields, active tab, editable field
+  // values — persisted in sessionStorage via useSyncedReviewState.
+  const {
+    activeTopTab, setActiveTopTab,
+    activeSubTab, setActiveSubTab,
+    selectedField, setSelectedField,
+    wages, setWages,
+    amounts, updateAmounts,
+    fieldValues, updateFieldValue,
+    reviewedFields,
+    editedFields,
+    markEdited,
+    fieldOverrides,
+    setFieldOverride,
+    activeDivPayer, setActiveDivPayer,
+    activeIntPayer, setActiveIntPayer,
+    markReviewed: handleMarkReviewed,
+    markReviewedBulk: handleMarkReviewedBulk,
+    verifiedDocs,
+    verifiedDocsMeta,
+    toggleVerifiedDoc,
+    summaryCheckedFields,
+    summaryCheckedMeta,
+    toggleSummaryChecked,
+    summaryFlaggedFields,
+    summaryFlaggedMeta,
+    toggleSummaryFlagged,
+    summaryFlagNotes,
+    summaryFlagActivity,
+    setSummaryFlagNote,
+    editedFieldsMeta,
+  } = useSyncedReviewState()
+  const liveTotals = computeLiveReturn(amounts)
+  const total1a = liveTotals.wages
+  const totalWithholding = liveTotals.totalWithholding
+  const updateField = (key: keyof typeof fieldValues, value: number | { techCircle: number }) =>
+    updateFieldValue(key, value)
+  // Agent panel width in px when open (default 588px, user-resizable)
+  const [agentPanelWidth, setAgentPanelWidth] = useState(588)
+  // Right panel width in px (default ~65% viewport once imports start)
+  const [rightPanelWidth, setRightPanelWidth] = useState(() =>
+    typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.65) : 920,
+  )
+  // Body width for Sources-panel share of the row (drives auto side-by-side).
+  const [bodyWidth, setBodyWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1400,
+  )
+  // Suppress panel width CSS transitions while the user is dragging a resize handle
+  const [panelResizing, setPanelResizing] = useState(false)
+  // Top/bottom section height ratio in right panel (0-100, where value = preview percentage)
+  const [previewHeight, setPreviewHeight] = useState(40)
+  // Whether the right document panel is visible — hidden until "Start reviewing imports"
+  const [rightPanelVisible, setRightPanelVisible] = useState(false)
+  // Whether the right panel is animating out (slide-out before display:none)
+  const [rightPanelExiting, setRightPanelExiting] = useState(false)
+  // Agent panel view state: idle → loading → report → closing → idle
+  const [agentView, setAgentView] = useState<'idle' | 'loading' | 'report' | 'closing'>('idle')
+  // Right panel animating-in: true during the 'closing' state so enter CSS fires
+  const [rightPanelAnimating, setRightPanelAnimating] = useState(false)
+  // Whether YoY analysis is expanded (screen 4) — drives -15% badge on 1040
+  const [yoyExpanded, setYoyExpanded] = useState(false)
+  // Whether user navigated to source docs from the agent panel — shows back link
+  const [fromAgent, setFromAgent] = useState(false)
+  // Which agent subview to restore when going back to agent insights
+  // 'overview' = report overview, 'yoyDetail' = YoY detail pane open
+  const [agentSubView, setAgentSubView] = useState<'overview' | 'yoyDetail'>('overview')
+  // Notes / comments — persisted for C2 handoff
+  const NOTES_KEY = 'protoc2-notes'
+  const [notes, setNotes] = useState<Note[]>(() => {
+    try {
+      const raw = sessionStorage.getItem(NOTES_KEY)
+      if (raw) return JSON.parse(raw) as Note[]
+    } catch { /* ignore */ }
+    return []
+  })
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [notesClosing, setNotesClosing] = useState(false)
+
+  // C2: multi-pass handoff
+  type HandoffUi =
+    | null
+    | { kind: 'decide' }
+    | { kind: 'preview'; snapshot: HandoffSnapshot }
+  const [reviewPass, setReviewPass] = useState<1 | 2>(1)
+  const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>('preparer')
+  const [handoffUi, setHandoffUi] = useState<HandoffUi>(null)
+  /** Pass 2 open-items filter */
+  type Pass2Filter = 'all' | 'flags' | 'notes'
+  const [pass2Filter, setPass2Filter] = useState<Pass2Filter>('all')
+  const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
+  const actorLabel = reviewRole === 'reviewer' ? REVIEWER_NAME : PREPARER_NAME
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(NOTES_KEY, JSON.stringify(notes))
+    } catch { /* ignore */ }
+  }, [notes])
+
+  useEffect(() => {
+    setReviewActor(actorLabel)
+  }, [actorLabel])
+
+  // --- ProtoC: two-phase sequential review ------------------------------------
+  // 'welcome'     → Intuit Assist orientation screen
+  // 'import'      → Phase 1: Import Accuracy (source-doc experience)
+  // 'diagnostics' → Phase 2: AI Diagnostics (agent panel primary)
+  type ReviewPhase = 'welcome' | 'import' | 'diagnostics'
+  const [phase, setPhase] = useState<ReviewPhase>('welcome')
+  // Phase 1: Summary visible by default; sources hidden until Start reviewing imports
+  const [show1040, setShow1040] = useState(true)
+  const [outputFormId, setOutputFormId] = useState<OutputFormId>('summary')
+  const [importsStarted, setImportsStarted] = useState(false)
+  /** First-run coach tip: hide summary */
+  const [coachTip, setCoachTip] = useState<CoachTipId | null>(null)
+  /** One-shot nudge when Phase 1 is fully complete (flags + docs) */
+  const [continueDiagnosticsCoach, setContinueDiagnosticsCoach] = useState(false)
+  /** One-shot nudge after Phase 2 diagnostics are all reviewed */
+  const [outputFormsCoach, setOutputFormsCoach] = useState(false)
+  const [outputSourcesCoach, setOutputSourcesCoach] = useState(false)
+  /** Explicit left-panel px width during Summary collapse/expand (null = natural flex). */
+  const [leftAnimWidth, setLeftAnimWidth] = useState<number | null>(null)
+  /** Keep doc|Details side-by-side during Summary toggle so flexDirection doesn't flip mid-motion. */
+  const [freezePreviewSideBySide, setFreezePreviewSideBySide] = useState(false)
+  const [questionnaireHighlightId, setQuestionnaireHighlightId] = useState<QuestionnaireResponseId | null>(null)
+
+  // The import/OCR flags owned by Phase 1. Each key matches the reviewed-field key
+  // emitted by the DetailFields "Edit+Save" / "Mark as correct" controls.
+  const phase1Total = PHASE1_FLAG_KEYS.length
+  const phase1Resolved = PHASE1_FLAG_KEYS.filter(k => isPhase1FlagResolved(k, reviewedFields)).length
+  // Counter of unresolved import flags — never below 0
+  const phase1Remaining = countPhase1Remaining(reviewedFields)
+  const phase1Complete = phase1Remaining === 0
+  // Per-document unresolved counts for dynamic tab badges
+  const tabFlagCounts = getTabFlagCounts(reviewedFields)
+  const tabInitialFlagCounts = getTabInitialFlagCounts()
+  // PeelTab per-payer badges — unresolved Phase 1 import flags only (mirrors tabFlagCounts)
+  const divPayerFieldCounts: Record<DivPayer, number> = Object.fromEntries(
+    DIV_PAYER_TABS.map(({ key: p }) => [p, countPhase1FlagsForDivPayer(p, reviewedFields)])
+  ) as Record<DivPayer, number>
+  const intPayerFieldCounts: Record<IntPayer, number> = Object.fromEntries(
+    INT_PAYER_TABS.map(({ key: p }) => [p, countPhase1FlagsForIntPayer(p, reviewedFields)])
+  ) as Record<IntPayer, number>
+  const w2PayerFieldCounts: Record<W2Employer, number> = Object.fromEntries(
+    W2_PAYER_TABS.map(({ key: p }) => [p, countPhase1FlagsForW2Payer(p, reviewedFields)])
+  ) as Record<W2Employer, number>
+  const tabVerifiedKeys = buildTabVerifiedKeys()
+  const typeReviewed = buildTypeReviewed({
+    verifiedDocs,
+    w2Counts: w2PayerFieldCounts,
+    divCounts: divPayerFieldCounts,
+    intCounts: intPayerFieldCounts,
+    rRemaining: tabFlagCounts['1099-rs'] ?? 0,
+  })
+  const unreviewedSourceDocs = getUnreviewedSourceDocs({
+    verifiedDocs,
+    w2Counts: w2PayerFieldCounts,
+    divCounts: divPayerFieldCounts,
+    intCounts: intPayerFieldCounts,
+    rRemaining: tabFlagCounts['1099-rs'] ?? 0,
+  })
+  const unreviewedDocCount = unreviewedSourceDocs.length
+  const flagsCleared = phase1Complete
+  const phase1FullyComplete = flagsCleared && unreviewedDocCount === 0
+  // Phase 2 diagnostics progress — same dismiss rules AgentReportPane uses, so
+  // resolving Phase 1 flags / editing amounts that fix an insight keeps the banner in sync.
+  const phase2Progress = getPhase2Progress({
+    reviewedFields,
+    live: liveTotals,
+    amounts,
+  })
+  const phase2Reviewed = phase2Progress.reviewed
+  const phase2Total = phase2Progress.total
+  const phase2Complete = phase2Progress.complete
+  // ---------------------------------------------------------------------------
+
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const leftPanelRef = useRef<HTMLDivElement>(null)
+  const rightRef = useRef<HTMLDivElement>(null)
+  /** Split container for document preview ↔ Details (not the whole right panel). */
+  const splitPaneRef = useRef<HTMLDivElement>(null)
+  /** Right-panel width to restore when Show Summary expands again. */
+  const preCollapseRightWidthRef = useRef<number | null>(null)
+  const summaryToggleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (summaryToggleTimerRef.current) clearTimeout(summaryToggleTimerRef.current)
+  }, [])
+
+  const ensureSourcePanelVisible = useCallback(() => {
+    if (!rightPanelVisible) {
+      setRightPanelVisible(true)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setRightPanelAnimating(true)
+        setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
+      }))
+    }
+  }, [rightPanelVisible])
+
+  /** Hide the imported-documents panel with the same slide-out used by the toolbar toggle */
+  const handleCloseSourcePanel = useCallback(() => {
+    if (!rightPanelVisible || rightPanelExiting) return
+    setRightPanelExiting(true)
+    setTimeout(() => {
+      setRightPanelExiting(false)
+      setRightPanelVisible(false)
+    }, SOURCE_PANEL_EXIT_MS)
+  }, [rightPanelVisible, rightPanelExiting])
+
+  const startReviewingImports = useCallback(() => {
+    setImportsStarted(true)
+    // Keep Summary visible so the Hide Summary coach tip can teach the control
+    setShow1040(true)
+    const body = bodyRef.current
+    const bodyW = body
+      ? (body.clientWidth || body.getBoundingClientRect().width)
+      : window.innerWidth
+    setBodyWidth(bodyW)
+    // ~65% of body for Sources; Details stays full-width of Sources while
+    // Summary is open (stacked). Clamp so Summary stays ≥ LEFT_PANEL_MIN_WIDTH.
+    const preferred = Math.round(bodyW * 0.65)
+    const maxRight = Math.max(0, bodyW - LEFT_PANEL_MIN_WIDTH - PANEL_DRAG_HANDLE_WIDTH)
+    const floor = Math.min(RIGHT_PANEL_MIN_WIDTH, maxRight)
+    setRightPanelWidth(Math.max(floor, Math.min(preferred, maxRight)))
+    setRightPanelVisible(true)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setRightPanelAnimating(true)
+      setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
+    }))
+  }, [])
+
+  const dismissCoachTip = useCallback((id: CoachTipId) => {
+    markCoachTipShown(id)
+    setCoachTip(null)
+  }, [])
+
+  const dismissContinueDiagnosticsCoach = useCallback(() => {
+    markCoachTipShown('continueDiagnostics')
+    setContinueDiagnosticsCoach(false)
+  }, [])
+
+  const dismissOutputFormsCoach = useCallback(() => {
+    markCoachTipShown('outputForms')
+    setOutputFormsCoach(false)
+  }, [])
+
+  const dismissOutputSourcesCoach = useCallback(() => {
+    markCoachTipShown('outputSourcesFirst')
+    setOutputSourcesCoach(false)
+  }, [])
+
+  // First tip as soon as review starts: teach output→source on Summary (before docs open)
+  useEffect(() => {
+    if (phase !== 'import' || !show1040) return
+    if (readCoachTipShown('outputSourcesFirst')) return
+    setOutputFormId('summary')
+    setOutputSourcesCoach(true)
+  }, [phase, show1040])
+
+  // Second tip: Hide Summary / outputs — only after source docs are open
+  useEffect(() => {
+    if (phase !== 'import' || !importsStarted || !rightPanelVisible) return
+    if (!readCoachTipShown('hideSummary')) {
+      if (show1040) {
+        // Wait until sources tip is done so tips don’t stack
+        if (outputSourcesCoach || !readCoachTipShown('outputSourcesFirst')) return
+        setCoachTip('hideSummary')
+      } else {
+        markCoachTipShown('hideSummary')
+      }
+    }
+  }, [phase, importsStarted, rightPanelVisible, show1040, outputSourcesCoach])
+  // Continue-to-diagnostics nudge when Phase 1 is fully complete
+  useEffect(() => {
+    if (phase !== 'import' || !phase1FullyComplete) return
+    if (readCoachTipShown('continueDiagnostics')) return
+    setContinueDiagnosticsCoach(true)
+  }, [phase, phase1FullyComplete])
+
+  // Output-forms nudge when Phase 2 diagnostics are complete
+  useEffect(() => {
+    if (phase !== 'diagnostics' || !phase2Complete) return
+    if (readCoachTipShown('outputForms')) return
+    setOutputFormsCoach(true)
+  }, [phase, phase2Complete])
+
+  // If Hide Summary collapses while its tip is open, advance the sequence
+  useEffect(() => {
+    if (!show1040 && coachTip === 'hideSummary') {
+      dismissCoachTip('hideSummary')
+    }
+  }, [show1040, coachTip, dismissCoachTip])
+
+  // Field that the agent flagged as an issue — drives orange highlight mode
+  // Set when navigating to source docs from any issue detail pane
+  const [activeIssueField, setActiveIssueField] = useState<string | null>(null)
+
+  // Maps doc-overlay field keys → 1040 field keys (when they differ)
+  const DOC_FIELD_TO_1040: Record<string, string> = {
+    earlyWithdrawal: 'taxableInterest', // Box 2 flows to same 1040 line 2b
+  }
+
+  // issueField: the 1040 field currently flagged by the active agent issue
+  const issueField = (() => {
+    if (activeIssueField && (agentView === 'report' || agentView === 'closing' || fromAgent)) {
+      return DOC_FIELD_TO_1040[activeIssueField] ?? activeIssueField
+    }
+    if (agentSubView === 'yoyDetail' && (agentView === 'report' || agentView === 'closing')) return 'wages'
+    return null
+  })()
+  const highlightMode: 'orange' | 'blue' = phase === 'import'
+    ? 'blue'
+    : (selectedField && (selectedField === issueField || DOC_FIELD_TO_1040[selectedField] === issueField)) ? 'orange' : 'blue'
+
+  const applyVerifyNavigation = useCallback((field: string) => {
+    const nav = navigationForDetailField(field)
+    if (nav) {
+      setActiveTopTab(nav.tab)
+      if (nav.divPayer) setActiveDivPayer(nav.divPayer)
+      if (nav.intPayer) setActiveIntPayer(nav.intPayer)
+    }
+    setSelectedField(field)
+    if (!importsStarted) startReviewingImports()
+    else ensureSourcePanelVisible()
+  }, [
+    setActiveTopTab, setActiveDivPayer, setActiveIntPayer, setSelectedField,
+    importsStarted, startReviewingImports, ensureSourcePanelVisible,
+  ])
+
+  const handleVerifyNext = useCallback(() => {
+    if (!importsStarted) startReviewingImports()
+    const next = getNextVerifyItem(reviewedFields, selectedField)
+    if (!next) return
+    applyVerifyNavigation(next.field)
+  }, [importsStarted, startReviewingImports, reviewedFields, selectedField, applyVerifyNavigation])
+
+  const handleReviewNextDocument = useCallback(() => {
+    if (!importsStarted) startReviewingImports()
+    else ensureSourcePanelVisible()
+    const next = getNextUnreviewedSourceDoc(unreviewedSourceDocs, {
+      tab: activeTopTab,
+      w2SubTab: activeSubTab,
+      divPayer: activeDivPayer,
+      intPayer: activeIntPayer,
+    })
+    if (!next) return
+    setActiveTopTab(next.tab)
+    if (next.w2SubTab) setActiveSubTab(next.w2SubTab)
+    if (next.divPayer) setActiveDivPayer(next.divPayer)
+    if (next.intPayer) setActiveIntPayer(next.intPayer)
+    setSelectedField(null)
+    setActiveIssueField(null)
+    if (next.tab === 'questionnaire') setQuestionnaireHighlightId(null)
+  }, [
+    importsStarted, startReviewingImports, ensureSourcePanelVisible,
+    unreviewedSourceDocs, activeTopTab, activeSubTab, activeDivPayer, activeIntPayer,
+    setActiveTopTab, setActiveSubTab, setActiveDivPayer, setActiveIntPayer, setSelectedField,
+  ])
+
+  const handleFieldSelect = useCallback((field: string | null) => {
+    setSelectedField(field)
+    if (phase === 'import' && field) {
+      if (!importsStarted) startReviewingImports()
+      else ensureSourcePanelVisible()
+    }
+  }, [phase, setSelectedField, importsStarted, startReviewingImports, ensureSourcePanelVisible])
+
+  const handleNavigateToSourceDoc = useCallback((docId: string) => {
+    const nav = navigationForSourceDoc(docId)
+    if (!nav) return
+    setActiveTopTab(nav.tab)
+    if (nav.subTab) setActiveSubTab(nav.subTab)
+    if (nav.divPayer) setActiveDivPayer(nav.divPayer)
+    if (nav.intPayer) setActiveIntPayer(nav.intPayer)
+
+    if (!importsStarted) {
+      startReviewingImports()
+    } else if (agentView !== 'idle') {
+      setFromAgent(true)
+      setAgentSubView('overview')
+      setAgentView('closing')
+      setYoyExpanded(false)
+      setTimeout(() => setAgentView('idle'), 350)
+    } else {
+      ensureSourcePanelVisible()
+    }
+  }, [
+    agentView,
+    importsStarted,
+    startReviewingImports,
+    ensureSourcePanelVisible,
+    setActiveTopTab,
+    setActiveSubTab,
+    setActiveDivPayer,
+    setActiveIntPayer,
+  ])
+
+  /** From FieldPopover source row — jump to doc + highlight the matching detail field. */
+  const handleNavigateSource = useCallback((source: {
+    docId: string
+    detailFieldId: string
+    label: string
+  }) => {
+    handleNavigateToSourceDoc(source.docId)
+    setSelectedField(source.detailFieldId)
+  }, [handleNavigateToSourceDoc, setSelectedField])
+
+  const handle1040FieldClick = useCallback((field1040: string | null) => {
+    if (!field1040) {
+      setSelectedField(null)
+      return
+    }
+    const mapped = field1040ToDetail(field1040)
+    if (mapped) {
+      applyVerifyNavigation(mapped.field)
+    } else {
+      setSelectedField(field1040)
+    }
+  }, [applyVerifyNavigation, setSelectedField])
+
+  const highlightField1040 = get1040HighlightField(selectedField)
+
+  const sourceDocPreview = getSourceDocPreview({
+    activeTopTab,
+    activeSubTab,
+    activeIntPayer,
+    activeDivPayer,
+    prior1040Images: [img1040PriorPage1, img1040PriorPage2],
+  })
+
+  // Reset field selection on mount
+  useEffect(() => {
+    setSelectedField(null)
+  }, [])
+
+  // ProtoC: the agent panel is driven by the phase model (opens on entering Phase 2),
+  // not by the ?agent=true entry param. See handleBeginDiagnostics below.
+
+  const handleAgentOpen = (subView?: 'overview' | 'yoyDetail') => {
+    setSelectedField(null)
+    if (subView) setAgentSubView(subView)
+    const alreadyLoaded = sessionStorage.getItem('agentLoaded')
+    if (alreadyLoaded) {
+      setAgentView('report')
+    } else {
+      setAgentView('loading')
+      setTimeout(() => {
+        setAgentView('report')
+        sessionStorage.setItem('agentLoaded', '1')
+      }, 3200)
+    }
+  }
+
+  // ProtoC: Phase 1 → Phase 2 transition. Switches layout to agent-primary and
+  // opens the AI diagnostics panel (plays the loading animation once).
+  const handleBeginDiagnostics = () => {
+    dismissContinueDiagnosticsCoach()
+    setPhase('diagnostics')
+    setShow1040(true)          // 1040 visible by default in Phase 2 (context for diagnostics)
+    setSelectedField(null)
+    handleAgentOpen()
+  }
+
+  // ProtoC: return to Phase 1 (source docs) from the completion banner
+  const handleReturnToImport = () => {
+    if (agentView !== 'idle') handleAgentClose()
+    setPhase('import')
+    setShow1040(true)
+    setSelectedField(null)
+  }
+
+  const handleAgentClose = (preserveSelection = false) => {
+    setAgentView('closing')
+    setYoyExpanded(false)
+    if (!preserveSelection) {
+      setSelectedField(null)
+      setActiveIssueField(null)
+    }
+    // Step 1: agent plays panelSlideOut (350ms)
+    // Step 2: switch to idle (display:flex appears on right panel)
+    // Step 3: one rAF later, add the enter animation class (browser has painted display:flex)
+    setTimeout(() => {
+      setAgentView('idle')          // right panel: display:flex now
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { // second rAF: browser has rendered the flex layout
+          setRightPanelAnimating(true)
+          setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
+        })
+      })
+    }, 350)
+  }
+
+  const handleOpenNotes = () => setNotesOpen(true)
+  const handleCloseNotes = () => {
+    setNotesClosing(true)
+    setTimeout(() => { setNotesOpen(false); setNotesClosing(false) }, 200)
+  }
+  const formatNoteAt = () =>
+    new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+
+  const handleAddNote = (text: string, context?: string) => {
+    setNotes(prev => [...prev, {
+      id: `note-${Date.now()}`,
+      text,
+      author: getReviewActor(),
+      at: formatNoteAt(),
+      context,
+      status: 'open',
+      role: reviewRole,
+      replies: [],
+    }])
+    setNotesOpen(true)
+  }
+
+  const handleEditNote = (id: string, text: string) => {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, text, at: formatNoteAt() } : n))
+  }
+
+  const handleResolveNote = (id: string) => {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, status: 'resolved' as const } : n))
+  }
+
+  const handleReplyNote = (id: string, text: string) => {
+    setNotes(prev => prev.map(n => {
+      if (n.id !== id) return n
+      const reply = {
+        id: `reply-${Date.now()}`,
+        text,
+        author: getReviewActor(),
+        at: formatNoteAt(),
+        role: reviewRole,
+      }
+      return { ...n, replies: [...(n.replies ?? []), reply] }
+    }))
+  }
+
+  const openNotesFocus = (noteId?: string) => {
+    if (noteId) setFocusNoteId(noteId)
+    setNotesOpen(true)
+  }
+
+  const pass2FocusFields: Set<string> | null = (() => {
+    if (reviewRole !== 'reviewer' || pass2Filter === 'all') return null
+    if (pass2Filter === 'flags') return new Set(summaryFlaggedFields)
+    const set = new Set<string>()
+    for (const n of notes) {
+      if ((n.status ?? 'open') !== 'open') continue
+      if (n.context) set.add(n.context)
+    }
+    return set.size ? set : new Set(['__none__'])
+  })()
+
+  const buildSnapshot = (mode: HandoffMode): HandoffSnapshot =>
+    buildHandoffSnapshot(mode, reviewPass, actorLabel, {
+      reviewedFields,
+      verifiedDocs,
+      editedFields: editedFieldsMeta,
+      summaryChecked: summaryCheckedMeta,
+      summaryFlagged: summaryFlaggedMeta,
+      summaryFlagNotes,
+      notes,
+      amounts,
+    })
+
+  const handleWrapUpPass = () => setHandoffUi({ kind: 'decide' })
+
+  const handlePreviewFinishAndFile = () => {
+    setHandoffUi({ kind: 'preview', snapshot: buildSnapshot('finish-and-file') })
+  }
+
+  const handlePreviewPassToReviewer = () => {
+    setHandoffUi({ kind: 'preview', snapshot: buildSnapshot('pass-to-reviewer') })
+  }
+
+  const handleConfirmHandoffSend = () => {
+    setHandoffUi({ kind: 'preview', snapshot: buildSnapshot('awaiting-reviewer') })
+  }
+
+  const handleOpenAsReviewer = () => {
+    setReviewPass(2)
+    setReviewRole('reviewer')
+    setReviewActor(REVIEWER_NAME)
+    setHandoffUi(null)
+    setPhase('diagnostics')
+    setShow1040(true)
+    setOutputFormId('summary')
+    setAgentView('idle')
+    // Seed a preparer note if none exist so Pass 2 has something to resolve
+    setNotes(prev => {
+      if (prev.length > 0) return prev
+      return [{
+        id: 'note-seed-pass1',
+        text: 'Please confirm NIIT Form 8960 still applies after AGI tweak — SC',
+        author: PREPARER_NAME,
+        at: formatNoteAt(),
+        context: 'Form 8960',
+        status: 'open',
+        role: 'preparer',
+        replies: [],
+      }]
+    })
+  }
+
+  const handleFinishReviewerPass = () => setHandoffUi({ kind: 'decide' })
+
+  /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
+  const handleSwitchRole = (role: 'preparer' | 'reviewer') => {
+    if (role === 'reviewer') {
+      handleOpenAsReviewer()
+      setPass2Filter('flags')
+      return
+    }
+    setReviewRole('preparer')
+    setReviewPass(1)
+    setReviewActor(PREPARER_NAME)
+    setPass2Filter('all')
+    setFocusNoteId(null)
+  }
+
+  /**
+   * Shared drag bootstrap: pointer events + document-level move/up while dragging.
+   * Falls back cleanly if the gesture was not a primary button press.
+   */
+  const beginPanelDrag = useCallback((
+    e: React.PointerEvent,
+    cursor: string,
+    onMove: (clientX: number, clientY: number) => void,
+  ) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const target = e.currentTarget as HTMLElement
+    target.setPointerCapture?.(e.pointerId)
+    setPanelResizing(true)
+    document.body.style.cursor = cursor
+    document.body.style.userSelect = 'none'
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      onMove(moveEvent.clientX, moveEvent.clientY)
+    }
+    const onPointerUp = (upEvent: PointerEvent) => {
+      try { target.releasePointerCapture?.(upEvent.pointerId) } catch { /* already released */ }
+      document.removeEventListener('pointermove', onPointerMove)
+      document.removeEventListener('pointerup', onPointerUp)
+      document.removeEventListener('pointercancel', onPointerUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      setPanelResizing(false)
+    }
+
+    document.addEventListener('pointermove', onPointerMove)
+    document.addEventListener('pointerup', onPointerUp)
+    document.addEventListener('pointercancel', onPointerUp)
+  }, [])
+
+  // Horizontal drag between left panel and agent panel (resizes agent panel px width).
+  // Keep Summary ≥ LEFT_PANEL_MIN_WIDTH (795.7px) so breakdown labels aren’t truncated.
+  const handleAgentDrag = useCallback((e: React.PointerEvent) => {
+    const body = bodyRef.current
+    if (!body) return
+    const startX = e.clientX
+    const startPanelWidth = agentPanelWidth
+    beginPanelDrag(e, 'col-resize', (clientX) => {
+      const delta = startX - clientX // dragging left = wider agent panel
+      const bodyW = body.getBoundingClientRect().width
+      const preferredMax = bodyW - LEFT_PANEL_MIN_WIDTH - PANEL_DRAG_HANDLE_WIDTH
+      const upper = Math.min(bodyW * 0.7, Math.max(0, preferredMax))
+      const floor = Math.min(360, upper)
+      const next = startPanelWidth + delta
+      setAgentPanelWidth(Math.max(floor, Math.min(upper, next)))
+    })
+  }, [agentPanelWidth, beginPanelDrag])
+
+  // Horizontal drag between left panel and right panel (resizes rightPanelWidth).
+  // Keep Summary ≥ LEFT_PANEL_MIN_WIDTH (795.7px) so breakdown labels aren’t truncated.
+  const handleRightPanelDrag = useCallback((e: React.PointerEvent) => {
+    const body = bodyRef.current
+    if (!body) return
+    const startX = e.clientX
+    const startPanelWidth = rightPanelWidth
+    beginPanelDrag(e, 'col-resize', (clientX) => {
+      const delta = startX - clientX // dragging left = wider right panel
+      const bodyW = body.getBoundingClientRect().width
+      const preferredMax = bodyW - LEFT_PANEL_MIN_WIDTH - PANEL_DRAG_HANDLE_WIDTH
+      const upper = Math.min(bodyW * 0.75, Math.max(0, preferredMax))
+      const floor = Math.min(RIGHT_PANEL_MIN_WIDTH, upper)
+      const next = startPanelWidth + delta
+      setRightPanelWidth(Math.max(floor, Math.min(upper, next)))
+    })
+  }, [rightPanelWidth, beginPanelDrag])
+
+  // Keep bodyWidth in sync (Sources share of row uses rightPanelWidth / bodyWidth).
+  // Prefer clientWidth (scrollport) so overflowed content min-sizes don't inflate the ratio.
+  // Re-bind when phase changes so ProtoC attaches after leaving welcome (body mounts).
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body || typeof ResizeObserver === 'undefined') return
+    const update = () => setBodyWidth(body.clientWidth || body.getBoundingClientRect().width)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(body)
+    return () => ro.disconnect()
+  }, [phase])
+
+  // Clamp Sources width when the viewport shrinks so Summary stays ≥ LEFT_PANEL_MIN_WIDTH.
+  useEffect(() => {
+    if (bodyWidth <= 0 || !rightPanelVisible) return
+    const maxRight = Math.max(0, bodyWidth - LEFT_PANEL_MIN_WIDTH - PANEL_DRAG_HANDLE_WIDTH)
+    setRightPanelWidth((w) => Math.min(w, maxRight))
+  }, [bodyWidth, rightPanelVisible])
+
+  // Side-by-side (doc LEFT / Details RIGHT) when:
+  //   1. Hide Summary (!show1040), OR
+  //   2. Sources (right) panel is >60% of review body width
+  // Stacked (preview TOP / Details BOTTOM) when Summary is visible AND
+  // Sources panel is ≤60% of body.
+  // freezePreviewSideBySide holds orientation steady during Hide/Show Summary.
+  const sourcesPanelWide =
+    rightPanelVisible &&
+    !rightPanelExiting &&
+    bodyWidth > 0 &&
+    rightPanelWidth / bodyWidth > 0.6
+  const previewSideBySide = freezePreviewSideBySide || !show1040 || sourcesPanelWide
+  const inImportPhase = phase === 'import'
+
+  // Resize drag between the document preview and detail fields. Axis is frozen
+  // for the gesture (matches flexDirection at pointer-down). previewHeight
+  // only controls the split ratio — never orientation.
+  const handlePreviewDrag = useCallback((e: React.PointerEvent) => {
+    const split = splitPaneRef.current ?? rightRef.current
+    if (!split) return
+
+    // Freeze axis to the layout at pointer-down (matches flexDirection).
+    const stacked = !previewSideBySide
+    const startPos = stacked ? e.clientY : e.clientX
+    const startSize = previewHeight
+    beginPanelDrag(e, stacked ? 'row-resize' : 'col-resize', (clientX, clientY) => {
+      const pos = stacked ? clientY : clientX
+      const delta = pos - startPos
+      const rect = split.getBoundingClientRect()
+      const splitSize = stacked ? rect.height : rect.width
+      if (splitSize <= 0) return
+      setPreviewHeight(Math.max(20, Math.min(75, startSize + (delta / splitSize) * 100)))
+    })
+  }, [previewHeight, previewSideBySide, beginPanelDrag])
+
+  // While Summary is animating or collapsed, right/agent panel flex-fills
+  const rightPanelFills = (!show1040 || leftAnimWidth !== null) && (rightPanelVisible || agentView !== 'idle')
+
+  const handleHideSummary = useCallback(() => {
+    const body = bodyRef.current
+    const left = leftPanelRef.current
+    if (!body) {
+      setShow1040(false)
+      return
+    }
+    const bodyW = body.clientWidth || body.getBoundingClientRect().width
+    const leftW = left?.getBoundingClientRect().width
+      ?? Math.max(0, bodyW - rightPanelWidth - PANEL_DRAG_HANDLE_WIDTH)
+    preCollapseRightWidthRef.current = rightPanelWidth
+    // If doc|Details is already side-by-side, keep that axis for the whole motion.
+    if (previewSideBySide) setFreezePreviewSideBySide(true)
+
+    // Frame 1: lock left at its current pixel width (right switches to flex-fill
+    // via leftAnimWidth !== null) — visually identical, no reflow jump.
+    setLeftAnimWidth(leftW)
+    if (summaryToggleTimerRef.current) clearTimeout(summaryToggleTimerRef.current)
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setShow1040(false)
+        setLeftAnimWidth(0)
+      })
+    })
+
+    summaryToggleTimerRef.current = setTimeout(() => {
+      setLeftAnimWidth(null)
+      setFreezePreviewSideBySide(false)
+      summaryToggleTimerRef.current = null
+    }, SUMMARY_TOGGLE_MS)
+  }, [previewSideBySide, rightPanelWidth])
+
+  const handleShowSummary = useCallback(() => {
+    const body = bodyRef.current
+    const bodyW = body
+      ? (body.clientWidth || body.getBoundingClientRect().width)
+      : window.innerWidth
+    const restoreWidth = preCollapseRightWidthRef.current
+      ?? Math.max(480, Math.round(bodyW * 0.65))
+    const targetLeft = Math.max(0, bodyW - restoreWidth - PANEL_DRAG_HANDLE_WIDTH)
+    // Keep side-by-side frozen when restoring into a wide Sources layout.
+    if (restoreWidth / bodyW > 0.6) setFreezePreviewSideBySide(true)
+
+    setLeftAnimWidth(0)
+    setShow1040(true)
+    if (summaryToggleTimerRef.current) clearTimeout(summaryToggleTimerRef.current)
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setLeftAnimWidth(targetLeft)
+        setRightPanelWidth(restoreWidth)
+      })
+    })
+
+    summaryToggleTimerRef.current = setTimeout(() => {
+      setLeftAnimWidth(null)
+      setFreezePreviewSideBySide(false)
+      preCollapseRightWidthRef.current = null
+      summaryToggleTimerRef.current = null
+    }, SUMMARY_TOGGLE_MS)
+  }, [])
+
+  // ProtoC: welcome/orientation screen is the entry point (no header chrome)
+  if (phase === 'welcome') {
+    return (
+      <div className={styles.page}>
+        <WelcomePane
+          clientName="Jessica Drake"
+          flagCount={phase1Total}
+          onBegin={() => {
+            setPhase('import')
+            setShow1040(true)
+            setOutputFormId('summary')
+            setRightPanelVisible(false)
+            setImportsStarted(false)
+            // Fresh review — always show the sources tip first
+            try { sessionStorage.removeItem('protoc2-coach-tip:outputSourcesFirst') } catch { /* ignore */ }
+            setOutputSourcesCoach(true)
+          }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.page}>
+      {reviewRole === 'reviewer' && (
+        <div className={handoffStyles.passBar} role="status">
+          <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
+          <span>· Pass {reviewPass} · {REVIEWER_NAME}</span>
+          <div className={handoffStyles.filterChips} role="group" aria-label="Open items filter">
+            {([
+              ['all', 'All'],
+              ['flags', 'Open flags'],
+              ['notes', 'Unresolved notes'],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`${handoffStyles.filterChip} ${pass2Filter === id ? handoffStyles.filterChipActive : ''}`}
+                onClick={() => {
+                  setPass2Filter(id)
+                  if (id === 'notes') {
+                    const open = notes.find(n => (n.status ?? 'open') === 'open')
+                    openNotesFocus(open?.id)
+                  } else if (id === 'flags') {
+                    const first = [...summaryFlaggedFields][0]
+                    if (first) {
+                      setSelectedField(first)
+                      setShow1040(true)
+                      setOutputFormId('summary')
+                    }
+                  }
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button type="button" className={handoffStyles.passBarLink} onClick={handleFinishReviewerPass}>
+            Finish reviewer pass
+          </button>
+          <button
+            type="button"
+            className={handoffStyles.passBarLink}
+            onClick={() => setHandoffUi({ kind: 'preview', snapshot: buildSnapshot('pass-to-reviewer') })}
+          >
+            View handoff
+          </button>
+        </div>
+      )}
+      {/* Header */}
+      <div className={styles.header}>
+        <div className={styles.headerLeft}>
+          <span className={styles.headerTitle}>Data Review - Form 1040</span>
+          <span className={handoffStyles.roleSwitcher} role="group" aria-label="Demo role">
+            <button
+              type="button"
+              className={`${handoffStyles.roleBtn} ${reviewRole === 'preparer' ? handoffStyles.roleBtnActive : ''}`}
+              onClick={() => handleSwitchRole('preparer')}
+            >
+              Preparer
+            </button>
+            <button
+              type="button"
+              className={`${handoffStyles.roleBtn} ${reviewRole === 'reviewer' ? handoffStyles.roleBtnActive : ''}`}
+              onClick={() => handleSwitchRole('reviewer')}
+            >
+              Reviewer
+            </button>
+          </span>
+        </div>
+        <div className={styles.headerRight}>
+
+          <button
+            className={`${styles.intuitIntelBtn} ${notesOpen ? styles.intuitIntelBtnActive : ''}`}
+            aria-label="Comments"
+            style={{ position: 'relative' }}
+            onClick={notesOpen ? handleCloseNotes : handleOpenNotes}
+          >
+            <Comment size="medium" />
+            <span className={styles.intuitIntelLabel}>Comments</span>
+            {notes.length > 0 && (
+              <span className={styles.notesBadge}>{notes.length}</span>
+            )}
+          </button>
+          <button
+            className={`${styles.intuitIntelBtn} ${rightPanelVisible && agentView === 'idle' ? styles.intuitIntelBtnActive : ''}`}
+            aria-label="Toggle panel"
+            onClick={() => {
+              if (agentView !== 'idle') {
+                handleAgentClose()
+              } else if (rightPanelVisible) {
+                handleCloseSourcePanel()
+              } else if (importsStarted) {
+                setRightPanelVisible(true)
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                  setRightPanelAnimating(true)
+                  setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
+                }))
+              } else {
+                // Same as Phase 1 banner CTA — open sources and mark imports started
+                startReviewingImports()
+              }
+            }}
+          >
+            <Panel size="medium" />
+            <span className={styles.intuitIntelLabel}>Source Documents</span>
+          </button>
+          {/* ProtoC: AI Review is Phase 2 only — hidden during Phase 1 (import accuracy) */}
+          {!inImportPhase && (
+            <button
+              className={`${styles.intuitIntelBtn} ${agentView !== 'idle' ? styles.intuitIntelBtnActive : ''}`}
+              aria-label="Intuit Intelligence"
+              onClick={() => handleAgentOpen()}
+            >
+              <img src={intuitAssistIcon} alt="" className={styles.intuitIntelIcon} />
+              <span className={styles.intuitIntelLabel}>AI Review</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ProtoC Phase 1 — Import Accuracy banner (flags-only gate for Phase 2 CTA) */}
+      {inImportPhase && (
+        <Phase1Banner
+          resolved={phase1Resolved}
+          total={phase1Total}
+          flagsCleared={flagsCleared}
+          unreviewedDocCount={unreviewedDocCount}
+          complete={phase1FullyComplete}
+          onContinue={handleBeginDiagnostics}
+          importsStarted={importsStarted}
+          onStartImports={startReviewingImports}
+          continueCoachOpen={continueDiagnosticsCoach}
+          onDismissContinueCoach={dismissContinueDiagnosticsCoach}
+        />
+      )}
+
+      {/* ProtoC Phase 2 — AI Diagnostics banner. Shares Phase1Banner's visual language
+          (Intuit Assist icon, title/subtitle, progress) so both phases feel like one
+          continuous guided experience rather than two disconnected screens. */}
+      {!inImportPhase && (
+        <Phase2Banner
+          reviewed={phase2Reviewed}
+          total={phase2Total}
+          complete={phase2Complete}
+        />
+      )}
+
+      {/* Body — left panel + drag handle + right panel + agent panel */}
+      <div className={styles.body} ref={bodyRef}>
+        {/* ProtoC Phase 1: 1040 is minimized by default — collapsed to a compact button
+            pinned near the top of the column. Expanding grows the panel horizontally, so
+            the chevron points right (expand) / left (collapse) rather than up/down. Left
+            panel stays mounted and animates width/opacity (same pattern as .rightPanel)
+            so the transition is smooth. */}
+        {/* Collapsed "Show outputs" edge tab — available in import and AI phases */}
+        <div
+          className={styles.form1040HandleWrap}
+          style={{
+            width: show1040 ? 0 : SHOW_SUMMARY_HANDLE_WIDTH,
+            opacity: show1040 ? 0 : 1,
+            pointerEvents: show1040 ? 'none' : 'auto',
+            transition: panelResizing ? 'none' : undefined,
+          }}
+        >
+          <button
+            className={styles.form1040Handle}
+            onClick={handleShowSummary}
+            aria-label="Show outputs"
+          >
+            <ChevronRight size="small" className={styles.form1040HandleIcon} />
+            <span className={styles.form1040HandleLabel}>Show outputs</span>
+          </button>
+        </div>
+        <div
+          ref={leftPanelRef}
+          className={styles.leftPanel}
+          style={{
+            /* During toggle, drive an explicit px width so min-width→0 and collapse
+               interpolate together; otherwise flex:1 grows into remaining space. */
+            flex: leftAnimWidth !== null
+              ? `0 0 ${leftAnimWidth}px`
+              : !show1040 ? '0 0 0px' : 1,
+            width: leftAnimWidth !== null
+              ? leftAnimWidth
+              : !show1040 ? 0 : undefined,
+            opacity: !show1040 ? 0 : 1,
+            /* Keep Summary ≥ 795.7px so Return Breakdown labels aren’t truncated.
+               Collapse animation / Hide outputs still use minWidth 0. */
+            minWidth: leftAnimWidth !== null || !show1040
+              ? 0
+              : LEFT_PANEL_MIN_WIDTH,
+            transition: panelResizing ? 'none' : undefined,
+          }}
+        >
+          {show1040 && (rightPanelVisible || notesOpen || (!inImportPhase && agentView !== 'idle')) && (
+            <CoachTip
+              open={coachTip === 'hideSummary'}
+              title="Hide outputs"
+              message="Need more room for source documents? Hide outputs to collapse this panel. You can bring it back anytime with Show outputs."
+              onClose={() => dismissCoachTip('hideSummary')}
+              position="bottom"
+              alignment="left"
+            >
+              <Button
+                priority="secondary"
+                size="small"
+                className={styles.form1040HideBtn}
+                onClick={() => {
+                  if (coachTip === 'hideSummary') dismissCoachTip('hideSummary')
+                  handleHideSummary()
+                }}
+                aria-label="Hide outputs"
+              >
+                <ChevronLeft size="small" /> Hide outputs
+              </Button>
+            </CoachTip>
+          )}
+          <LeftPanel1040
+            selectedField={selectedField}
+            highlightField={highlightField1040}
+            onFieldClick={inImportPhase ? handle1040FieldClick : setSelectedField}
+            total1a={total1a}
+            wages={wages}
+            yoyExpanded={yoyExpanded || agentSubView === 'yoyDetail' || activeTopTab === 'prior-1040' || phase === 'diagnostics'}
+            reviewedFields={reviewedFields}
+            checkedFields={summaryCheckedFields}
+            checkedMeta={summaryCheckedMeta}
+            onToggleChecked={toggleSummaryChecked}
+            flaggedFields={summaryFlaggedFields}
+            flaggedMeta={summaryFlaggedMeta}
+            onToggleFlagged={toggleSummaryFlagged}
+            flagNotes={summaryFlagNotes}
+            flagActivity={summaryFlagActivity}
+            onSetFlagNote={setSummaryFlagNote}
+            issueField={issueField}
+            liveTotals={liveTotals}
+            liveAmounts={amounts}
+            editedFields={editedFields}
+            outputFormId={outputFormId}
+            onOutputFormChange={setOutputFormId}
+            outputFormsCoachOpen={outputFormsCoach}
+            onDismissOutputFormsCoach={dismissOutputFormsCoach}
+            outputSourcesCoachOpen={outputSourcesCoach}
+            onDismissOutputSourcesCoach={dismissOutputSourcesCoach}
+            focusFields={pass2FocusFields}
+            onAddFieldNote={(text, context) => handleAddNote(text, context)}
+            onNavigateToSourceDoc={handleNavigateToSourceDoc}
+            onNavigateSource={handleNavigateSource}
+            onViewSource={(fieldName, sourceLabel) => {
+              // Map field → document tab
+              const tabMap: Record<string, typeof activeTopTab> = {
+                wages:           'w2s',
+                w2Withholding:   'w2s',
+                withholding:     '1099-divs',
+                taxableInterest: '1099-ints',
+                qualifiedDivs:   '1099-divs',
+                ordinaryDivs:    '1099-divs',
+                withholding1099: '1099-rs',
+                iraDistrib:      '1099-rs',
+                otherIncome:     '1099-necs',
+                capitalGain:     'w2s',
+                stdDeduction:    'w2s',
+                agi:             'prior-1040',
+                totalTax:        'prior-1040',
+                amountOwed:      'prior-1040',
+                totalPayments:   'prior-1040',
+              }
+              const tab = tabMap[fieldName] ?? 'w2s'
+              setActiveTopTab(tab)
+
+              // Navigate to the correct W-2 sub-tab based on source label
+              if (tab === 'w2s' && sourceLabel) {
+                const lc = sourceLabel.toLowerCase()
+                if (lc.includes('tech circle')) setActiveSubTab('techCircle')
+              }
+
+              if (!importsStarted) {
+                startReviewingImports()
+              } else if (agentView !== 'idle') {
+                // Agent is open — close it preserving the field selection
+                setFromAgent(true)
+                setAgentSubView('overview')
+                handleAgentClose(true)
+              } else {
+                ensureSourcePanelVisible()
+              }
+            }}
+          />
+        </div>
+
+        {/* Left/right drag handle — stays mounted and collapses width with Summary
+            so the gutter doesn't pop out of the row mid-animation. */}
+        {agentView === 'idle' && rightPanelVisible && !rightPanelExiting && (
+              <div
+                className={`${dragStyles.handleVertical} ${styles.summarySplitter}`}
+                onPointerDown={show1040 ? handleRightPanelDrag : undefined}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize Summary and Source Documents"
+                aria-hidden={!show1040}
+                style={{
+                  width: !show1040 ? 0 : PANEL_DRAG_HANDLE_WIDTH,
+                  opacity: !show1040 ? 0 : 1,
+                  pointerEvents: !show1040 ? 'none' : 'auto',
+                  transition: panelResizing ? 'none' : undefined,
+                }}
+              >
+                <VerticalGripIcon />
+              </div>
+            )}
+
+            {/* Right panel — always in DOM, width animates to 0 when hidden. During Summary
+                toggle/collapse it flex-fills so it grows as the left width eases to 0
+                (no hard px→flex flip after the row is already side-by-side). */}
+            <div
+              className={`${styles.rightPanel} ${rightPanelAnimating ? styles.rightPanelEntering : ''} ${rightPanelExiting ? styles.rightPanelExiting : ''} ${rightPanelFills ? styles.rightPanelFills : ''}`}
+              ref={rightRef}
+              style={{
+                width: (agentView === 'loading' || agentView === 'report' || agentView === 'closing' || (!rightPanelVisible && !rightPanelExiting))
+                  ? 0
+                  : rightPanelFills ? undefined : rightPanelWidth,
+                flex: (rightPanelFills && rightPanelVisible)
+                  ? '1 1 0%'
+                  : '0 0 auto',
+                minWidth: 0,
+                overflow: 'hidden',
+                opacity: (agentView === 'loading' || agentView === 'report' || agentView === 'closing' || (!rightPanelVisible && !rightPanelExiting)) ? 0 : 1,
+                transition: panelResizing ? 'none' : undefined,
+              }}
+            >
+              {/* Source panel header — title left; Close on right */}
+              <div className={styles.sourcePanelHeader}>
+                {/* "Back to agent insights" only makes sense in Phase 2, after navigating from the agent */}
+                {!inImportPhase && fromAgent && agentView === 'idle' && rightPanelVisible ? (
+                  <button
+                    className={styles.agentBackBtn}
+                    onClick={() => { setFromAgent(false); setActiveIssueField(null); handleAgentOpen(agentSubView) }}
+                  >
+                    <ChevronLeft size="small" /> Back to agent insights
+                  </button>
+                ) : (
+                  <span className={styles.sourcePanelTitle}>Imported documents</span>
+                )}
+                <div className={styles.sourcePanelActions}>
+                  <IconControl
+                    size="small"
+                    aria-label="Close"
+                    onClick={handleCloseSourcePanel}
+                  >
+                    <Close size="small" />
+                  </IconControl>
+                </div>
+              </div>
+              {inImportPhase && phase1Remaining > 0 && (
+                <Phase1IssueBanner
+                  mode="flags"
+                  unresolvedCount={phase1Remaining}
+                  onVerify={handleVerifyNext}
+                />
+              )}
+              {inImportPhase && flagsCleared && unreviewedDocCount > 0 && !phase1FullyComplete && (
+                <Phase1IssueBanner
+                  mode="documents"
+                  unreviewedDocCount={unreviewedDocCount}
+                  onReviewNextDocument={handleReviewNextDocument}
+                />
+              )}
+              <ReviewTab
+                activeTopTab={activeTopTab}
+                flagCounts={inImportPhase ? tabFlagCounts : undefined}
+                initialFlagCounts={inImportPhase ? tabInitialFlagCounts : undefined}
+                verifiedDocs={verifiedDocs}
+                tabVerifiedKeys={tabVerifiedKeys}
+                typeReviewed={inImportPhase ? typeReviewed : undefined}
+                onTopTabChange={(tab) => {
+                  setActiveTopTab(tab)
+                  setFromAgent(false)
+                  setSelectedField(null)
+                  setActiveIssueField(null)
+                }}
+              />
+
+              {/* Peel tabs — payer switcher for multi-payer doc types */}
+              {activeTopTab === '1099-divs' && (
+                <PeelTab
+                  tabs={DIV_PAYER_TABS.map(t => ({
+                    ...t,
+                    badge: divPayerFieldCounts[t.key],
+                    showClearedCheck: isDocReviewed(
+                      verifiedDocs,
+                      divVerifiedDocKey(t.key),
+                      divPayerFieldCounts[t.key],
+                      getInitialDivPayerFlagCount(t.key),
+                    ),
+                  }))}
+                  activeKey={activeDivPayer}
+                  onChange={key => setActiveDivPayer(key as DivPayer)}
+                />
+              )}
+              {activeTopTab === '1099-ints' && (
+                <PeelTab
+                  tabs={INT_PAYER_TABS.map(t => ({
+                    ...t,
+                    badge: intPayerFieldCounts[t.key],
+                    showClearedCheck: isDocReviewed(
+                      verifiedDocs,
+                      intVerifiedDocKey(t.key),
+                      intPayerFieldCounts[t.key],
+                      getInitialIntPayerFlagCount(t.key),
+                    ),
+                  }))}
+                  activeKey={activeIntPayer}
+                  onChange={key => setActiveIntPayer(key as IntPayer)}
+                />
+              )}
+              {activeTopTab === 'w2s' && (
+                <PeelTab
+                  tabs={W2_PAYER_TABS.map(t => ({
+                    ...t,
+                    badge: w2PayerFieldCounts[t.key],
+                    showClearedCheck: isDocReviewed(
+                      verifiedDocs,
+                      t.key,
+                      w2PayerFieldCounts[t.key],
+                      getInitialW2PayerFlagCount(t.key),
+                    ),
+                  }))}
+                  activeKey={activeSubTab}
+                  onChange={key => setActiveSubTab(key as W2Employer)}
+                />
+              )}
+              {activeTopTab === '1099-rs' && (
+                <PeelTab
+                  tabs={R_PAYER_TABS.map(t => ({
+                    ...t,
+                    badge: tabFlagCounts['1099-rs'],
+                    showClearedCheck: isDocReviewed(
+                      verifiedDocs,
+                      '1099-r',
+                      tabFlagCounts['1099-rs'],
+                      getInitialRPayerFlagCount(),
+                    ),
+                  }))}
+                  activeKey="meridian"
+                  onChange={() => {}}
+                />
+              )}
+              {activeTopTab === '1099-necs' && (
+                <PeelTab
+                  tabs={NEC_PAYER_TABS.map(t => ({
+                    ...t,
+                    badge: 0,
+                    showClearedCheck: verifiedDocs.has('1099-nec'),
+                  }))}
+                  activeKey="summit"
+                  onChange={() => {}}
+                />
+              )}
+
+              {/* Document preview + detail fields. flex-basis % (not width/height alone)
+                  so the six-dot handle can shrink the preview even when the document
+                  image has a large intrinsic min-size. */}
+              <div
+                ref={splitPaneRef}
+                style={{
+                  display: 'flex',
+                  flex: 1,
+                  minHeight: 0,
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  flexDirection: previewSideBySide ? 'row' : 'column',
+                }}
+              >
+              {activeTopTab !== 'questionnaire' && (
+              <>
+              <div style={previewSideBySide
+                ? {
+                    flex: `0 0 ${previewHeight}%`,
+                    overflow: 'hidden',
+                    borderRight: '1px solid #D5DEE3',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: 0,
+                    minWidth: 0,
+                  }
+                : {
+                    flex: `0 0 ${previewHeight}%`,
+                    overflow: 'hidden',
+                    borderBottom: '1px solid #D5DEE3',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: 0,
+                    minWidth: 0,
+                  }
+              }>
+                <DocumentPreview
+                  imageSrc={sourceDocPreview.imageSrc}
+                  alt={sourceDocPreview.alt}
+                  customContent={
+                    sourceDocPreview.useInt1099UnwaveringHtml
+                      ? <Int1099FormPreview />
+                      : undefined
+                  }
+                />
+              </div>
+
+              {/* Drag handle — vertical (col-resize) side by side, horizontal (row-resize) stacked */}
+              <div
+                className={previewSideBySide ? dragStyles.handleVertical : dragStyles.handleHorizontal}
+                onPointerDown={handlePreviewDrag}
+                role="separator"
+                aria-orientation={previewSideBySide ? 'vertical' : 'horizontal'}
+                aria-label="Resize document preview and Details"
+              >
+                <DotsSix size="small" className={`${dragStyles.handleIcon} ${previewSideBySide ? '' : dragStyles.rotated90}`} />
+              </div>
+              </>
+              )}
+
+              {/* Detail fields — switches based on active tab */}
+              <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              {activeTopTab === 'w2s' && (
+                <DetailFields
+                  formTitle="Details: Wages, Salaries, Tips (W-2)"
+                  selectedField={selectedField}
+                  highlightMode={highlightMode}
+                  onFieldSelect={handleFieldSelect}
+                  activeSubTab={activeSubTab}
+                  onSubTabChange={(tab) => setActiveSubTab(tab as W2Employer)}
+                  wages={{ bingEquipment: 0, techCircle: wages.techCircle }}
+                  onWageChange={(employer, value) => {
+                    setWages({ ...wages, [employer]: value })
+                    markEdited(`wages-${employer}`)
+                  }}
+                  fieldValues={{ ...fieldValues, withholding: fieldValues.withholding[activeSubTab] }}
+                  onFieldValueChange={(key, value) => {
+                    if (key === 'withholding' && typeof value === 'number') {
+                      updateField('withholding', { techCircle: value })
+                      markEdited('withholding')
+                    } else {
+                      updateField(key as keyof typeof fieldValues, value as number)
+                      markEdited(String(key))
+                    }
+                  }}
+                  box12Rows={amounts.box12Rows}
+                  onBox12RowChange={(sub, patch) => {
+                    updateAmounts({
+                      box12Rows: {
+                        ...amounts.box12Rows,
+                        [sub]: { ...amounts.box12Rows[sub], ...patch },
+                      },
+                    })
+                    markEdited(`box12${sub}-${activeSubTab}`)
+                  }}
+                  onIdentityChange={(kind, value) => {
+                    if (kind === 'ssn') updateAmounts({ employeeSsn: value })
+                    else updateAmounts({ employerEin: value })
+                    markEdited(kind === 'ssn' ? 'ssn-techCircle' : 'ein-techCircle')
+                  }}
+                  identityValues={{ ssn: amounts.employeeSsn, ein: amounts.employerEin }}
+                  box13={{
+                    retirementPlan: amounts.box13RetirementPlan,
+                    statutoryEmployee: amounts.box13StatutoryEmployee,
+                    thirdPartySickPay: amounts.box13ThirdPartySickPay,
+                  }}
+                  onBox13Change={patch => {
+                    updateAmounts({
+                      ...(patch.retirementPlan !== undefined
+                        ? { box13RetirementPlan: patch.retirementPlan }
+                        : {}),
+                      ...(patch.statutoryEmployee !== undefined
+                        ? { box13StatutoryEmployee: patch.statutoryEmployee }
+                        : {}),
+                      ...(patch.thirdPartySickPay !== undefined
+                        ? { box13ThirdPartySickPay: patch.thirdPartySickPay }
+                        : {}),
+                    })
+                    markEdited('box13')
+                  }}
+                  onMarkReviewed={handleMarkReviewed}
+                  onMarkReviewedBulk={handleMarkReviewedBulk}
+                  reviewedFields={reviewedFields}
+                  editedFields={editedFields}
+                  editedFieldsMeta={editedFieldsMeta}
+                  fieldOverrides={fieldOverrides}
+                  onFieldOverride={setFieldOverride}
+                  verifiedDocs={verifiedDocs}
+                  verifiedDocsMeta={verifiedDocsMeta}
+                  onVerifyDoc={toggleVerifiedDoc}
+                  flaggedFields={{
+                    ssn: PHASE1_FLAG_MESSAGES.w2.ssn,
+                    wages: PHASE1_FLAG_MESSAGES.w2.wages,
+                    box12: PHASE1_FLAG_MESSAGES.w2.box12,
+                    ein: PHASE1_FLAG_MESSAGES.w2.ein,
+                  }}
+                />
+              )}
+              {activeTopTab === '1099-divs' && (
+                <DetailFieldsDiv
+                  activePayer={activeDivPayer}
+                  selectedField={selectedField}
+                  highlightMode={highlightMode}
+                  onFieldSelect={handleFieldSelect}
+                  fieldValues={{ ...fieldValues, withholding: totalWithholding, divWithholding: amounts.divWithholding }}
+                  onFieldValueChange={(key, value) => {
+                    updateField(key as keyof typeof fieldValues, value)
+                    markEdited(String(key))
+                  }}
+                  onAmountChange={(patch, editedKey) => {
+                    updateAmounts(patch)
+                    if (editedKey) markEdited(editedKey)
+                  }}
+                  amounts={amounts}
+                  onMarkReviewed={handleMarkReviewed}
+                  onMarkReviewedBulk={handleMarkReviewedBulk}
+                  reviewedFields={reviewedFields}
+                  editedFields={editedFields}
+                  fieldOverrides={fieldOverrides}
+                  onFieldOverride={setFieldOverride}
+                  verifiedDocs={verifiedDocs}
+                  onVerifyDoc={toggleVerifiedDoc}
+                  flaggedFields={{
+                    divCollectibles: PHASE1_FLAG_MESSAGES.div.divCollectibles,
+                    divNonDiv: PHASE1_FLAG_MESSAGES.div.divNonDiv,
+                    fedTaxWithheld: PHASE1_FLAG_MESSAGES.div.fedTaxWithheld,
+                    ordinaryDivs: PHASE1_FLAG_MESSAGES.div.ordinaryDivs,
+                  }}
+                  onAddFieldNote={(text, context) => handleAddNote(text, context)}
+                />
+              )}
+              {activeTopTab === '1099-ints' && (
+                <DetailFields1099
+                  activePayer={activeIntPayer}
+                  selectedField={selectedField}
+                  highlightMode={highlightMode}
+                  onFieldSelect={handleFieldSelect}
+                  fieldValues={{ ...fieldValues, withholding: totalWithholding }}
+                  onFieldValueChange={(key, value) => {
+                    updateField(key as keyof typeof fieldValues, value)
+                    markEdited(String(key))
+                  }}
+                  onAmountChange={(patch, editedKey) => {
+                    updateAmounts(patch)
+                    if (editedKey) markEdited(editedKey)
+                  }}
+                  amounts={amounts}
+                  onMarkReviewed={handleMarkReviewed}
+                  onMarkReviewedBulk={handleMarkReviewedBulk}
+                  reviewedFields={reviewedFields}
+                  editedFields={editedFields}
+                  editedFieldsMeta={editedFieldsMeta}
+                  fieldOverrides={fieldOverrides}
+                  onFieldOverride={setFieldOverride}
+                  verifiedDocs={verifiedDocs}
+                  verifiedDocsMeta={verifiedDocsMeta}
+                  onVerifyDoc={toggleVerifiedDoc}
+                  flaggedFields={{
+                    taxableInterest: PHASE1_FLAG_MESSAGES.int.taxableInterest,
+                  }}
+                  onAddFieldNote={(text, context) => handleAddNote(text, context)}
+                />
+              )}
+              {activeTopTab === '1099-rs' && (
+                <DetailFields1099R
+                  selectedField={selectedField}
+                  highlightMode={highlightMode}
+                  onFieldSelect={handleFieldSelect}
+                  amounts={amounts}
+                  onAmountChange={(patch, editedKey) => {
+                    updateAmounts(patch)
+                    if (editedKey) markEdited(editedKey)
+                  }}
+                  onMarkReviewed={handleMarkReviewed}
+                  onMarkReviewedBulk={handleMarkReviewedBulk}
+                  reviewedFields={reviewedFields}
+                  editedFields={editedFields}
+                  fieldOverrides={fieldOverrides}
+                  onFieldOverride={setFieldOverride}
+                  verifiedDocs={verifiedDocs}
+                  onVerifyDoc={toggleVerifiedDoc}
+                  flaggedFields={{ grossDistrib: PHASE1_FLAG_MESSAGES.r.grossDistrib }}
+                  onAddFieldNote={(text, context) => handleAddNote(text, context)}
+                />
+              )}
+              {activeTopTab === '1099-necs' && (
+                <DetailFieldsNec
+                  selectedField={selectedField}
+                  highlightMode={highlightMode}
+                  onFieldSelect={handleFieldSelect}
+                  amounts={amounts}
+                  onAmountChange={(patch, editedKey) => {
+                    updateAmounts(patch)
+                    if (editedKey) markEdited(editedKey)
+                  }}
+                  onMarkReviewed={handleMarkReviewed}
+                  onMarkReviewedBulk={handleMarkReviewedBulk}
+                  reviewedFields={reviewedFields}
+                  editedFields={editedFields}
+                  fieldOverrides={fieldOverrides}
+                  onFieldOverride={setFieldOverride}
+                  verifiedDocs={verifiedDocs}
+                  onVerifyDoc={toggleVerifiedDoc}
+                  onAddFieldNote={(text, context) => handleAddNote(text, context)}
+                />
+              )}
+              {activeTopTab === 'prior-1040' && (
+                <PriorYear1040Fields
+                  selectedField={selectedField}
+                  highlightMode={highlightMode}
+                  onFieldSelect={handleFieldSelect}
+                  onMarkReviewed={handleMarkReviewed}
+                  reviewedFields={reviewedFields}
+                  onAddFieldNote={(text, context) => handleAddNote(text, context)}
+                  verifiedDocs={verifiedDocs}
+                  onVerifyDoc={toggleVerifiedDoc}
+                />
+              )}
+              {activeTopTab === 'questionnaire' && (
+                <QuestionnaireResponsesPanel
+                  verifiedDocs={verifiedDocs}
+                  onVerifyDoc={toggleVerifiedDoc}
+                  highlightResponseId={questionnaireHighlightId}
+                />
+              )}
+              </div>
+              </div>
+            </div>
+
+            {/* Drag handle between left panel and agent panel — only when agent open */}
+            {agentView !== 'idle' && show1040 && (
+              <div
+                className={dragStyles.handleVertical}
+                onPointerDown={handleAgentDrag}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize AI panel"
+              >
+                <VerticalGripIcon />
+              </div>
+            )}
+
+            {/* Agent panel — always mounted, width animates between 0 and agentPanelWidth.
+                When outputs are hidden, flex-fill so AI review uses the freed space. */}
+            <div
+              className={styles.agentPanelWrapper}
+              style={{
+                width: agentView === 'idle' ? 0 : (!show1040 ? undefined : agentPanelWidth),
+                flex: (agentView !== 'idle' && !show1040) ? '1 1 0%' : '0 0 auto',
+                minWidth: 0,
+                transition: panelResizing ? 'none' : undefined,
+              }}
+            >
+                <AgentLoadingPane
+                  onClose={handleAgentClose}
+                  isLoading={agentView === 'loading'}
+                  showReport={agentView === 'report' || agentView === 'closing'}
+                  closing={agentView === 'closing'}
+                  reportContent={
+                    <AgentReportPane
+                      embedded
+                      closing={agentView === 'closing'}
+                      onClose={handleAgentClose}
+                      onYoyToggle={setYoyExpanded}
+                      onMarkReviewed={handleMarkReviewed}
+                      reviewedFields={reviewedFields}
+                      initialSubView={agentSubView}
+                      onSubViewChange={(subView) => {
+                        setAgentSubView(subView)
+                        // Auto-select the issue field when detail pane opens
+                        if (subView === 'yoyDetail') {
+                          setSelectedField('wages')
+                        } else {
+                          setSelectedField(null)
+                        }
+                      }}
+                      onViewW2={(fromSubView) => {
+                        // Keep agentSubView as-is (yoyDetail) so orange highlight persists in doc panel
+                        // Only update if explicitly provided and different
+                        if (fromSubView) setAgentSubView(fromSubView)
+                        setFromAgent(true)
+                        setActiveIssueField('wages')
+                        setSelectedField('wages')
+                        // Preserve wages selection so highlight carries through to document panel
+                        handleAgentClose(true)
+                        setActiveTopTab('w2s')
+                      }}
+                      onNavigateToTab={(tab, subTab, field, questionnaireResponseId, focus) => {
+                        // Summary-only CTAs (e.g. NIIT “Summary — investment lines”):
+                        // switch to Summary, highlight the CY line, scroll it into view —
+                        // do not open Sources on a stale tab.
+                        if (!tab && field) {
+                          setSelectedField(field)
+                          setActiveIssueField(field)
+                          setQuestionnaireHighlightId(null)
+                          setOutputFormId('summary')
+                          setShow1040(true)
+                          const rowKey = get1040HighlightField(field) ?? field
+                          requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                              const row = document.querySelector(
+                                `[data-field-row="${rowKey}"]`,
+                              ) as HTMLElement | null
+                              row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+                            })
+                          })
+                          return
+                        }
+                        if (tab) {
+                          setActiveTopTab(tab)
+                          if (subTab) setActiveSubTab(subTab)
+                        }
+                        // Prefer field-driven payer navigation (DIV / INT peel tabs)
+                        if (field) {
+                          const nav = navigationForDetailField(field)
+                          if (nav?.divPayer) setActiveDivPayer(nav.divPayer)
+                          if (nav?.intPayer) setActiveIntPayer(nav.intPayer)
+                          if (nav?.tab && !tab) setActiveTopTab(nav.tab)
+                        }
+                        if (tab === 'questionnaire') {
+                          setQuestionnaireHighlightId(questionnaireResponseId ?? null)
+                          setSelectedField(null)
+                          setActiveIssueField(null)
+                        } else if (focus === 'preview') {
+                          // Review source: open document preview; light/no Details highlight
+                          setSelectedField(null)
+                          setActiveIssueField(null)
+                          setQuestionnaireHighlightId(null)
+                          setPreviewHeight(58)
+                        } else if (field) {
+                          // Go to input: focus/highlight Details field and give it room
+                          setSelectedField(field)
+                          setActiveIssueField(field)
+                          setQuestionnaireHighlightId(null)
+                          setPreviewHeight(22)
+                        } else if (!tab) {
+                          setSelectedField(null)
+                          setActiveIssueField(null)
+                        }
+                        setFromAgent(true)
+                        ensureSourcePanelVisible()
+                        handleAgentClose(true)
+                      }}
+                      onHighlightField={(field) => {
+                        setSelectedField(field)
+                        setActiveIssueField(field)
+                      }}
+                      fieldValues={{ ...fieldValues, withholding: totalWithholding }}
+                      liveTotals={liveTotals}
+                      amounts={amounts}
+                      onOpenForm={(label) => {
+                        const formId = resolveOutputFormFromAction(label)
+                        if (formId) {
+                          setOutputFormId(formId)
+                          setShow1040(true)
+                        }
+                      }}
+                      onWrapUpPass={handleWrapUpPass}
+                      wrapUpLabel={reviewRole === 'reviewer' ? 'Finish reviewer pass' : 'Wrap up this pass'}
+                      onFieldValueChange={(key, value) => {
+                        if (key === 'withholding' && typeof value === 'number') {
+                          updateField('withholding', { techCircle: value })
+                        } else {
+                          updateField(key as keyof typeof fieldValues, value as number)
+                        }
+                      }}
+                    />
+                  }
+                />
+            </div>
+      </div>
+
+      {/* Notes / Comments pane — page-level overlay */}
+      {(notesOpen || notesClosing) && (
+        <NotesPane
+          notes={notes}
+          onAdd={(text) => handleAddNote(text)}
+          onEdit={handleEditNote}
+          onResolve={handleResolveNote}
+          onReply={handleReplyNote}
+          focusNoteId={focusNoteId}
+          onClose={handleCloseNotes}
+          closing={notesClosing}
+        />
+      )}
+
+      {handoffUi?.kind === 'decide' && (
+        <WrapUpDecision
+          pass={reviewPass}
+          actorLabel={actorLabel}
+          onFinishAndFile={handlePreviewFinishAndFile}
+          onPassToReviewer={handlePreviewPassToReviewer}
+          onContinue={() => setHandoffUi(null)}
+        />
+      )}
+
+      {handoffUi?.kind === 'preview' && (
+        <HandoffSummary
+          snapshot={handoffUi.snapshot}
+          onClose={() => setHandoffUi(null)}
+          primaryLabel={
+            handoffUi.snapshot.mode === 'finish-and-file'
+              ? 'Mark ready to file'
+              : handoffUi.snapshot.mode === 'awaiting-reviewer'
+                ? 'Open as reviewer'
+                : 'Send to reviewer'
+          }
+          onPrimary={() => {
+            if (handoffUi.snapshot.mode === 'pass-to-reviewer') {
+              handleConfirmHandoffSend()
+            } else if (handoffUi.snapshot.mode === 'awaiting-reviewer') {
+              handleOpenAsReviewer()
+            } else {
+              setHandoffUi(null)
+            }
+          }}
+          secondaryLabel={
+            handoffUi.snapshot.mode === 'awaiting-reviewer'
+              ? 'Close'
+              : 'Back'
+          }
+          onSecondary={() => {
+            if (handoffUi.snapshot.mode === 'awaiting-reviewer') {
+              setHandoffUi(null)
+            } else {
+              setHandoffUi({ kind: 'decide' })
+            }
+          }}
+          tertiaryLabel={
+            handoffUi.snapshot.mode === 'pass-to-reviewer' || handoffUi.snapshot.mode === 'awaiting-reviewer'
+              ? 'Open as reviewer'
+              : undefined
+          }
+          onTertiary={
+            handoffUi.snapshot.mode === 'pass-to-reviewer' || handoffUi.snapshot.mode === 'awaiting-reviewer'
+              ? handleOpenAsReviewer
+              : undefined
+          }
+        />
+      )}
+    </div>
+  )
+}

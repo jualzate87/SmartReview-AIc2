@@ -1,0 +1,421 @@
+/* Data Review Page — full screen layout */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Header — white bg, bottom border; +16px vertical padding vs prior 16px so
+   Comments / Source Documents buttons aren't clipped by a fixed height */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 68px;
+  padding: var(--space-container-padding-x-large, 32px) var(--space-medium, 16px) var(--space-container-padding-x-large, 32px) 22px;
+  background: var(--color-container-background-primary, #ffffff);
+  border-bottom: 1px solid #C3CED5;
+  flex-shrink: 0;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* Title — Regular weight, not Demi */
+.headerTitle {
+  font-family: var(--font-family-component) !important;
+  font-size: var(--font-size-heading-5, 24px);
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--color-text-primary, #393a3d);
+  white-space: nowrap;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-medium, 16px);
+  justify-content: flex-end;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* Intuit Intelligence button — bordered box */
+.intuitIntelBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--color-container-background-primary, #ffffff);
+  border: 1px solid #859299;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.intuitIntelLabel {
+  font-family: var(--font-family-component, sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+  color: #21262a;
+  white-space: nowrap;
+}
+
+.intuitIntelBtn:hover {
+  background: #f4f5f8;
+}
+
+.intuitIntelBtnActive {
+  background: #e0edff;
+  border-color: #103661;
+}
+
+.intuitIntelBtnActive .intuitIntelLabel {
+  color: #103661;
+}
+
+.intuitIntelIcon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Red badge on Notes button in header */
+.notesBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #c9500f;
+  color: #fff;
+  font-family: var(--font-family-component);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-align: center;
+  padding: 0 4px;
+  pointer-events: none;
+}
+
+/* Body — fills remaining space */
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  /* min-width:0 lets columns shrink so Summary + Sources fit the viewport
+     without page-level horizontal scroll. */
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  position: relative;
+}
+
+/* Left panel — flex:1, smoothly grows/shrinks as panels open/close.
+   Visible Summary enforces min-width 795.7px in DataReviewPage (labels stay readable). */
+.leftPanel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  transition: flex var(--duration-transform-emphasize-fast) var(--ease-transform),
+              flex-basis var(--duration-transform-emphasize-fast) var(--ease-transform),
+              width var(--duration-transform-emphasize-fast) var(--ease-transform),
+              min-width var(--duration-transform-emphasize-fast) var(--ease-transform),
+              opacity var(--duration-disappear-slow) var(--ease-fade);
+}
+
+/* Right panel — fixed width, flex column */
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid #D5DEE3;
+  min-height: 0;
+  /* min-width:0 so wide Details/preview content can't expand past the
+     allocated Sources width and force page-level horizontal scroll. */
+  min-width: 0;
+  flex-shrink: 0;
+  /* Matches .leftPanel timing so the two panels resize in lockstep
+     when the 1040 toggles — includes `flex` since collapsing the 1040 switches
+     this panel from a fixed pixel width to flex:1 to fill the freed space. */
+  transition: width var(--duration-transform-emphasize-fast) var(--ease-transform),
+              flex var(--duration-transform-emphasize-fast) var(--ease-transform),
+              opacity var(--duration-transform-emphasize-fast) var(--ease-transform);
+}
+
+/* While Summary collapses/expands, right panel flex-fills — drop width transitions
+   so layout growth follows the left panel's easing instead of fighting a px→auto jump. */
+.rightPanelFills {
+  min-width: 0;
+  transition: opacity var(--duration-transform-emphasize-fast) var(--ease-transform);
+}
+
+/* Summary ↔ Sources splitter — width collapses with Hide Summary */
+.summarySplitter {
+  overflow: hidden;
+  box-sizing: border-box;
+  transition: width var(--duration-transform-emphasize-fast) var(--ease-transform),
+              opacity var(--duration-disappear-slow) var(--ease-fade),
+              border-color var(--duration-disappear-slow) var(--ease-fade);
+}
+
+/* ── Slide in from right (agent close → doc panel appears) ── */
+@keyframes rightPanelSlideIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+
+/* ── Slide out to right (doc panel dismissed) ── */
+@keyframes rightPanelSlideOut {
+  from { opacity: 1; transform: translateX(0);    }
+  to   { opacity: 0; transform: translateX(40px); }
+}
+
+.rightPanelEntering {
+  animation: rightPanelSlideIn var(--duration-appear-emphasize-fast) var(--ease-appear) both;
+}
+
+.rightPanelExiting {
+  animation: rightPanelSlideOut var(--duration-disappear-emphasize-fast) var(--ease-disappear) both;
+  display: flex !important;
+  pointer-events: none;
+}
+
+/* Agent panel wrapper — smooth width transition */
+.agentPanelWrapper {
+  display: flex;
+  height: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 380ms cubic-bezier(0.4, 0, 0.25, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leftPanel { transition: none; }
+  .rightPanel { transition: none; }
+  .rightPanelFills { transition: none; }
+  .summarySplitter { transition: none; }
+  .agentPanelWrapper { transition: none; }
+  .rightPanelEntering, .rightPanelExiting { animation: none; }
+}
+
+/* Back to agent insights link — shown in right panel when navigated from agent */
+.agentBackLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 4px 16px;
+  flex-shrink: 0;
+}
+
+.agentBackBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-family-component) !important;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  color: #0365ac;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.agentBackBtn:hover { text-decoration: underline; }
+
+/* Source document panel header — Prototype A */
+.sourcePanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-component-gap-small, 8px);
+  /* 16px vertical; 20px horizontal so title + actions aren't flush to edges */
+  padding: var(--space-container-padding-small, 16px) var(--space-container-padding-medium, 20px);
+  flex-shrink: 0;
+  background: var(--color-container-background-secondary);
+  border-bottom: 1px solid var(--color-divider-tertiary, #e8edf0);
+}
+
+.sourcePanelTitle {
+  font-family: var(--font-family-component) !important;
+  font-size: var(--font-size-component-medium, 16px);
+  font-weight: var(--font-weight-component-semibold, 500);
+  color: var(--color-text-primary, #21262a);
+}
+
+.sourcePanelActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-x-large, 40px);
+  flex-shrink: 0;
+}
+
+/* Issue banner — shown below the panel header, above the tabs.
+   Shared shell for flags (orange) and remaining documents (info). */
+.issueBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 16px 6px;
+  padding: 10px 14px;
+  border: 1px solid #ff6a00;
+  border-radius: 8px;
+  background: rgba(255, 187, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.issueBannerDocuments {
+  border-color: var(--color-container-border-info, #0097e6);
+  background: var(--color-container-background-info, #d9effb);
+}
+
+.issueBannerIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #cc5500;
+}
+
+.issueBannerDocuments .issueBannerIcon {
+  color: var(--color-container-border-info, #0097e6);
+}
+
+.issueBannerCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.issueBannerHeader {
+  font-family: var(--font-family-component) !important;
+  font-size: 13px;
+  font-weight: 600;
+  color: #393a3d;
+}
+
+.issueBannerBody {
+  font-family: var(--font-family-component) !important;
+  font-size: 12px;
+  font-weight: 400;
+  color: #5d686f;
+  line-height: 1.35;
+}
+
+/* Legacy single-line class — kept for any stray fallbacks */
+.issueBannerText {
+  font-family: var(--font-family-component) !important;
+  font-size: 13px;
+  font-weight: 500;
+  color: #393a3d;
+  flex: 1;
+}
+
+.issueBannerPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: #ff6a00;
+  color: #fff;
+  font-family: var(--font-family-component) !important;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  flex-shrink: 0;
+}
+.issueBannerPill:hover {
+  background: #e05500;
+}
+
+.issueBannerDocuments .issueBannerPill {
+  background: var(--color-container-border-info, #0077c5);
+}
+.issueBannerDocuments .issueBannerPill:hover {
+  background: #0066a8;
+}
+
+/* ProtoC — Phase 1: minimized 1040 — slim edge handle, matches the panel drag-handle
+   language since expanding grows the layout horizontally (not vertically). */
+/* Wrapper occupies the collapsed column and animates width; the button itself is a
+   flush-edge tab (like a bookmark ribbon), not a floating pill — same treatment as a
+   docked side-panel launcher, pinned to the top of the column with no gap or border
+   of its own (the tab's rounded corners + shadow do that work). */
+.form1040HandleWrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  align-self: stretch;
+  overflow: hidden;
+  /* Match left/right panel Summary toggle (~500ms emphasize) */
+  transition: width var(--duration-transform-emphasize-fast) var(--ease-transform),
+              opacity var(--duration-disappear-slow) var(--ease-fade);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .form1040HandleWrap { transition: none; }
+}
+
+.form1040Handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  background: var(--color-action-standard, #0077C5);
+  border: none;
+  border-radius: 0 8px 8px 0;
+  color: var(--color-white, #ffffff);
+  cursor: pointer;
+  padding: 16px 10px;
+  margin-top: 24px;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.12);
+  transition: background 120ms ease;
+}
+
+.form1040Handle:hover {
+  background: var(--color-action-standard-active, #055393);
+}
+
+.form1040HandleIcon {
+  flex-shrink: 0;
+}
+
+.form1040HandleLabel {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-family-component, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ProtoC — Phase 1: Hide Summary — layout only; IDS Button secondary supplies look */
+.form1040HideBtn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0 12px;
+  width: fit-content;
+  flex-shrink: 0;
+}
