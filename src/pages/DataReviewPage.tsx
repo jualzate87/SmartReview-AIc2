@@ -8,9 +8,13 @@ import '@ids-ts/icon-control/dist/main.css'
 import NotesPane from './data-review/NotesPane'
 import type { Note } from './data-review/NotesPane'
 import HandoffSummary from './data-review/HandoffSummary'
-import WrapUpDecision from './data-review/WrapUpDecision'
 import handoffStyles from '../styles/data-review/HandoffSummary.module.css'
-import { buildHandoffSnapshot, type HandoffMode, type HandoffSnapshot } from '../data/handoffSnapshot'
+import {
+  buildHandoffSnapshot,
+  type HandoffJump,
+  type HandoffMode,
+  type HandoffSnapshot,
+} from '../data/handoffSnapshot'
 import {
   PREPARER_NAME,
   REVIEWER_NAME,
@@ -182,19 +186,18 @@ export default function DataReviewPage() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [notesClosing, setNotesClosing] = useState(false)
 
-  // C2: multi-pass handoff
-  type HandoffUi =
-    | null
-    | { kind: 'decide' }
-    | { kind: 'preview'; snapshot: HandoffSnapshot }
+  // C2: multi-pass handoff — summary overlay (sign-off → decide)
   const [reviewPass, setReviewPass] = useState<1 | 2>(1)
   const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>('preparer')
-  const [handoffUi, setHandoffUi] = useState<HandoffUi>(null)
+  const [handoffSnapshot, setHandoffSnapshot] = useState<HandoffSnapshot | null>(null)
+  /** Pass 2: AI panel shows Pass 1 briefing first */
+  const [showPassHandoff, setShowPassHandoff] = useState(false)
   /** Pass 2 open-items filter */
   type Pass2Filter = 'all' | 'flags' | 'notes'
   const [pass2Filter, setPass2Filter] = useState<Pass2Filter>('all')
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const actorLabel = reviewRole === 'reviewer' ? REVIEWER_NAME : PREPARER_NAME
+  const pass1ActorLabel = PREPARER_NAME
 
   useEffect(() => {
     try {
@@ -655,10 +658,11 @@ export default function DataReviewPage() {
     return set.size ? set : new Set(['__none__'])
   })()
 
-  const buildSnapshot = (mode: HandoffMode): HandoffSnapshot =>
-    buildHandoffSnapshot(mode, reviewPass, actorLabel, {
+  const buildSnapshot = (mode: HandoffMode, pass: 1 | 2 = reviewPass, actor = actorLabel): HandoffSnapshot =>
+    buildHandoffSnapshot(mode, pass, actor, {
       reviewedFields,
       verifiedDocs,
+      verifiedDocsMeta,
       editedFields: editedFieldsMeta,
       summaryChecked: summaryCheckedMeta,
       summaryFlagged: summaryFlaggedMeta,
@@ -667,29 +671,64 @@ export default function DataReviewPage() {
       amounts,
     })
 
-  const handleWrapUpPass = () => setHandoffUi({ kind: 'decide' })
+  /** Sign-off CTA → detailed summary first (then Finish & file / Pass to reviewer) */
+  const handleWrapUpPass = () => {
+    setHandoffSnapshot(buildSnapshot('signoff-review'))
+  }
 
   const handlePreviewFinishAndFile = () => {
-    setHandoffUi({ kind: 'preview', snapshot: buildSnapshot('finish-and-file') })
+    setHandoffSnapshot(buildSnapshot('finish-and-file'))
   }
 
   const handlePreviewPassToReviewer = () => {
-    setHandoffUi({ kind: 'preview', snapshot: buildSnapshot('pass-to-reviewer') })
+    setHandoffSnapshot(buildSnapshot('pass-to-reviewer'))
   }
 
   const handleConfirmHandoffSend = () => {
-    setHandoffUi({ kind: 'preview', snapshot: buildSnapshot('awaiting-reviewer') })
+    setHandoffSnapshot(buildSnapshot('awaiting-reviewer'))
   }
+
+  const handleHandoffJump = useCallback((jump: HandoffJump) => {
+    setHandoffSnapshot(null)
+    if (jump.type === 'notesPane' || jump.type === 'note') {
+      if (jump.type === 'note') setFocusNoteId(jump.noteId)
+      setNotesOpen(true)
+      return
+    }
+    if (jump.type === 'field') {
+      setSelectedField(jump.field)
+      setShow1040(true)
+      setOutputFormId('summary')
+      requestAnimationFrame(() => {
+        document.querySelector(`[data-field-row="${jump.field}"]`)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+      })
+      return
+    }
+    if (jump.type === 'doc') {
+      handleNavigateToSourceDoc(jump.docId)
+      return
+    }
+    if (jump.type === 'diagnostic') {
+      setShowPassHandoff(false)
+      setAgentView('report')
+      setPhase('diagnostics')
+    }
+  }, [handleNavigateToSourceDoc, setSelectedField, setOutputFormId])
 
   const handleOpenAsReviewer = () => {
     setReviewPass(2)
     setReviewRole('reviewer')
     setReviewActor(REVIEWER_NAME)
-    setHandoffUi(null)
+    setHandoffSnapshot(null)
     setPhase('diagnostics')
     setShow1040(true)
     setOutputFormId('summary')
-    setAgentView('idle')
+    setShowPassHandoff(true)
+    setPass2Filter('flags')
+    setAgentView('report')
     // Seed a preparer note if none exist so Pass 2 has something to resolve
     setNotes(prev => {
       if (prev.length > 0) return prev
@@ -706,13 +745,14 @@ export default function DataReviewPage() {
     })
   }
 
-  const handleFinishReviewerPass = () => setHandoffUi({ kind: 'decide' })
+  const handleFinishReviewerPass = () => {
+    setHandoffSnapshot(buildSnapshot('signoff-review', 2, REVIEWER_NAME))
+  }
 
   /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
   const handleSwitchRole = (role: 'preparer' | 'reviewer') => {
     if (role === 'reviewer') {
       handleOpenAsReviewer()
-      setPass2Filter('flags')
       return
     }
     setReviewRole('preparer')
@@ -720,7 +760,12 @@ export default function DataReviewPage() {
     setReviewActor(PREPARER_NAME)
     setPass2Filter('all')
     setFocusNoteId(null)
+    setShowPassHandoff(false)
   }
+
+  const pass2BriefingSnapshot = reviewRole === 'reviewer'
+    ? buildSnapshot('signoff-review', 1, pass1ActorLabel)
+    : null
 
   /**
    * Shared drag bootstrap: pointer events + document-level move/up while dragging.
@@ -978,9 +1023,12 @@ export default function DataReviewPage() {
           <button
             type="button"
             className={handoffStyles.passBarLink}
-            onClick={() => setHandoffUi({ kind: 'preview', snapshot: buildSnapshot('pass-to-reviewer') })}
+            onClick={() => {
+              setShowPassHandoff(true)
+              setAgentView('report')
+            }}
           >
-            View handoff
+            View Pass 1 summary
           </button>
         </div>
       )}
@@ -1793,7 +1841,17 @@ export default function DataReviewPage() {
                         }
                       }}
                       onWrapUpPass={handleWrapUpPass}
-                      wrapUpLabel={reviewRole === 'reviewer' ? 'Finish reviewer pass' : 'Wrap up this pass'}
+                      wrapUpLabel={
+                        reviewRole === 'reviewer'
+                          ? 'Sign-off and move to next step'
+                          : 'Sign-off and move to next step'
+                      }
+                      showPassHandoff={showPassHandoff && reviewRole === 'reviewer'}
+                      passHandoffSnapshot={pass2BriefingSnapshot}
+                      passHandoffTitle={`What ${pass1ActorLabel} completed`}
+                      passHandoffSubtitle="Pass 1 handoff · Start with open flags and unresolved notes — jump links use the same navigation as Review AI"
+                      onHandoffJump={handleHandoffJump}
+                      onDismissPassHandoff={() => setShowPassHandoff(false)}
                       onFieldValueChange={(key, value) => {
                         if (key === 'withholding' && typeof value === 'number') {
                           updateField('withholding', { techCircle: value })
@@ -1821,58 +1879,23 @@ export default function DataReviewPage() {
         />
       )}
 
-      {handoffUi?.kind === 'decide' && (
-        <WrapUpDecision
-          pass={reviewPass}
-          actorLabel={actorLabel}
+      {handoffSnapshot && (
+        <HandoffSummary
+          snapshot={handoffSnapshot}
+          onClose={() => setHandoffSnapshot(null)}
+          onContinue={() => {
+            if (handoffSnapshot.mode === 'pass-to-reviewer') {
+              setHandoffSnapshot(buildSnapshot('signoff-review'))
+            } else {
+              setHandoffSnapshot(null)
+            }
+          }}
+          onJump={handleHandoffJump}
+          showQuickLinks={handoffSnapshot.mode === 'signoff-review' || handoffSnapshot.mode === 'pass-to-reviewer'}
           onFinishAndFile={handlePreviewFinishAndFile}
           onPassToReviewer={handlePreviewPassToReviewer}
-          onContinue={() => setHandoffUi(null)}
-        />
-      )}
-
-      {handoffUi?.kind === 'preview' && (
-        <HandoffSummary
-          snapshot={handoffUi.snapshot}
-          onClose={() => setHandoffUi(null)}
-          primaryLabel={
-            handoffUi.snapshot.mode === 'finish-and-file'
-              ? 'Mark ready to file'
-              : handoffUi.snapshot.mode === 'awaiting-reviewer'
-                ? 'Open as reviewer'
-                : 'Send to reviewer'
-          }
-          onPrimary={() => {
-            if (handoffUi.snapshot.mode === 'pass-to-reviewer') {
-              handleConfirmHandoffSend()
-            } else if (handoffUi.snapshot.mode === 'awaiting-reviewer') {
-              handleOpenAsReviewer()
-            } else {
-              setHandoffUi(null)
-            }
-          }}
-          secondaryLabel={
-            handoffUi.snapshot.mode === 'awaiting-reviewer'
-              ? 'Close'
-              : 'Back'
-          }
-          onSecondary={() => {
-            if (handoffUi.snapshot.mode === 'awaiting-reviewer') {
-              setHandoffUi(null)
-            } else {
-              setHandoffUi({ kind: 'decide' })
-            }
-          }}
-          tertiaryLabel={
-            handoffUi.snapshot.mode === 'pass-to-reviewer' || handoffUi.snapshot.mode === 'awaiting-reviewer'
-              ? 'Open as reviewer'
-              : undefined
-          }
-          onTertiary={
-            handoffUi.snapshot.mode === 'pass-to-reviewer' || handoffUi.snapshot.mode === 'awaiting-reviewer'
-              ? handleOpenAsReviewer
-              : undefined
-          }
+          onConfirmSend={handleConfirmHandoffSend}
+          onOpenAsReviewer={handleOpenAsReviewer}
         />
       )}
     </div>

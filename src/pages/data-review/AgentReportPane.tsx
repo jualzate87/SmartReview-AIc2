@@ -21,6 +21,8 @@ import {
 } from './phase2FlagSync'
 import type { QuestionnaireResponseId } from './questionnaireData'
 import type { TopTab } from './ReviewTab'
+import HandoffSummary from './HandoffSummary'
+import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import styles from '../../styles/data-review/AgentReportPane.module.css'
 
 export const TOTAL_REVIEW_ITEMS = PHASE2_DIAGNOSTIC_ORDER.length
@@ -61,6 +63,13 @@ interface AgentReportPaneProps {
   onWrapUpPass?: () => void
   /** C2: label for the completion primary CTA */
   wrapUpLabel?: string
+  /** C2 Pass 2: show handoff summary in this panel */
+  passHandoffSnapshot?: HandoffSnapshot | null
+  showPassHandoff?: boolean
+  onHandoffJump?: (jump: HandoffJump) => void
+  onDismissPassHandoff?: () => void
+  passHandoffTitle?: string
+  passHandoffSubtitle?: string
 }
 
 const REPORT_CARDS = [
@@ -392,7 +401,13 @@ export default function AgentReportPane({
   amounts = SEED_AMOUNTS,
   onOpenForm,
   onWrapUpPass,
-  wrapUpLabel = 'Wrap up this pass',
+  wrapUpLabel = 'Sign-off and move to next step',
+  passHandoffSnapshot = null,
+  showPassHandoff = false,
+  onHandoffJump,
+  onDismissPassHandoff,
+  passHandoffTitle,
+  passHandoffSubtitle,
 }: AgentReportPaneProps) {
   const live = liveTotals ?? computeLiveReturn(amounts)
   const ALL_ISSUES = buildAllIssues(live, amounts)
@@ -538,6 +553,31 @@ export default function AgentReportPane({
       )}
 
       <div className={styles.pane}>
+        {showPassHandoff && passHandoffSnapshot ? (
+          <div className={styles.chat} style={{ padding: 0, overflow: 'hidden' }}>
+            <HandoffSummary
+              variant="embedded"
+              snapshot={passHandoffSnapshot}
+              showQuickLinks
+              hideFooter
+              titleOverride={passHandoffTitle}
+              subtitleOverride={passHandoffSubtitle}
+              onJump={onHandoffJump}
+            />
+            <div style={{ padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {onDismissPassHandoff && (
+                <button type="button" className={styles.completionSecondaryBtn} onClick={onDismissPassHandoff}>
+                  View diagnostics catalog
+                </button>
+              )}
+              {onWrapUpPass && (
+                <Button priority="primary" size="medium" onClick={() => onWrapUpPass()}>
+                  {wrapUpLabel}
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className={styles.chat}>
 
           <p className={styles.agentMessage}>
@@ -658,8 +698,10 @@ export default function AgentReportPane({
           </div>
 
         </div>
+        )}
       </div>
 
+      {!showPassHandoff && (
       <div className={styles.inputArea}>
         <div className={styles.inputFade} />
         <div className={styles.inputBox}>
@@ -697,8 +739,9 @@ export default function AgentReportPane({
         </div>
         <span className={styles.legal}>Important information about how we use generative AI</span>
       </div>
+      )}
 
-      {(!!issueDetailOpen || issueDetailClosing) && activeIssue && (
+      {(!!issueDetailOpen || issueDetailClosing) && activeIssue && !showPassHandoff && (
         <IssueDetailPane
           closing={issueDetailClosing}
           issueKey={activeIssue.issueKey}
