@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
-import { ChevronDown, ChevronRight } from '@design-systems/icons'
+import { ChevronDown, ChevronRight, Close } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
+import { jumpActionLabel } from '../../data/handoffSnapshot'
 import styles from '../../styles/data-review/HandoffSummary.module.css'
 
 type Props = {
@@ -26,16 +27,8 @@ type Props = {
   hideFooter?: boolean
 }
 
-function statusClass(status: 'done' | 'open' | 'info') {
-  if (status === 'done') return styles.itemDone
-  if (status === 'open') return styles.itemOpen
-  return styles.itemInfo
-}
-
-function bucketClass(bucket: 'done' | 'open' | 'outstanding') {
-  if (bucket === 'done') return styles.bucketDone
-  if (bucket === 'open') return styles.bucketOpen
-  return styles.bucketOutstanding
+function bucketClass(bucket: 'critical' | 'done') {
+  return bucket === 'critical' ? styles.bucketCritical : styles.bucketDone
 }
 
 export default function HandoffSummary({
@@ -77,17 +70,17 @@ export default function HandoffSummary({
       : snapshot.mode === 'awaiting-reviewer'
         ? 'Handoff sent — waiting for reviewer'
         : snapshot.mode === 'signoff-review'
-          ? 'This is what has been done'
+          ? 'Review snapshot'
           : 'Handoff summary preview')
 
   const subtitle =
     subtitleOverride ??
     (snapshot.mode === 'finish-and-file'
-      ? `Pass ${snapshot.pass} · ${snapshot.actorLabel} · What was done and what’s suggested next`
+      ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
       : snapshot.mode === 'awaiting-reviewer'
         ? `Pass ${snapshot.pass} complete · Next person can open as reviewer`
         : snapshot.mode === 'signoff-review'
-          ? `Pass ${snapshot.pass} · ${snapshot.actorLabel} · Review the snapshot, then finish & file or pass to the next reviewer`
+          ? `Pass ${snapshot.pass} · ${snapshot.actorLabel} · Critical items first, then what was done`
           : `Pass ${snapshot.pass} · Preview of what the next reviewer will see`)
 
   const body = (
@@ -99,34 +92,47 @@ export default function HandoffSummary({
         </div>
         {variant === 'overlay' && onClose && (
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
-            Close
+            <Close size="small" />
           </button>
         )}
       </header>
 
+      <div
+        className={`${styles.verdict} ${
+          snapshot.verdict.tone === 'clear' ? styles.verdictClear : styles.verdictAttention
+        }`}
+      >
+        <p className={styles.verdictTitle}>{snapshot.verdict.title}</p>
+        <p className={styles.verdictDetail}>{snapshot.verdict.detail}</p>
+      </div>
+
       {showQuickLinks && snapshot.quickLinks.length > 0 && (
-        <div className={styles.quickLinks} role="group" aria-label="Jump to items">
-          {snapshot.quickLinks.map(link => (
-            <button
-              key={link.id}
-              type="button"
-              className={styles.quickLink}
-              disabled={link.count === 0 && !link.jump && !link.sectionId}
-              onClick={() => {
-                if (link.jump) onJump?.(link.jump)
-                else if (link.sectionId) {
-                  setOpenIds(prev => new Set(prev).add(link.sectionId!))
-                  document.getElementById(`handoff-sec-${link.sectionId}`)?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest',
-                  })
-                }
-              }}
-            >
-              {link.label}
-              <span className={styles.quickCount}>{link.count}</span>
-            </button>
-          ))}
+        <div className={styles.quickLinks} role="group" aria-label="Jump to sections">
+          {snapshot.quickLinks.map(link => {
+            const canAct = Boolean(link.jump || link.sectionId)
+            return (
+              <button
+                key={link.id}
+                type="button"
+                className={styles.quickLink}
+                disabled={!canAct}
+                title={!canAct ? link.label : undefined}
+                onClick={() => {
+                  if (link.jump) onJump?.(link.jump)
+                  else if (link.sectionId) {
+                    setOpenIds(prev => new Set(prev).add(link.sectionId!))
+                    document.getElementById(`handoff-sec-${link.sectionId}`)?.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'nearest',
+                    })
+                  }
+                }}
+              >
+                {link.label}
+                <span className={styles.quickCount}>{link.count}</span>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -154,7 +160,10 @@ export default function HandoffSummary({
               {isOpen && (
                 <ul className={styles.list}>
                   {section.items.map((item, i) => (
-                    <li key={`${section.id}-${i}`} className={`${styles.item} ${statusClass(item.status)}`}>
+                    <li
+                      key={`${section.id}-${i}`}
+                      className={`${styles.item} ${item.status === 'open' ? styles.itemOpen : ''}`}
+                    >
                       <div className={styles.itemText}>
                         <span className={styles.itemLabel}>{item.label}</span>
                         {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}
@@ -165,7 +174,7 @@ export default function HandoffSummary({
                           className={styles.jumpBtn}
                           onClick={() => onJump(item.jump!)}
                         >
-                          Go
+                          {item.jumpLabel ?? jumpActionLabel(item.jump)}
                         </button>
                       )}
                     </li>
@@ -176,7 +185,7 @@ export default function HandoffSummary({
           )
         })}
 
-        <section className={styles.section}>
+        <section className={`${styles.section} ${styles.sectionNext}`}>
           <h3 className={styles.sectionTitleStatic}>Suggested next</h3>
           <ul className={styles.nextList}>
             {snapshot.nextSteps.map((step, i) => (

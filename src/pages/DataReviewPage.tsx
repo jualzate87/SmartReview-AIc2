@@ -72,6 +72,7 @@ import {
   getInitialRPayerFlagCount,
   isPhase1FlagResolved,
   navigationForDetailField,
+  PHASE1_VERIFY_QUEUE,
 } from './data-review/phase1FieldSync'
 import { getPhase2Progress } from './data-review/phase2FlagSync'
 import { PHASE1_FLAG_MESSAGES } from './data-review/phase1FlagMessages'
@@ -702,6 +703,22 @@ export default function DataReviewPage() {
       return
     }
     if (jump.type === 'field') {
+      // Phase 1 flag keys → source detail field; otherwise try summary / 1040 row
+      const fromFlag = PHASE1_VERIFY_QUEUE.find(q => q.flagKey === jump.field)
+      if (fromFlag) {
+        applyVerifyNavigation(fromFlag.field)
+        return
+      }
+      const mapped = field1040ToDetail(jump.field)
+      if (mapped) {
+        applyVerifyNavigation(mapped.field)
+        return
+      }
+      const detailNav = navigationForDetailField(jump.field)
+      if (detailNav) {
+        applyVerifyNavigation(jump.field)
+        return
+      }
       setSelectedField(jump.field)
       setShow1040(true)
       setOutputFormId('summary')
@@ -722,7 +739,12 @@ export default function DataReviewPage() {
       setAgentView('report')
       setPhase('diagnostics')
     }
-  }, [handleNavigateToSourceDoc, setSelectedField, setOutputFormId])
+  }, [
+    handleNavigateToSourceDoc,
+    setSelectedField,
+    setOutputFormId,
+    applyVerifyNavigation,
+  ])
 
   const handleOpenAsReviewer = () => {
     setReviewPass(2)
