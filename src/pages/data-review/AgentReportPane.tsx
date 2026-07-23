@@ -71,7 +71,6 @@ interface AgentReportPaneProps {
   /** Reopen handoff after dismissing to clear items */
   onOpenPassHandoff?: () => void
   passHandoffTitle?: string
-  passHandoffSubtitle?: string
   /** Label for reopen control (preparer vs reviewer) */
   handoffReopenLabel?: string
 }
@@ -412,7 +411,6 @@ export default function AgentReportPane({
   onDismissPassHandoff,
   onOpenPassHandoff,
   passHandoffTitle,
-  passHandoffSubtitle,
   handoffReopenLabel = 'Handoff report',
 }: AgentReportPaneProps) {
   const live = liveTotals ?? computeLiveReturn(amounts)
@@ -566,7 +564,7 @@ export default function AgentReportPane({
               snapshot={passHandoffSnapshot}
               hideFooter
               titleOverride={passHandoffTitle}
-              subtitleOverride={passHandoffSubtitle}
+              subtitleOverride=""
               onJump={onHandoffJump}
             />
             <div style={{ padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -461,9 +461,6 @@ export function buildHandoffSnapshot(
   // ── Conversational story + verdict ────────────────────────────────────
   const story: string[] = []
   if (isBriefing) {
-    story.push(
-      `${who} finished Pass 1 and handed this return to you. Here’s the short version of what happened — then what’s still open.`,
-    )
     const beats: string[] = []
     if (clearedFlags.length) {
       beats.push(
@@ -528,7 +525,7 @@ export function buildHandoffSnapshot(
               unverifiedDocs.length ? `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}` : null,
             ]
               .filter(Boolean)
-              .join(' · ') + '. Read the story below, then work the open items in that order.'
+              .join(' · ') + '.'
           : 'Work through open notes and flags first, then AI diagnostics and any documents still unverified.',
       }
 

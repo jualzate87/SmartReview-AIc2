@@ -1932,7 +1932,6 @@ export default function DataReviewPage() {
                       showPassHandoff={showPassHandoff && reviewRole === 'reviewer'}
                       passHandoffSnapshot={pass2BriefingSnapshot}
                       passHandoffTitle={`Handoff from ${pass1ActorLabel}`}
-                      passHandoffSubtitle="Pass 1 → your review · Read the story, then work what’s still open"
                       onHandoffJump={handleHandoffJump}
                       onDismissPassHandoff={() => setShowPassHandoff(false)}
                       onOpenPassHandoff={handleOpenHandoffReport}

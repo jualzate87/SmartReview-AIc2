@@ -73,14 +73,15 @@ export default function HandoffSummary({
           : 'Handoff preview')
 
   const subtitle =
-    subtitleOverride ??
-    (snapshot.mode === 'finish-and-file'
-      ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
-      : snapshot.mode === 'awaiting-reviewer'
-        ? `Pass ${snapshot.pass} complete · Next person can open as reviewer`
-        : snapshot.mode === 'signoff-review'
-          ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
-          : `Pass ${snapshot.pass} · Preview for the next reviewer`)
+    subtitleOverride !== undefined
+      ? subtitleOverride
+      : snapshot.mode === 'finish-and-file'
+        ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
+        : snapshot.mode === 'awaiting-reviewer'
+          ? `Pass ${snapshot.pass} complete · Next person can open as reviewer`
+          : snapshot.mode === 'signoff-review'
+            ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
+            : `Pass ${snapshot.pass} · Preview for the next reviewer`
 
   const verdictType = snapshot.verdict.tone === 'clear' ? 'success' : 'warn'
 
@@ -89,7 +90,7 @@ export default function HandoffSummary({
       <header className={styles.header}>
         <div>
           <h2 id="handoff-title" className={styles.title}>{title}</h2>
-          <p className={styles.subtitle}>{subtitle}</p>
+          {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
         </div>
         {variant === 'overlay' && onClose && (
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
