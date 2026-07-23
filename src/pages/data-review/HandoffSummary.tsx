@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
 import { NumericBadge } from '@ids-ts/badge'
@@ -50,6 +50,19 @@ export default function HandoffSummary({
     }
     return initial
   })
+  const bodyRef = useRef<HTMLDivElement>(null)
+
+  const scrollToOpenItem = (itemId: string) => {
+    setOpenIds(prev => {
+      const next = new Set(prev)
+      next.add('needsAttention')
+      return next
+    })
+    requestAnimationFrame(() => {
+      const target = bodyRef.current?.querySelector<HTMLElement>(`#handoff-open-${itemId}`)
+      target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }
 
   const toggle = (id: string) => {
     setOpenIds(prev => {
@@ -119,7 +132,22 @@ export default function HandoffSummary({
         </PageMessage>
       </div>
 
-      <div className={styles.body}>
+      {snapshot.openNav.length > 0 && (
+        <nav className={styles.openNav} aria-label="Jump to open items">
+          {snapshot.openNav.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              className={styles.openNavChip}
+              onClick={() => scrollToOpenItem(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      <div className={styles.body} ref={bodyRef}>
         {snapshot.sections.map(section => {
           const isOpen = openIds.has(section.id)
           return (
@@ -147,7 +175,11 @@ export default function HandoffSummary({
                   {section.intro && <p className={styles.sectionIntro}>{section.intro}</p>}
                   <ul className={styles.list}>
                     {section.items.map((item, i) => (
-                      <li key={`${section.id}-${i}`} className={styles.item}>
+                      <li
+                        key={item.id ?? `${section.id}-${i}`}
+                        id={item.id ? `handoff-open-${item.id}` : undefined}
+                        className={styles.item}
+                      >
                         <div className={styles.itemText}>
                           <span className={styles.itemLabel}>{item.label}</span>
                           {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}

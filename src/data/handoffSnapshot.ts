@@ -30,11 +30,18 @@ export type HandoffJump =
   | { type: 'notesPane' }
 
 export type HandoffItem = {
+  /** Stable anchor id for open-item subnav (open items only) */
+  id?: string
   label: string
   detail?: string
   status: 'done' | 'open' | 'info'
   jump?: HandoffJump
   jumpLabel?: string
+}
+
+export type HandoffOpenNavItem = {
+  id: string
+  label: string
 }
 
 export type HandoffSection = {
@@ -64,6 +71,8 @@ export type HandoffSnapshot = {
     detail: string
   }
   sections: HandoffSection[]
+  /** Jump targets for open-item subnav; empty when nothing is open */
+  openNav: HandoffOpenNavItem[]
   nextSteps: string[]
   quickLinks: {
     id: string
@@ -217,6 +226,16 @@ function firstName(full: string): string {
   return full.split(/\s+/)[0] || full
 }
 
+function attentionVerdictTitle(openCount: number): string {
+  return openCount === 1
+    ? 'There is 1 item that needs your attention'
+    : `There are ${openCount} items that need your attention`
+}
+
+function clearVerdictTitle(): string {
+  return 'No items need your attention'
+}
+
 export function buildHandoffSnapshot(
   mode: HandoffMode,
   pass: 1 | 2,
@@ -257,12 +276,16 @@ export function buildHandoffSnapshot(
 
   if (openNotes.length) {
     for (const n of openNotes) {
+      const label = n.context
+        ? isBriefing
+          ? `Open note on ${n.context}`
+          : `Your note on ${n.context}`
+        : isBriefing
+          ? 'Open note'
+          : 'Open note'
       openItems.push({
-        label: isBriefing
-          ? `${who} left a note${n.context ? ` on ${n.context}` : ''}`
-          : n.context
-            ? `Your note on ${n.context}`
-            : 'Open note',
+        id: `note-${n.id}`,
+        label,
         detail: n.text,
         status: 'open',
         jump: { type: 'note', noteId: n.id },
@@ -274,10 +297,10 @@ export function buildHandoffSnapshot(
   if (humanFlags.length) {
     for (const [field, meta] of humanFlags) {
       const note = input.summaryFlagNotes[field]
+      const name = fieldLabel(field) !== field ? fieldLabel(field) : field
       openItems.push({
-        label: isBriefing
-          ? `${who} flagged ${fieldLabel(field) !== field ? fieldLabel(field) : field}`
-          : `Flagged: ${fieldLabel(field) !== field ? fieldLabel(field) : field}`,
+        id: `flag-${field}`,
+        label: isBriefing ? `${name} flagged for follow-up` : `Flagged: ${name}`,
         detail: note
           ? `"${note}" · ${formatCheckMeta(meta)}`
           : `Marked for follow-up · ${formatCheckMeta(meta)}`,
@@ -291,11 +314,10 @@ export function buildHandoffSnapshot(
   if (openImportFlags.length) {
     const names = openImportFlags.map(fieldLabel)
     openItems.push({
-      label: isBriefing
-        ? `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open`
-        : `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open`,
+      id: 'import-flags',
+      label: `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open`,
       detail: isBriefing
-        ? `${who} didn’t clear these yet: ${listPhrase(names)}. Worth confirming against the source docs.`
+        ? `Still need a look: ${listPhrase(names)}. Worth confirming against the source docs.`
         : `Still need a look: ${listPhrase(names)}.`,
       status: 'open',
       jump: { type: 'field', field: openImportFlags[0] },
@@ -306,11 +328,10 @@ export function buildHandoffSnapshot(
   if (diagsOpen.length) {
     const names = diagsOpen.map(k => DIAG_LABELS[k] ?? k)
     openItems.push({
-      label: isBriefing
-        ? `AI still has ${diagsOpen.length} diagnostic${diagsOpen.length === 1 ? '' : 's'} to walk through`
-        : `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'} not reviewed yet`,
+      id: 'ai-diagnostics',
+      label: `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'} not reviewed yet`,
       detail: isBriefing
-        ? `${listPhrase(names)}. These weren’t marked reviewed in Pass 1 — pick them up after the import picture feels solid.`
+        ? `${listPhrase(names)}. Not marked reviewed in Pass 1 — pick up after the import picture feels solid.`
         : `${listPhrase(names)} — not marked reviewed yet.`,
       status: 'open',
       jump: { type: 'diagnostic', issueKey: diagsOpen[0] },
@@ -320,12 +341,9 @@ export function buildHandoffSnapshot(
 
   if (unverifiedDocs.length) {
     openItems.push({
-      label: isBriefing
-        ? `${unverifiedDocs.length} source document${unverifiedDocs.length === 1 ? '' : 's'} not marked verified`
-        : `${unverifiedDocs.length} document${unverifiedDocs.length === 1 ? '' : 's'} not verified`,
-      detail: isBriefing
-        ? `${who} didn’t mark these done: ${listPhrase(unverifiedDocs.map(docLabel))}.`
-        : listPhrase(unverifiedDocs.map(docLabel)),
+      id: 'unverified-docs',
+      label: `${unverifiedDocs.length} source document${unverifiedDocs.length === 1 ? '' : 's'} not verified`,
+      detail: listPhrase(unverifiedDocs.map(docLabel)),
       status: 'open',
       jump: { type: 'doc', docId: unverifiedDocs[0] },
       jumpLabel: 'Open first document',
@@ -461,6 +479,13 @@ export function buildHandoffSnapshot(
   // ── Conversational story + verdict ────────────────────────────────────
   const story: string[] = []
   if (isBriefing) {
+    if (hasOpen) {
+      story.push(
+        openItems.length === 1
+          ? 'Pass 1 has 1 open item in this snapshot — start there before spot-checking the rest.'
+          : `Pass 1 has ${openItems.length} open items in this snapshot — work through those first, then spot-check the rest.`,
+      )
+    }
     const beats: string[] = []
     if (clearedFlags.length) {
       beats.push(
@@ -475,15 +500,15 @@ export function buildHandoffSnapshot(
     if (diagsReviewed.length) beats.push(`reviewed ${diagsReviewed.length} AI diagnostic${diagsReviewed.length === 1 ? '' : 's'}`)
     if (edits.length && !editedClears.length) beats.push(`made ${edits.length} amount change${edits.length === 1 ? '' : 's'}`)
     if (beats.length) {
-      story.push(`${who} ${listPhrase(beats)}.`)
-    } else {
-      story.push(`${who} didn’t leave much of a trail yet — you may want a fuller Pass 1 pass before you dig into AI.`)
+      story.push(`In Pass 1, ${who} ${listPhrase(beats)}.`)
+    } else if (!hasOpen) {
+      story.push(`Pass 1 doesn’t show much completed work yet — you may want a fuller first pass before digging into AI.`)
     }
     if (openNotes.length) {
       story.push(
         openNotes.length === 1
-          ? `There’s 1 open note from ${who} — start there if you want their intent in their own words.`
-          : `There are ${openNotes.length} open notes from ${who} — start there if you want their intent in their own words.`,
+          ? 'There is 1 open note — read it first if you want the preparer’s intent in their own words.'
+          : `There are ${openNotes.length} open notes — read those first if you want the preparer’s intent in their own words.`,
       )
     }
   } else {
@@ -501,32 +526,30 @@ export function buildHandoffSnapshot(
     }
   }
 
+  const openBreakdown = [
+    openNotes.length ? `${openNotes.length} note${openNotes.length === 1 ? '' : 's'}` : null,
+    openImportFlags.length ? `${openImportFlags.length} open import flag${openImportFlags.length === 1 ? '' : 's'}` : null,
+    diagsOpen.length ? `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}` : null,
+    humanFlags.length ? `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}` : null,
+    unverifiedDocs.length ? `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   const verdict = !hasOpen
     ? {
         tone: 'clear' as const,
-        title: isBriefing
-          ? `${who} left you a clean handoff`
-          : 'Looks clear for the next step',
+        title: clearVerdictTitle(),
         detail: isBriefing
-          ? 'No open flags, notes, or unverified docs in this snapshot. Spot-check what they did, then move through AI diagnostics if you want a second opinion.'
-          : 'No open anomalies, flags, or notes left in this snapshot.',
+          ? 'No open flags, notes, or unverified docs in this snapshot. Spot-check Pass 1 work, then move through AI diagnostics if you want a second opinion.'
+          : 'No open anomalies, flags, or notes in this snapshot.',
       }
     : {
         tone: 'attention' as const,
-        title: isBriefing
-          ? `${who} left a few things for you`
-          : 'A few things still need a look',
+        title: attentionVerdictTitle(openItems.length),
         detail: isBriefing
-          ? [
-              openNotes.length ? `${openNotes.length} note${openNotes.length === 1 ? '' : 's'}` : null,
-              openImportFlags.length ? `${openImportFlags.length} open import flag${openImportFlags.length === 1 ? '' : 's'}` : null,
-              diagsOpen.length ? `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}` : null,
-              humanFlags.length ? `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}` : null,
-              unverifiedDocs.length ? `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ') + '.'
-          : 'Work through open notes and flags first, then AI diagnostics and any documents still unverified.',
+          ? `${openBreakdown}.`
+          : `${openBreakdown}. Work through open notes and flags first, then AI diagnostics and any documents still unverified.`,
       }
 
   const storySection: HandoffSection = {
@@ -567,10 +590,12 @@ export function buildHandoffSnapshot(
         ],
   }
 
-  // Reviewer: story first, then open. Self: open first, then story.
-  const sections: HandoffSection[] = isBriefing
-    ? [storySection, openSection]
-    : [openSection, storySection]
+  // Open items first, then completed work — same order for self and reviewer briefing.
+  const sections: HandoffSection[] = [openSection, storySection]
+
+  const openNav: HandoffOpenNavItem[] = openItems
+    .filter((item): item is HandoffItem & { id: string } => Boolean(item.id))
+    .map(item => ({ id: item.id, label: item.label }))
 
   const nextSteps: string[] = isBriefing
     ? [
@@ -606,6 +631,7 @@ export function buildHandoffSnapshot(
     story,
     verdict,
     sections,
+    openNav,
     nextSteps,
     quickLinks: [],
   }
