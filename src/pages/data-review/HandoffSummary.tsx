@@ -40,18 +40,24 @@ function CountBadge({
 }) {
   if (count <= 0) return null
   if (warning) {
-    // Rect warning badge — round shape skips IDS orange background for numeric values.
+    // NumericBadge is neutral-only. Badge `value` skips Badge-value (no orange fill).
+    // Children render inside Badge-value, which gets warning orange from IDS + our pill CSS.
     return (
-      <Badge
-        status="warning"
-        value={count}
-        aria-label={countLabel}
-        className={styles.openCountBadge}
-      />
+      <span className={styles.openCountBadgeWrap}>
+        <Badge
+          status="warning"
+          priority="primary"
+          capitalization="sentence"
+          aria-label={countLabel}
+          className={styles.openCountBadge}
+        >
+          {String(count)}
+        </Badge>
+      </span>
     )
   }
   return (
-    <span aria-label={countLabel}>
+    <span className={styles.openCountBadgeWrap} aria-label={countLabel}>
       <NumericBadge quantity={count} />
     </span>
   )

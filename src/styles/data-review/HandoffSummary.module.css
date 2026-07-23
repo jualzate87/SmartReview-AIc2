@@ -250,23 +250,54 @@
   align-items: center;
   flex-shrink: 0;
   margin-left: auto;
+  /* Break out of accordion <button> color/font inheritance */
+  color: unset;
+  font: unset;
+  line-height: normal;
+  -webkit-text-fill-color: unset;
 }
 
-/* IDS warning badge: rect shape gets orange fill; pill styling for open counts */
+/* Isolate badge from accordion button typography/color inheritance */
+.openCountBadgeWrap {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: unset;
+  font: unset;
+  line-height: normal;
+  -webkit-text-fill-color: unset;
+  pointer-events: none;
+}
+
 .openCountBadge:global(.idsTSBadge) {
   flex-shrink: 0;
-}
-
-.openCountBadge:global(.idsTSBadge) :global([class*='Badge-value']) {
-  border-radius: 999px;
-  min-width: 22px;
-  justify-content: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.sectionToggle .sectionBadge,
-.groupToggle .sectionBadge {
   color: unset;
+  -webkit-text-fill-color: unset;
+}
+
+/*
+ * Pill numeric warning badge.
+ * IDS warning orange only applies to .Badge-value under rect/dot — force it
+ * so accordion button styles and theme quirks cannot wash counts to gray.
+ */
+.openCountBadge:global(.idsTSBadge) :global([class*='Badge-value']) {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: 999px !important;
+  min-width: 22px;
+  min-height: 20px;
+  padding: 0 var(--space-component-inline-padding-x-small, 4px);
+  font-variant-numeric: tabular-nums;
+  text-transform: none !important;
+  background-color: var(--color-ui-attention) !important;
+  color: var(--color-text-inverse) !important;
+  -webkit-text-fill-color: var(--color-text-inverse) !important;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-bold);
+  line-height: 1;
 }
 
 .sectionSummary {
