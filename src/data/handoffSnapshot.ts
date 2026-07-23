@@ -1,5 +1,5 @@
 /**
- * C2 handoff snapshot — critical-first hierarchy, then connected “what was done”.
+ * C2 handoff snapshot — conversational storyline for preparer sign-off and reviewer briefing.
  */
 import type { ActivityEntry } from '../hooks/useSyncedReviewState'
 import { computeLiveReturn, type LiveAmounts } from './liveReturn'
@@ -20,6 +20,8 @@ export type HandoffMode =
   | 'finish-and-file'
   | 'awaiting-reviewer'
 
+export type HandoffVoice = 'self' | 'reviewer-briefing'
+
 export type HandoffJump =
   | { type: 'field'; field: string }
   | { type: 'doc'; docId: string }
@@ -32,16 +34,15 @@ export type HandoffItem = {
   detail?: string
   status: 'done' | 'open' | 'info'
   jump?: HandoffJump
-  /** Button label when jump is available */
   jumpLabel?: string
 }
 
 export type HandoffSection = {
   id: string
   title: string
-  /** Collapsed summary, e.g. "3 cleared" */
   summary: string
-  /** critical = needs attention first; done = completed work */
+  /** Optional lead-in under the section title */
+  intro?: string
   bucket: 'critical' | 'done'
   defaultOpen?: boolean
   items: HandoffItem[]
@@ -51,7 +52,9 @@ export type HandoffSnapshot = {
   mode: HandoffMode
   pass: 1 | 2
   actorLabel: string
-  /** One-line AI / readiness verdict */
+  voice: HandoffVoice
+  /** Short narrative before the lists */
+  story: string[]
   verdict: {
     tone: 'clear' | 'attention'
     title: string
@@ -59,7 +62,6 @@ export type HandoffSnapshot = {
   }
   sections: HandoffSection[]
   nextSteps: string[]
-  /** Quick-link chips for Pass 2 AI panel — keep sparse */
   quickLinks: {
     id: string
     label: string
@@ -114,7 +116,6 @@ const DOC_LABELS: Record<string, string> = {
   '1099-nec': '1099-NEC · Summit',
 }
 
-/** Map Phase 1 flag keys → related source doc ids for “connect the dots” */
 const FLAG_TO_DOC: Record<string, string> = {
   'ssn-techCircle': 'w2-techCircle',
   'wages-techCircle': 'w2-techCircle',
@@ -180,6 +181,18 @@ function docRelatedEdits(docId: string, editKeys: string[]): string[] {
   })
 }
 
+function listPhrase(parts: string[], max = 3): string {
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0]
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`
+  const shown = parts.slice(0, max)
+  const rest = parts.length - shown.length
+  if (rest <= 0) {
+    return `${shown.slice(0, -1).join(', ')}, and ${shown[shown.length - 1]}`
+  }
+  return `${shown.join(', ')}, and ${rest} more`
+}
+
 export function jumpActionLabel(jump: HandoffJump): string {
   switch (jump.type) {
     case 'field':
@@ -197,12 +210,21 @@ export function jumpActionLabel(jump: HandoffJump): string {
   }
 }
 
+function firstName(full: string): string {
+  return full.split(/\s+/)[0] || full
+}
+
 export function buildHandoffSnapshot(
   mode: HandoffMode,
   pass: 1 | 2,
   actorLabel: string,
   input: HandoffInputs,
+  options?: { voice?: HandoffVoice },
 ): HandoffSnapshot {
+  const voice: HandoffVoice = options?.voice ?? 'self'
+  const isBriefing = voice === 'reviewer-briefing'
+  const who = firstName(actorLabel)
+
   const phase1Keys = PHASE1_FLAG_KEYS as readonly Phase1FlagKey[]
   const clearedFlags = phase1Keys.filter(k => isPhase1FlagResolved(k, input.reviewedFields))
   const openImportFlags = phase1Keys.filter(k => !isPhase1FlagResolved(k, input.reviewedFields))
@@ -224,29 +246,24 @@ export function buildHandoffSnapshot(
   const humanFlags = [...input.summaryFlagged.entries()]
   const edits = [...input.editedFields.entries()]
   const editKeys = edits.map(([k]) => k)
+  const editedClears = clearedFlags.filter(k => editKeys.some(ek => editTouchesFlag(ek, k)))
+  const markedOnly = clearedFlags.filter(k => !editKeys.some(ek => editTouchesFlag(ek, k)))
 
-  const criticalItems: HandoffItem[] = []
+  // ── Still open (grouped story beats, not a flat dump) ─────────────────
+  const openItems: HandoffItem[] = []
 
-  if (diagsOpen.length) {
-    for (const k of diagsOpen) {
-      criticalItems.push({
-        label: DIAG_LABELS[k] ?? k,
-        detail: 'Open AI diagnostic — not marked reviewed yet',
+  if (openNotes.length) {
+    for (const n of openNotes) {
+      openItems.push({
+        label: isBriefing
+          ? `${who} left a note${n.context ? ` on ${n.context}` : ''}`
+          : n.context
+            ? `Your note on ${n.context}`
+            : 'Open note',
+        detail: n.text,
         status: 'open',
-        jump: { type: 'diagnostic', issueKey: k },
-        jumpLabel: 'Open AI review',
-      })
-    }
-  }
-
-  if (openImportFlags.length) {
-    for (const k of openImportFlags) {
-      criticalItems.push({
-        label: fieldLabel(k),
-        detail: 'Import / mismatch flag still open',
-        status: 'open',
-        jump: { type: 'field', field: k },
-        jumpLabel: 'View field',
+        jump: { type: 'note', noteId: n.id },
+        jumpLabel: 'Read note',
       })
     }
   }
@@ -254,9 +271,13 @@ export function buildHandoffSnapshot(
   if (humanFlags.length) {
     for (const [field, meta] of humanFlags) {
       const note = input.summaryFlagNotes[field]
-      criticalItems.push({
-        label: fieldLabel(field) !== field ? fieldLabel(field) : field,
-        detail: [formatCheckMeta(meta), note].filter(Boolean).join(' — ') || 'Preparer flag for follow-up',
+      openItems.push({
+        label: isBriefing
+          ? `${who} flagged ${fieldLabel(field) !== field ? fieldLabel(field) : field}`
+          : `Flagged: ${fieldLabel(field) !== field ? fieldLabel(field) : field}`,
+        detail: note
+          ? `"${note}" · ${formatCheckMeta(meta)}`
+          : `Marked for follow-up · ${formatCheckMeta(meta)}`,
         status: 'open',
         jump: { type: 'field', field },
         jumpLabel: 'View field',
@@ -264,216 +285,322 @@ export function buildHandoffSnapshot(
     }
   }
 
-  if (openNotes.length) {
-    for (const n of openNotes) {
-      criticalItems.push({
-        label: n.context ? `${n.context}` : 'Preparer note',
-        detail: n.text,
-        status: 'open',
-        jump: { type: 'note', noteId: n.id },
-        jumpLabel: 'Open note',
-      })
-    }
+  if (openImportFlags.length) {
+    const names = openImportFlags.map(fieldLabel)
+    openItems.push({
+      label: isBriefing
+        ? `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open`
+        : `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open`,
+      detail: isBriefing
+        ? `${who} didn’t clear these yet: ${listPhrase(names)}. Worth confirming against the source docs.`
+        : `Still need a look: ${listPhrase(names)}.`,
+      status: 'open',
+      jump: { type: 'field', field: openImportFlags[0] },
+      jumpLabel: 'View first flag',
+    })
+  }
+
+  if (diagsOpen.length) {
+    const names = diagsOpen.map(k => DIAG_LABELS[k] ?? k)
+    openItems.push({
+      label: isBriefing
+        ? `AI still has ${diagsOpen.length} diagnostic${diagsOpen.length === 1 ? '' : 's'} to walk through`
+        : `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'} not reviewed yet`,
+      detail: isBriefing
+        ? `${listPhrase(names)}. These weren’t marked reviewed in Pass 1 — pick them up after the import picture feels solid.`
+        : `${listPhrase(names)} — not marked reviewed yet.`,
+      status: 'open',
+      jump: { type: 'diagnostic', issueKey: diagsOpen[0] },
+      jumpLabel: 'Open AI review',
+    })
   }
 
   if (unverifiedDocs.length) {
-    if (unverifiedDocs.length <= 3) {
-      for (const docId of unverifiedDocs) {
-        criticalItems.push({
-          label: docLabel(docId),
-          detail: 'Not marked verified',
-          status: 'open',
-          jump: { type: 'doc', docId },
-          jumpLabel: 'Open document',
-        })
-      }
-    } else {
-      criticalItems.push({
-        label: `${unverifiedDocs.length} documents not verified`,
-        detail: unverifiedDocs.slice(0, 3).map(docLabel).join(', ') + ', and more',
-        status: 'open',
-        jump: { type: 'doc', docId: unverifiedDocs[0] },
-        jumpLabel: 'Open first document',
+    openItems.push({
+      label: isBriefing
+        ? `${unverifiedDocs.length} source document${unverifiedDocs.length === 1 ? '' : 's'} not marked verified`
+        : `${unverifiedDocs.length} document${unverifiedDocs.length === 1 ? '' : 's'} not verified`,
+      detail: isBriefing
+        ? `${who} didn’t mark these done: ${listPhrase(unverifiedDocs.map(docLabel))}.`
+        : listPhrase(unverifiedDocs.map(docLabel)),
+      status: 'open',
+      jump: { type: 'doc', docId: unverifiedDocs[0] },
+      jumpLabel: 'Open first document',
+    })
+  }
+
+  // ── What happened (connected story) ───────────────────────────────────
+  const doneItems: HandoffItem[] = []
+
+  if (editedClears.length || markedOnly.length) {
+    if (editedClears.length) {
+      doneItems.push({
+        label: isBriefing
+          ? `Edited ${editedClears.length} field${editedClears.length === 1 ? '' : 's'} to clear import flags`
+          : `Edited to clear ${editedClears.length} import flag${editedClears.length === 1 ? '' : 's'}`,
+        detail: listPhrase(editedClears.map(fieldLabel)),
+        status: 'done',
+        jump: { type: 'field', field: editedClears[0] },
+        jumpLabel: 'View field',
+      })
+    }
+    if (markedOnly.length) {
+      doneItems.push({
+        label: isBriefing
+          ? `Marked ${markedOnly.length} flagged field${markedOnly.length === 1 ? '' : 's'} correct without changing amounts`
+          : `Marked ${markedOnly.length} correct — no amount edit`,
+        detail: listPhrase(markedOnly.map(fieldLabel)),
+        status: 'done',
+        jump: { type: 'field', field: markedOnly[0] },
+        jumpLabel: 'View field',
       })
     }
   }
 
-  const attentionCount = criticalItems.length
-  const verdict =
-    attentionCount === 0
-      ? {
-          tone: 'clear' as const,
-          title: 'Looks clear for the next step',
-          detail:
-            diagsReviewed.length || clearedFlags.length
-              ? 'No open anomalies, flags, or preparer notes left in this snapshot.'
-              : 'No open items recorded — confirm the work matches your pass before finishing.',
-        }
-      : {
-          tone: 'attention' as const,
-          title: `${attentionCount} item${attentionCount === 1 ? '' : 's'} still need attention`,
-          detail: 'Review open diagnostics, flags, notes, and unverified documents before handoff or filing.',
-        }
-
-  // ── What was done: connected story (fewer, denser items) ──────────────
-  const doneItems: HandoffItem[] = []
-
-  for (const k of clearedFlags) {
-    const meta = input.reviewedFields.get(k)
-    const edited = editKeys.some(ek => editTouchesFlag(ek, k))
-    doneItems.push({
-      label: fieldLabel(k),
-      detail: edited
-        ? `Edited to clear import flag${meta ? ` · ${formatCheckMeta(meta)}` : ''}`
-        : `Marked correct — no amount edit${meta ? ` · ${formatCheckMeta(meta)}` : ''}`,
-      status: 'done',
-      jump: { type: 'field', field: k },
-      jumpLabel: 'View field',
-    })
+  const extraChecks = checks.filter(([field]) => !clearedFlags.includes(field as Phase1FlagKey))
+  if (extraChecks.length) {
+    const editedOnes = extraChecks.filter(([field]) => editKeys.some(ek => editTouchesFlag(ek, field)))
+    const reviewOnly = extraChecks.filter(([field]) => !editKeys.some(ek => editTouchesFlag(ek, field)))
+    if (editedOnes.length) {
+      doneItems.push({
+        label: isBriefing
+          ? `Also edited and checked ${editedOnes.length} summary line${editedOnes.length === 1 ? '' : 's'}`
+          : `Edited and checked ${editedOnes.length} summary line${editedOnes.length === 1 ? '' : 's'}`,
+        detail: listPhrase(editedOnes.map(([f]) => f)),
+        status: 'done',
+        jump: { type: 'field', field: editedOnes[0][0] },
+        jumpLabel: 'View field',
+      })
+    }
+    if (reviewOnly.length) {
+      doneItems.push({
+        label: isBriefing
+          ? `Reviewed ${reviewOnly.length} summary line${reviewOnly.length === 1 ? '' : 's'} without edits`
+          : `Reviewed ${reviewOnly.length} line${reviewOnly.length === 1 ? '' : 's'} without edits`,
+        detail: listPhrase(reviewOnly.map(([f]) => f)),
+        status: 'done',
+        jump: { type: 'field', field: reviewOnly[0][0] },
+        jumpLabel: 'View field',
+      })
+    }
   }
 
-  // Summary line checks that aren’t already covered as cleared import flags
-  for (const [field, meta] of checks) {
-    if (clearedFlags.includes(field)) continue
-    const edited = editKeys.some(ek => editTouchesFlag(ek, field))
-    doneItems.push({
-      label: field,
-      detail: edited
-        ? `Edited, then marked correct · ${formatCheckMeta(meta)}`
-        : `Reviewed without edits · ${formatCheckMeta(meta)}`,
-      status: 'done',
-      jump: { type: 'field', field },
-      jumpLabel: 'View field',
-    })
-  }
-
-  // Edits that didn’t clear a flag / become a check — still worth listing briefly
   const orphanEdits = edits.filter(
     ([k]) => !clearedFlags.some(f => editTouchesFlag(k, f)) && !checks.some(([c]) => editTouchesFlag(k, c)),
   )
   if (orphanEdits.length) {
-    const preview = orphanEdits.slice(0, 4).map(([k, meta]) => `${k} (${formatCheckMeta(meta)})`)
     doneItems.push({
-      label: `${orphanEdits.length} other field edit${orphanEdits.length === 1 ? '' : 's'}`,
-      detail: preview.join(' · ') + (orphanEdits.length > 4 ? ' · …' : ''),
+      label: `${orphanEdits.length} other amount change${orphanEdits.length === 1 ? '' : 's'}`,
+      detail: listPhrase(orphanEdits.map(([k, meta]) => `${k} (${formatCheckMeta(meta)})`), 4),
       status: 'info',
-      jump: orphanEdits[0] ? { type: 'field', field: orphanEdits[0][0] } : undefined,
-      jumpLabel: orphanEdits[0] ? 'View field' : undefined,
+      jump: { type: 'field', field: orphanEdits[0][0] },
+      jumpLabel: 'View field',
     })
   }
 
-  for (const docId of verifiedList) {
-    const meta = input.verifiedDocsMeta?.get(docId)
-    const relatedFlags = clearedFlags.filter(f => FLAG_TO_DOC[f] === docId)
-    const relatedEdits = docRelatedEdits(docId, editKeys)
-    let detail: string
-    if (relatedFlags.length && relatedEdits.length) {
-      detail = `Verified after clearing ${relatedFlags.length} flag${relatedFlags.length === 1 ? '' : 's'} and ${relatedEdits.length} edit${relatedEdits.length === 1 ? '' : 's'}`
-    } else if (relatedFlags.length) {
-      detail = `Verified after clearing ${relatedFlags.length} import flag${relatedFlags.length === 1 ? '' : 's'}`
-    } else if (relatedEdits.length) {
-      detail = `Verified with ${relatedEdits.length} related edit${relatedEdits.length === 1 ? '' : 's'}`
-    } else {
-      detail = 'Verified with no flags or edits on this document'
+  if (verifiedList.length) {
+    const cleanDocs = verifiedList.filter(docId => {
+      const relatedFlags = clearedFlags.filter(f => FLAG_TO_DOC[f] === docId)
+      const relatedEdits = docRelatedEdits(docId, editKeys)
+      return relatedFlags.length === 0 && relatedEdits.length === 0
+    })
+    const touchedDocs = verifiedList.filter(docId => !cleanDocs.includes(docId))
+
+    if (touchedDocs.length) {
+      doneItems.push({
+        label: isBriefing
+          ? `Verified ${touchedDocs.length} document${touchedDocs.length === 1 ? '' : 's'} after working flags or edits`
+          : `Verified ${touchedDocs.length} document${touchedDocs.length === 1 ? '' : 's'} with related work`,
+        detail: listPhrase(touchedDocs.map(docLabel)),
+        status: 'done',
+        jump: { type: 'doc', docId: touchedDocs[0] },
+        jumpLabel: 'Open document',
+      })
     }
-    if (meta) detail += ` · ${formatCheckMeta(meta)}`
-    doneItems.push({
-      label: docLabel(docId),
-      detail,
-      status: 'done',
-      jump: { type: 'doc', docId },
-      jumpLabel: 'Open document',
-    })
+    if (cleanDocs.length) {
+      doneItems.push({
+        label: isBriefing
+          ? `Verified ${cleanDocs.length} document${cleanDocs.length === 1 ? '' : 's'} that looked clean — no flags or edits`
+          : `Verified ${cleanDocs.length} clean document${cleanDocs.length === 1 ? '' : 's'}`,
+        detail: listPhrase(cleanDocs.map(docLabel)),
+        status: 'done',
+        jump: { type: 'doc', docId: cleanDocs[0] },
+        jumpLabel: 'Open document',
+      })
+    }
   }
 
-  for (const k of diagsReviewed) {
-    const meta = input.reviewedFields.get(k)
+  if (diagsReviewed.length) {
     doneItems.push({
-      label: DIAG_LABELS[k] ?? k,
-      detail: meta ? `Diagnostic marked reviewed · ${formatCheckMeta(meta)}` : 'Diagnostic marked reviewed',
+      label: isBriefing
+        ? `Walked through ${diagsReviewed.length} AI diagnostic${diagsReviewed.length === 1 ? '' : 's'}`
+        : `Reviewed ${diagsReviewed.length} AI diagnostic${diagsReviewed.length === 1 ? '' : 's'}`,
+      detail: listPhrase(diagsReviewed.map(k => DIAG_LABELS[k] ?? k)),
       status: 'done',
-      jump: { type: 'diagnostic', issueKey: k },
+      jump: { type: 'diagnostic', issueKey: diagsReviewed[0] },
       jumpLabel: 'Open AI review',
     })
   }
 
   if (doneItems.length === 0) {
     doneItems.push({
-      label: 'No completed actions recorded yet',
-      detail: 'Edits, checks, cleared flags, verified docs, and reviewed diagnostics will show up here.',
+      label: isBriefing
+        ? `${who} hasn’t recorded edits, checks, or verified docs yet`
+        : 'No completed actions recorded yet',
+      detail: 'As work happens, it’ll show up here as the story of the pass.',
       status: 'info',
     })
   }
 
   const doneOnlyCount = doneItems.filter(i => i.status === 'done').length
+  const hasOpen = openItems.length > 0
 
-  const sections: HandoffSection[] = [
-    {
-      id: 'needsAttention',
-      title: 'Needs attention',
-      summary: attentionCount ? `${attentionCount} open` : 'All clear',
-      bucket: 'critical',
-      defaultOpen: true,
-      items: attentionCount
-        ? criticalItems
-        : [
-            {
-              label: 'Nothing critical left in this snapshot',
-              detail: 'No open diagnostics, import flags, preparer flags, notes, or unverified docs.',
-              status: 'info',
-            },
-          ],
-    },
-    {
-      id: 'whatWasDone',
-      title: 'What was done',
-      summary: doneOnlyCount ? `${doneOnlyCount} recorded` : 'Nothing yet',
-      bucket: 'done',
-      defaultOpen: attentionCount === 0,
-      items: doneItems,
-    },
-  ]
+  // ── Conversational story + verdict ────────────────────────────────────
+  const story: string[] = []
+  if (isBriefing) {
+    story.push(
+      `${who} finished Pass 1 and handed this return to you. Here’s the short version of what happened — then what’s still open.`,
+    )
+    const beats: string[] = []
+    if (clearedFlags.length) {
+      beats.push(
+        editedClears.length && markedOnly.length
+          ? `cleared ${clearedFlags.length} import flags (${editedClears.length} with edits, ${markedOnly.length} marked correct as-is)`
+          : editedClears.length
+            ? `cleared ${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} with edits`
+            : `cleared ${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} without changing amounts`,
+      )
+    }
+    if (verifiedList.length) beats.push(`verified ${verifiedList.length} source document${verifiedList.length === 1 ? '' : 's'}`)
+    if (diagsReviewed.length) beats.push(`reviewed ${diagsReviewed.length} AI diagnostic${diagsReviewed.length === 1 ? '' : 's'}`)
+    if (edits.length && !editedClears.length) beats.push(`made ${edits.length} amount change${edits.length === 1 ? '' : 's'}`)
+    if (beats.length) {
+      story.push(`${who} ${listPhrase(beats)}.`)
+    } else {
+      story.push(`${who} didn’t leave much of a trail yet — you may want a fuller Pass 1 pass before you dig into AI.`)
+    }
+    if (openNotes.length) {
+      story.push(
+        openNotes.length === 1
+          ? `There’s 1 open note from ${who} — start there if you want their intent in their own words.`
+          : `There are ${openNotes.length} open notes from ${who} — start there if you want their intent in their own words.`,
+      )
+    }
+  } else {
+    story.push(
+      pass === 2
+        ? `Here’s where Pass 2 stands with your work, ${who}.`
+        : `Here’s the story of this pass so far — what’s still open, then what you’ve already handled.`,
+    )
+    if (clearedFlags.length || verifiedList.length || diagsReviewed.length) {
+      const bits: string[] = []
+      if (clearedFlags.length) bits.push(`${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} cleared`)
+      if (verifiedList.length) bits.push(`${verifiedList.length} doc${verifiedList.length === 1 ? '' : 's'} verified`)
+      if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'} reviewed`)
+      story.push(`So far you’ve got ${listPhrase(bits)}.`)
+    }
+  }
 
-  const quickLinks = [
-    {
-      id: 'needsAttention',
-      label: attentionCount ? 'Needs attention' : 'All clear',
-      count: attentionCount,
-      sectionId: 'needsAttention',
-    },
-    {
-      id: 'notes',
-      label: openNotes.length ? 'Open notes' : 'No open notes',
-      count: openNotes.length,
-      jump: openNotes.length ? ({ type: 'notesPane' as const }) : undefined,
-    },
-    {
-      id: 'whatWasDone',
-      label: 'What was done',
-      count: doneOnlyCount,
-      sectionId: 'whatWasDone',
-    },
-  ]
+  const verdict = !hasOpen
+    ? {
+        tone: 'clear' as const,
+        title: isBriefing
+          ? `${who} left you a clean handoff`
+          : 'Looks clear for the next step',
+        detail: isBriefing
+          ? 'No open flags, notes, or unverified docs in this snapshot. Spot-check what they did, then move through AI diagnostics if you want a second opinion.'
+          : 'No open anomalies, flags, or notes left in this snapshot.',
+      }
+    : {
+        tone: 'attention' as const,
+        title: isBriefing
+          ? `${who} left a few things for you`
+          : 'A few things still need a look',
+        detail: isBriefing
+          ? [
+              openNotes.length ? `${openNotes.length} note${openNotes.length === 1 ? '' : 's'}` : null,
+              openImportFlags.length ? `${openImportFlags.length} open import flag${openImportFlags.length === 1 ? '' : 's'}` : null,
+              diagsOpen.length ? `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}` : null,
+              humanFlags.length ? `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}` : null,
+              unverifiedDocs.length ? `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') + '. Read the story below, then work the open items in that order.'
+          : 'Work through open notes and flags first, then AI diagnostics and any documents still unverified.',
+      }
 
-  const nextSteps: string[] =
-    mode === 'finish-and-file'
+  const storySection: HandoffSection = {
+    id: 'whatWasDone',
+    title: isBriefing ? `What ${who} did in Pass 1` : 'What happened this pass',
+    summary: doneOnlyCount ? `${doneOnlyCount} chapter${doneOnlyCount === 1 ? '' : 's'}` : 'Nothing yet',
+    intro: isBriefing
+      ? 'This is the trail they left — edits tied to flags, clean verifies, and anything they already walked through in AI.'
+      : 'Edits, clears, verifies, and diagnostics you’ve already handled.',
+    bucket: 'done',
+    defaultOpen: true,
+    items: doneItems,
+  }
+
+  const openSection: HandoffSection = {
+    id: 'needsAttention',
+    title: isBriefing ? 'Still open for you' : 'Still open',
+    summary: hasOpen ? `${openItems.length} thread${openItems.length === 1 ? '' : 's'}` : 'All clear',
+    intro: isBriefing
+      ? 'Suggested order: notes and flags first (intent + data accuracy), then AI diagnostics, then any docs still unverified.'
+      : 'Clear these before you hand off or file.',
+    bucket: 'critical',
+    defaultOpen: true,
+    items: hasOpen
+      ? openItems
+      : [
+          {
+            label: isBriefing ? 'Nothing waiting on you in this snapshot' : 'Nothing critical left',
+            detail: 'No open diagnostics, import flags, preparer flags, notes, or unverified docs.',
+            status: 'info',
+          },
+        ],
+  }
+
+  // Reviewer: story first, then open. Self: open first, then story.
+  const sections: HandoffSection[] = isBriefing
+    ? [storySection, openSection]
+    : [openSection, storySection]
+
+  const nextSteps: string[] = isBriefing
+    ? [
+        hasOpen
+          ? `Start with ${who}’s notes and any open import flags — that context will make the AI diagnostics easier to judge.`
+          : `Spot-check what ${who} verified, then walk the AI diagnostics catalog if you want a second pass.`,
+        'You can reply on notes, add your own checks or flags, then wrap Pass 2 when you’re ready.',
+      ]
+    : mode === 'finish-and-file'
       ? [
-          attentionCount
-            ? 'Clear or document remaining open items before transmitting.'
+          hasOpen
+            ? 'Clear or document what’s still open before transmitting.'
             : 'Return looks clear of open follow-ups — proceed to file.',
           'Confirm e-file checklist and state returns if applicable.',
         ]
       : mode === 'pass-to-reviewer' || mode === 'signoff-review'
         ? [
-            attentionCount
-              ? 'Start Pass 2 from Needs attention — open flags, notes, and unverified docs first.'
-              : 'Snapshot looks clear; reviewer can spot-check What was done.',
-            'Reviewer can reply/resolve notes and add their own checks or flags.',
+            hasOpen
+              ? 'If you pass this on, the next reviewer will see your open notes and flags first.'
+              : 'Looks like a clean handoff — the next reviewer can spot-check your trail.',
+            'They can reply on notes and add their own checks or flags.',
           ]
         : [
             'Waiting for the next reviewer.',
             'Use “Open as reviewer” to start Pass 2 in this prototype.',
           ]
 
-  return { mode, pass, actorLabel, verdict, sections, nextSteps, quickLinks }
+  return {
+    mode,
+    pass,
+    actorLabel,
+    voice,
+    story,
+    verdict,
+    sections,
+    nextSteps,
+    quickLinks: [],
+  }
 }

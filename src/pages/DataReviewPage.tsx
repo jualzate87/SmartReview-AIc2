@@ -665,7 +665,12 @@ export default function DataReviewPage() {
     return set.size ? set : new Set(['__none__'])
   })()
 
-  const buildSnapshot = (mode: HandoffMode, pass: 1 | 2 = reviewPass, actor = actorLabel): HandoffSnapshot =>
+  const buildSnapshot = (
+    mode: HandoffMode,
+    pass: 1 | 2 = reviewPass,
+    actor = actorLabel,
+    voice: 'self' | 'reviewer-briefing' = 'self',
+  ): HandoffSnapshot =>
     buildHandoffSnapshot(mode, pass, actor, {
       reviewedFields,
       verifiedDocs,
@@ -676,7 +681,7 @@ export default function DataReviewPage() {
       summaryFlagNotes,
       notes,
       amounts,
-    })
+    }, { voice })
 
   /** Sign-off CTA → detailed summary first (then Finish & file / Pass to reviewer) */
   const handleWrapUpPass = () => {
@@ -792,7 +797,7 @@ export default function DataReviewPage() {
   }
 
   const pass2BriefingSnapshot = reviewRole === 'reviewer'
-    ? buildSnapshot('signoff-review', 1, pass1ActorLabel)
+    ? buildSnapshot('signoff-review', 1, pass1ActorLabel, 'reviewer-briefing')
     : null
 
   /**
@@ -1903,8 +1908,8 @@ export default function DataReviewPage() {
                       }
                       showPassHandoff={showPassHandoff && reviewRole === 'reviewer'}
                       passHandoffSnapshot={pass2BriefingSnapshot}
-                      passHandoffTitle={`What ${pass1ActorLabel} completed`}
-                      passHandoffSubtitle="Pass 1 handoff · Start with open flags and unresolved notes — jump links use the same navigation as Review AI"
+                      passHandoffTitle={`Handoff from ${pass1ActorLabel}`}
+                      passHandoffSubtitle="Pass 1 → your review · Read the story, then work what’s still open"
                       onHandoffJump={handleHandoffJump}
                       onDismissPassHandoff={() => setShowPassHandoff(false)}
                       onFieldValueChange={(key, value) => {

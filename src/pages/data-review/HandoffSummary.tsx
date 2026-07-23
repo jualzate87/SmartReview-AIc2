@@ -12,22 +12,18 @@ import styles from '../../styles/data-review/HandoffSummary.module.css'
 
 type Props = {
   snapshot: HandoffSnapshot
-  /** overlay = modal; embedded = AI panel body */
   variant?: 'overlay' | 'embedded'
   onJump?: (jump: HandoffJump) => void
   onClose?: () => void
-  /** Keep reviewing / dismiss without deciding */
   onContinue?: () => void
   onFinishAndFile?: () => void
   onPassToReviewer?: () => void
   onConfirmSend?: () => void
   onOpenAsReviewer?: () => void
-  /** @deprecated Chips removed — hierarchy lives in sections */
+  /** @deprecated Chips removed */
   showQuickLinks?: boolean
-  /** Optional title override (Pass 2: “What Sara completed”) */
   titleOverride?: string
   subtitleOverride?: string
-  /** Embedded Pass 2 briefing — no decide footer */
   hideFooter?: boolean
 }
 
@@ -62,15 +58,17 @@ export default function HandoffSummary({
     })
   }
 
+  const isBriefing = snapshot.voice === 'reviewer-briefing'
+
   const title =
     titleOverride ??
     (snapshot.mode === 'finish-and-file'
-      ? 'Ready to file — snapshot'
+      ? 'Ready to file'
       : snapshot.mode === 'awaiting-reviewer'
-        ? 'Handoff sent — waiting for reviewer'
+        ? 'Handoff sent'
         : snapshot.mode === 'signoff-review'
-          ? 'Review snapshot'
-          : 'Handoff summary preview')
+          ? 'Where things stand'
+          : 'Handoff preview')
 
   const subtitle =
     subtitleOverride ??
@@ -79,8 +77,8 @@ export default function HandoffSummary({
       : snapshot.mode === 'awaiting-reviewer'
         ? `Pass ${snapshot.pass} complete · Next person can open as reviewer`
         : snapshot.mode === 'signoff-review'
-          ? `Pass ${snapshot.pass} · ${snapshot.actorLabel} · Critical items first, then what was done`
-          : `Pass ${snapshot.pass} · Preview of what the next reviewer will see`)
+          ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
+          : `Pass ${snapshot.pass} · Preview for the next reviewer`)
 
   const verdictType = snapshot.verdict.tone === 'clear' ? 'success' : 'warn'
 
@@ -97,6 +95,14 @@ export default function HandoffSummary({
           </button>
         )}
       </header>
+
+      {snapshot.story.length > 0 && (
+        <div className={styles.story}>
+          {snapshot.story.map((para, i) => (
+            <p key={i} className={styles.storyPara}>{para}</p>
+          ))}
+        </div>
+      )}
 
       <div className={styles.verdictWrap}>
         <PageMessage
@@ -132,32 +138,37 @@ export default function HandoffSummary({
                 <span className={styles.sectionSummary}>{section.summary}</span>
               </button>
               {isOpen && (
-                <ul className={styles.list}>
-                  {section.items.map((item, i) => (
-                    <li key={`${section.id}-${i}`} className={styles.item}>
-                      <div className={styles.itemText}>
-                        <span className={styles.itemLabel}>{item.label}</span>
-                        {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}
-                      </div>
-                      {item.jump && onJump && (
-                        <button
-                          type="button"
-                          className={styles.jumpBtn}
-                          onClick={() => onJump(item.jump!)}
-                        >
-                          {item.jumpLabel ?? jumpActionLabel(item.jump)}
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  {section.intro && <p className={styles.sectionIntro}>{section.intro}</p>}
+                  <ul className={styles.list}>
+                    {section.items.map((item, i) => (
+                      <li key={`${section.id}-${i}`} className={styles.item}>
+                        <div className={styles.itemText}>
+                          <span className={styles.itemLabel}>{item.label}</span>
+                          {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}
+                        </div>
+                        {item.jump && onJump && (
+                          <button
+                            type="button"
+                            className={styles.jumpBtn}
+                            onClick={() => onJump(item.jump!)}
+                          >
+                            {item.jumpLabel ?? jumpActionLabel(item.jump)}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </section>
           )
         })}
 
         <section className={`${styles.section} ${styles.sectionNext}`}>
-          <h3 className={styles.sectionTitleStatic}>Suggested next</h3>
+          <h3 className={styles.sectionTitleStatic}>
+            {isBriefing ? 'Suggested next for you' : 'Suggested next'}
+          </h3>
           <ul className={styles.nextList}>
             {snapshot.nextSteps.map((step, i) => (
               <li key={i}>{step}</li>
