@@ -558,7 +558,6 @@ export default function AgentReportPane({
             <HandoffSummary
               variant="embedded"
               snapshot={passHandoffSnapshot}
-              showQuickLinks
               hideFooter
               titleOverride={passHandoffTitle}
               subtitleOverride={passHandoffSubtitle}

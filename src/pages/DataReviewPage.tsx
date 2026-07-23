@@ -1946,7 +1946,6 @@ export default function DataReviewPage() {
             }
           }}
           onJump={handleHandoffJump}
-          showQuickLinks={handoffSnapshot.mode === 'signoff-review' || handoffSnapshot.mode === 'pass-to-reviewer'}
           onFinishAndFile={handlePreviewFinishAndFile}
           onPassToReviewer={handlePreviewPassToReviewer}
           onConfirmSend={handleConfirmHandoffSend}

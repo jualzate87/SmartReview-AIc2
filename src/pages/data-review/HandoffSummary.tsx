@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
+import { PageMessage } from '@ids-ts/page-message'
+import '@ids-ts/page-message/dist/main.css'
+import { B3 } from '@ids-ts/typography'
+import '@ids-ts/typography/dist/main.css'
 import { ChevronDown, ChevronRight, Close } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import { jumpActionLabel } from '../../data/handoffSnapshot'
@@ -18,17 +22,13 @@ type Props = {
   onPassToReviewer?: () => void
   onConfirmSend?: () => void
   onOpenAsReviewer?: () => void
-  /** When true, show Pass 2 quick-link chips */
+  /** @deprecated Chips removed — hierarchy lives in sections */
   showQuickLinks?: boolean
   /** Optional title override (Pass 2: “What Sara completed”) */
   titleOverride?: string
   subtitleOverride?: string
   /** Embedded Pass 2 briefing — no decide footer */
   hideFooter?: boolean
-}
-
-function bucketClass(bucket: 'critical' | 'done') {
-  return bucket === 'critical' ? styles.bucketCritical : styles.bucketDone
 }
 
 export default function HandoffSummary({
@@ -41,7 +41,6 @@ export default function HandoffSummary({
   onPassToReviewer,
   onConfirmSend,
   onOpenAsReviewer,
-  showQuickLinks = false,
   titleOverride,
   subtitleOverride,
   hideFooter = false,
@@ -83,6 +82,8 @@ export default function HandoffSummary({
           ? `Pass ${snapshot.pass} · ${snapshot.actorLabel} · Critical items first, then what was done`
           : `Pass ${snapshot.pass} · Preview of what the next reviewer will see`)
 
+  const verdictType = snapshot.verdict.tone === 'clear' ? 'success' : 'warn'
+
   const body = (
     <>
       <header className={styles.header}>
@@ -97,44 +98,17 @@ export default function HandoffSummary({
         )}
       </header>
 
-      <div
-        className={`${styles.verdict} ${
-          snapshot.verdict.tone === 'clear' ? styles.verdictClear : styles.verdictAttention
-        }`}
-      >
-        <p className={styles.verdictTitle}>{snapshot.verdict.title}</p>
-        <p className={styles.verdictDetail}>{snapshot.verdict.detail}</p>
+      <div className={styles.verdictWrap}>
+        <PageMessage
+          type={verdictType}
+          title={snapshot.verdict.title}
+          open
+          dismissible={false}
+          automationId="handoff-verdict"
+        >
+          <B3>{snapshot.verdict.detail}</B3>
+        </PageMessage>
       </div>
-
-      {showQuickLinks && snapshot.quickLinks.length > 0 && (
-        <div className={styles.quickLinks} role="group" aria-label="Jump to sections">
-          {snapshot.quickLinks.map(link => {
-            const canAct = Boolean(link.jump || link.sectionId)
-            return (
-              <button
-                key={link.id}
-                type="button"
-                className={styles.quickLink}
-                disabled={!canAct}
-                title={!canAct ? link.label : undefined}
-                onClick={() => {
-                  if (link.jump) onJump?.(link.jump)
-                  else if (link.sectionId) {
-                    setOpenIds(prev => new Set(prev).add(link.sectionId!))
-                    document.getElementById(`handoff-sec-${link.sectionId}`)?.scrollIntoView({
-                      behavior: 'smooth',
-                      block: 'nearest',
-                    })
-                  }
-                }}
-              >
-                {link.label}
-                <span className={styles.quickCount}>{link.count}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
 
       <div className={styles.body}>
         {snapshot.sections.map(section => {
@@ -143,7 +117,7 @@ export default function HandoffSummary({
             <section
               key={section.id}
               id={`handoff-sec-${section.id}`}
-              className={`${styles.section} ${bucketClass(section.bucket)}`}
+              className={styles.section}
             >
               <button
                 type="button"
@@ -160,10 +134,7 @@ export default function HandoffSummary({
               {isOpen && (
                 <ul className={styles.list}>
                   {section.items.map((item, i) => (
-                    <li
-                      key={`${section.id}-${i}`}
-                      className={`${styles.item} ${item.status === 'open' ? styles.itemOpen : ''}`}
-                    >
+                    <li key={`${section.id}-${i}`} className={styles.item}>
                       <div className={styles.itemText}>
                         <span className={styles.itemLabel}>{item.label}</span>
                         {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}

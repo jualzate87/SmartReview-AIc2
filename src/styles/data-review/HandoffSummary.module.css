@@ -66,46 +66,15 @@
   color: var(--color-text-primary);
 }
 
-.verdict {
-  margin: 0 var(--space-container-padding-medium);
-  margin-top: 12px;
-  padding: 12px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--color-divider-tertiary);
-}
-
-.verdictClear {
-  background: var(--color-container-background-secondary, #f4f5f8);
-  border-left: 3px solid var(--color-indicator-success, #00856d);
-}
-
-.verdictAttention {
-  background: var(--color-container-background-secondary, #f4f5f8);
-  border-left: 3px solid var(--color-indicator-warning, #d68000);
-}
-
-.verdictTitle {
-  margin: 0;
-  font-family: var(--font-family-heading);
-  font-size: var(--font-size-component-medium);
-  font-weight: var(--font-weight-heading);
-  color: var(--color-text-primary);
-}
-
-.verdictDetail {
-  margin: 4px 0 0;
-  font-family: var(--font-family-body);
-  font-size: var(--font-size-body-3);
-  color: var(--color-text-secondary);
-  line-height: 1.4;
+.verdictWrap {
+  padding: var(--space-container-padding-medium);
+  padding-bottom: 0;
 }
 
 .body {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-container-padding-medium);
-  /* Block layout so sections keep natural height and scroll.
-     Flex + default flex-shrink was crushing sections into an overlap. */
   display: block;
   min-height: 0;
 }
@@ -118,45 +87,13 @@
   background: var(--color-container-background-primary);
 }
 
-.quickLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 var(--space-container-padding-medium) 12px;
-}
-
-.quickLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--color-divider-tertiary);
-  background: var(--color-container-background-secondary, #f4f5f8);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-family: var(--font-family-component);
-  font-size: var(--font-size-component-x-small);
-  font-weight: var(--font-weight-component-semibold);
-  color: var(--color-text-primary);
-  cursor: pointer;
-}
-
-.quickLink:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.quickCount {
-  color: var(--color-text-secondary);
-}
-
 .section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   border: 1px solid var(--color-divider-tertiary);
-  border-radius: 6px;
+  border-radius: var(--size-border-radius-medium, 6px);
   overflow: hidden;
-  margin-bottom: var(--space-component-gap-small);
+  margin-bottom: var(--space-component-gap-medium);
   flex-shrink: 0;
 }
 
@@ -164,28 +101,19 @@
   margin-bottom: 0;
 }
 
-/* One accent per section — avoid rainbow inside expanded lists */
-.bucketCritical {
-  border-left: 3px solid var(--color-indicator-warning, #d68000);
-}
-
-.bucketDone {
-  border-left: 3px solid var(--color-divider-secondary, #c7ccd1);
-}
-
 .sectionNext {
-  border-left: 3px solid transparent;
+  border-style: solid;
 }
 
 .sectionToggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-component-gap-small);
   width: 100%;
   min-height: 44px;
   border: none;
   background: var(--color-container-background-secondary, #f4f5f8);
-  padding: 10px 12px;
+  padding: var(--space-container-padding-small) var(--space-container-padding-medium);
   cursor: pointer;
   text-align: left;
   box-sizing: border-box;
@@ -209,7 +137,7 @@
 
 .sectionTitleStatic {
   margin: 0;
-  padding: 0 4px;
+  padding: var(--space-container-padding-small) var(--space-container-padding-medium) 0;
   font-family: var(--font-family-heading);
   font-size: var(--font-size-component-medium);
   font-weight: var(--font-weight-heading);
@@ -226,25 +154,21 @@
 .list,
 .nextList {
   margin: 0;
-  padding: 8px;
+  padding: var(--space-container-padding-small);
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-component-gap-small);
 }
 
 .item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 4px;
+  gap: var(--space-component-gap-small);
+  padding: var(--space-container-padding-small) var(--space-container-padding-medium);
+  border-radius: var(--size-border-radius-small, 4px);
   border: 1px solid var(--color-divider-tertiary);
   background: var(--color-container-background-primary);
-}
-
-.itemOpen {
-  background: var(--color-container-background-secondary, #fafbfc);
 }
 
 .itemText {
