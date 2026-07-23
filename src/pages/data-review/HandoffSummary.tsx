@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
+import { NumericBadge } from '@ids-ts/badge'
+import '@ids-ts/badge/dist/main.css'
 import PageMessage from '@ids-ts/page-message'
 import '@ids-ts/page-message/dist/main.css'
 import { B3 } from '@ids-ts/typography'
@@ -135,7 +137,9 @@ export default function HandoffSummary({
                   {isOpen ? <ChevronDown size="small" /> : <ChevronRight size="small" />}
                 </span>
                 <span className={styles.sectionTitle}>{section.title}</span>
-                <span className={styles.sectionSummary}>{section.summary}</span>
+                <span className={styles.sectionBadge} aria-label={section.countLabel}>
+                  <NumericBadge quantity={section.count} />
+                </span>
               </button>
               {isOpen && (
                 <>

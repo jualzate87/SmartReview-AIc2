@@ -169,6 +169,13 @@
   color: var(--color-text-primary);
 }
 
+.sectionBadge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .sectionSummary {
   font-family: var(--font-family-component);
   font-size: var(--font-size-component-x-small);

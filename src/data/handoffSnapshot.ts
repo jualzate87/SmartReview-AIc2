@@ -40,9 +40,12 @@ export type HandoffItem = {
 export type HandoffSection = {
   id: string
   title: string
-  summary: string
   /** Optional lead-in under the section title */
   intro?: string
+  /** Numeric badge count (IDS NumericBadge) */
+  count: number
+  /** Accessible label for the count, e.g. "3 open" */
+  countLabel: string
   bucket: 'critical' | 'done'
   defaultOpen?: boolean
   items: HandoffItem[]
@@ -532,7 +535,10 @@ export function buildHandoffSnapshot(
   const storySection: HandoffSection = {
     id: 'whatWasDone',
     title: isBriefing ? `What ${who} did in Pass 1` : 'What happened this pass',
-    summary: doneOnlyCount ? `${doneOnlyCount} chapter${doneOnlyCount === 1 ? '' : 's'}` : 'Nothing yet',
+    count: doneOnlyCount,
+    countLabel: doneOnlyCount
+      ? `${doneOnlyCount} completed`
+      : 'Nothing completed yet',
     intro: isBriefing
       ? 'This is the trail they left — edits tied to flags, clean verifies, and anything they already walked through in AI.'
       : 'Edits, clears, verifies, and diagnostics you’ve already handled.',
@@ -544,7 +550,10 @@ export function buildHandoffSnapshot(
   const openSection: HandoffSection = {
     id: 'needsAttention',
     title: isBriefing ? 'Still open for you' : 'Still open',
-    summary: hasOpen ? `${openItems.length} thread${openItems.length === 1 ? '' : 's'}` : 'All clear',
+    count: hasOpen ? openItems.length : 0,
+    countLabel: hasOpen
+      ? `${openItems.length} open`
+      : 'All clear',
     intro: isBriefing
       ? 'Suggested order: notes and flags first (intent + data accuracy), then AI diagnostics, then any docs still unverified.'
       : 'Clear these before you hand off or file.',
