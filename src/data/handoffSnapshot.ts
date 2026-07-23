@@ -522,31 +522,6 @@ export function buildHandoffSnapshot(
   const story: string[] = []
   if (isBriefing) {
     story.push(`${actorLabel} concluded her review. This is what you should know before you start Pass 2.`)
-    const beats: string[] = []
-    if (clearedFlags.length) {
-      beats.push(
-        editedClears.length && markedOnly.length
-          ? `cleared ${clearedFlags.length} import flags (${editedClears.length} with edits, ${markedOnly.length} marked correct as-is)`
-          : editedClears.length
-            ? `cleared ${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} with edits`
-            : `cleared ${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} without changing amounts`,
-      )
-    }
-    if (verifiedList.length) beats.push(`verified ${verifiedList.length} source document${verifiedList.length === 1 ? '' : 's'}`)
-    if (diagsReviewed.length) beats.push(`reviewed ${diagsReviewed.length} AI diagnostic${diagsReviewed.length === 1 ? '' : 's'}`)
-    if (edits.length && !editedClears.length) beats.push(`made ${edits.length} amount change${edits.length === 1 ? '' : 's'}`)
-    if (beats.length) {
-      story.push(`In Pass 1, ${who} ${listPhrase(beats)}.`)
-    } else if (!hasOpen) {
-      story.push(`Pass 1 does not show much completed work yet. Consider a fuller first pass before AI diagnostics.`)
-    }
-    if (openNotes.length) {
-      story.push(
-        openNotes.length === 1
-          ? 'There is 1 open note. Read it first for the preparer’s intent in their own words.'
-          : `There are ${openNotes.length} open notes. Read those first for the preparer’s intent in their own words.`,
-      )
-    }
   } else {
     story.push(
       pass === 2
