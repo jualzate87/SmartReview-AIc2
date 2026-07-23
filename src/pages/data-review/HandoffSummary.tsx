@@ -1,14 +1,14 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
-import { NumericBadge } from '@ids-ts/badge'
+import { Badge, NumericBadge } from '@ids-ts/badge'
 import '@ids-ts/badge/dist/main.css'
 import PageMessage from '@ids-ts/page-message'
 import '@ids-ts/page-message/dist/main.css'
 import { B3 } from '@ids-ts/typography'
 import '@ids-ts/typography/dist/main.css'
 import { ChevronDown, ChevronRight, Close } from '@design-systems/icons'
-import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
+import type { HandoffItem, HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import { jumpActionLabel } from '../../data/handoffSnapshot'
 import styles from '../../styles/data-review/HandoffSummary.module.css'
 
@@ -29,6 +29,62 @@ type Props = {
   hideFooter?: boolean
 }
 
+function CountBadge({
+  count,
+  countLabel,
+  warning = false,
+}: {
+  count: number
+  countLabel: string
+  warning?: boolean
+}) {
+  if (count <= 0) return null
+  if (warning) {
+    return (
+      <Badge shape="round" status="warning" aria-label={countLabel}>
+        {count}
+      </Badge>
+    )
+  }
+  return (
+    <span aria-label={countLabel}>
+      <NumericBadge quantity={count} />
+    </span>
+  )
+}
+
+function ItemRow({
+  item,
+  itemKey,
+  onJump,
+}: {
+  item: HandoffItem
+  itemKey: string
+  onJump?: (jump: HandoffJump) => void
+}) {
+  return (
+    <li
+      key={itemKey}
+      id={item.id ? `handoff-open-${item.id}` : undefined}
+      className={styles.item}
+    >
+      <div className={styles.itemText}>
+        <span className={styles.itemLabel}>{item.label}</span>
+        {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}
+      </div>
+      {item.jump && onJump && (
+        <button
+          type="button"
+          className={styles.jumpBtn}
+          onClick={() => onJump(item.jump!)}
+        >
+          {item.jumpLabel ?? jumpActionLabel(item.jump)}
+        </button>
+      )}
+    </li>
+  )
+}
+
 export default function HandoffSummary({
   snapshot,
   variant = 'overlay',
@@ -43,29 +99,17 @@ export default function HandoffSummary({
   subtitleOverride,
   hideFooter = false,
 }: Props) {
-  const [openIds, setOpenIds] = useState<Set<string>>(() => {
+  const [openSectionIds, setOpenSectionIds] = useState<Set<string>>(() => {
     const initial = new Set<string>()
     for (const s of snapshot.sections) {
       if (s.defaultOpen) initial.add(s.id)
     }
     return initial
   })
-  const bodyRef = useRef<HTMLDivElement>(null)
+  const [openGroupIds, setOpenGroupIds] = useState<Set<string>>(() => new Set())
 
-  const scrollToOpenItem = (itemId: string) => {
-    setOpenIds(prev => {
-      const next = new Set(prev)
-      next.add('needsAttention')
-      return next
-    })
-    requestAnimationFrame(() => {
-      const target = bodyRef.current?.querySelector<HTMLElement>(`#handoff-open-${itemId}`)
-      target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    })
-  }
-
-  const toggle = (id: string) => {
-    setOpenIds(prev => {
+  const toggleSection = (id: string) => {
+    setOpenSectionIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -73,7 +117,14 @@ export default function HandoffSummary({
     })
   }
 
-  const isBriefing = snapshot.voice === 'reviewer-briefing'
+  const toggleGroup = (id: string) => {
+    setOpenGroupIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const title =
     titleOverride ??
@@ -132,24 +183,10 @@ export default function HandoffSummary({
         </PageMessage>
       </div>
 
-      {snapshot.openNav.length > 0 && (
-        <nav className={styles.openNav} aria-label="Jump to open items">
-          {snapshot.openNav.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              className={styles.openNavChip}
-              onClick={() => scrollToOpenItem(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      )}
-
-      <div className={styles.body} ref={bodyRef}>
+      <div className={styles.body}>
         {snapshot.sections.map(section => {
-          const isOpen = openIds.has(section.id)
+          const isOpen = openSectionIds.has(section.id)
+          const isCritical = section.bucket === 'critical'
           return (
             <section
               key={section.id}
@@ -160,58 +197,84 @@ export default function HandoffSummary({
                 type="button"
                 className={styles.sectionToggle}
                 aria-expanded={isOpen}
-                onClick={() => toggle(section.id)}
+                onClick={() => toggleSection(section.id)}
               >
                 <span className={styles.sectionChevron}>
                   {isOpen ? <ChevronDown size="small" /> : <ChevronRight size="small" />}
                 </span>
                 <span className={styles.sectionTitle}>{section.title}</span>
-                <span className={styles.sectionBadge} aria-label={section.countLabel}>
-                  <NumericBadge quantity={section.count} />
+                <span className={styles.sectionBadge}>
+                  <CountBadge
+                    count={section.count}
+                    countLabel={section.countLabel}
+                    warning={isCritical && section.count > 0}
+                  />
                 </span>
               </button>
               {isOpen && (
                 <>
                   {section.intro && <p className={styles.sectionIntro}>{section.intro}</p>}
-                  <ul className={styles.list}>
-                    {section.items.map((item, i) => (
-                      <li
-                        key={item.id ?? `${section.id}-${i}`}
-                        id={item.id ? `handoff-open-${item.id}` : undefined}
-                        className={styles.item}
-                      >
-                        <div className={styles.itemText}>
-                          <span className={styles.itemLabel}>{item.label}</span>
-                          {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}
-                        </div>
-                        {item.jump && onJump && (
-                          <button
-                            type="button"
-                            className={styles.jumpBtn}
-                            onClick={() => onJump(item.jump!)}
+                  {section.groups && section.groups.length > 0 ? (
+                    <div className={styles.groupList}>
+                      {section.groups.map(group => {
+                        const groupOpen = openGroupIds.has(group.id)
+                        return (
+                          <div
+                            key={group.id}
+                            id={`handoff-group-${group.id}`}
+                            className={styles.group}
                           >
-                            {item.jumpLabel ?? jumpActionLabel(item.jump)}
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                            <button
+                              type="button"
+                              className={styles.groupToggle}
+                              aria-expanded={groupOpen}
+                              onClick={() => toggleGroup(group.id)}
+                            >
+                              <span className={styles.sectionChevron}>
+                                {groupOpen ? <ChevronDown size="small" /> : <ChevronRight size="small" />}
+                              </span>
+                              <span className={styles.groupTitle}>{group.title}</span>
+                              <span className={styles.sectionBadge}>
+                                <CountBadge
+                                  count={group.count}
+                                  countLabel={group.countLabel}
+                                  warning
+                                />
+                              </span>
+                            </button>
+                            {groupOpen && (
+                              <ul className={styles.list}>
+                                {group.items.map((item, i) => (
+                                  <ItemRow
+                                    key={item.id ?? `${group.id}-${i}`}
+                                    item={item}
+                                    itemKey={item.id ?? `${group.id}-${i}`}
+                                    onJump={onJump}
+                                  />
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <ul className={styles.list}>
+                      {section.items.map((item, i) => (
+                        <ItemRow
+                          key={item.id ?? `${section.id}-${i}`}
+                          item={item}
+                          itemKey={item.id ?? `${section.id}-${i}`}
+                          onJump={onJump}
+                        />
+                      ))}
+                    </ul>
+                  )}
                 </>
               )}
             </section>
           )
         })}
-
-        <section className={`${styles.section} ${styles.sectionNext}`}>
-          <h3 className={styles.sectionTitleStatic}>
-            {isBriefing ? 'Suggested next for you' : 'Suggested next'}
-          </h3>
-          <ul className={styles.nextList}>
-            {snapshot.nextSteps.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ul>
-        </section>
       </div>
 
       {!hideFooter && (

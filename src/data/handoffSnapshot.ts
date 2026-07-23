@@ -39,6 +39,15 @@ export type HandoffItem = {
   jumpLabel?: string
 }
 
+export type HandoffItemGroup = {
+  id: string
+  title: string
+  count: number
+  countLabel: string
+  defaultOpen?: boolean
+  items: HandoffItem[]
+}
+
 export type HandoffOpenNavItem = {
   id: string
   label: string
@@ -49,13 +58,15 @@ export type HandoffSection = {
   title: string
   /** Optional lead-in under the section title */
   intro?: string
-  /** Numeric badge count (IDS NumericBadge) */
+  /** Badge count — total granular items for open sections */
   count: number
   /** Accessible label for the count, e.g. "3 open" */
   countLabel: string
   bucket: 'critical' | 'done'
   defaultOpen?: boolean
   items: HandoffItem[]
+  /** Second-level grouping for open items (notes, flags, diagnostics, etc.) */
+  groups?: HandoffItemGroup[]
 }
 
 export type HandoffSnapshot = {
@@ -271,84 +282,108 @@ export function buildHandoffSnapshot(
   const editedClears = clearedFlags.filter(k => editKeys.some(ek => editTouchesFlag(ek, k)))
   const markedOnly = clearedFlags.filter(k => !editKeys.some(ek => editTouchesFlag(ek, k)))
 
-  // ── Still open (grouped story beats, not a flat dump) ─────────────────
-  const openItems: HandoffItem[] = []
+  // ── Still open — granular items grouped by category ───────────────────
+  const openGroups: HandoffItemGroup[] = []
 
   if (openNotes.length) {
-    for (const n of openNotes) {
-      const label = n.context
-        ? isBriefing
-          ? `Open note on ${n.context}`
-          : `Your note on ${n.context}`
-        : isBriefing
-          ? 'Open note'
-          : 'Open note'
-      openItems.push({
+    openGroups.push({
+      id: 'notes',
+      title: 'Notes',
+      count: openNotes.length,
+      countLabel: `${openNotes.length} note${openNotes.length === 1 ? '' : 's'}`,
+      items: openNotes.map(n => ({
         id: `note-${n.id}`,
-        label,
+        label: n.context
+          ? isBriefing
+            ? `Note on ${n.context}`
+            : `Your note on ${n.context}`
+          : 'Open note',
         detail: n.text,
-        status: 'open',
-        jump: { type: 'note', noteId: n.id },
+        status: 'open' as const,
+        jump: { type: 'note' as const, noteId: n.id },
         jumpLabel: 'Read note',
-      })
-    }
-  }
-
-  if (humanFlags.length) {
-    for (const [field, meta] of humanFlags) {
-      const note = input.summaryFlagNotes[field]
-      const name = fieldLabel(field) !== field ? fieldLabel(field) : field
-      openItems.push({
-        id: `flag-${field}`,
-        label: isBriefing ? `${name} flagged for follow-up` : `Flagged: ${name}`,
-        detail: note
-          ? `"${note}" · ${formatCheckMeta(meta)}`
-          : `Marked for follow-up · ${formatCheckMeta(meta)}`,
-        status: 'open',
-        jump: { type: 'field', field },
-        jumpLabel: 'View field',
-      })
-    }
+      })),
+    })
   }
 
   if (openImportFlags.length) {
-    const names = openImportFlags.map(fieldLabel)
-    openItems.push({
+    openGroups.push({
       id: 'import-flags',
-      label: `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open`,
-      detail: isBriefing
-        ? `Still need a look: ${listPhrase(names)}. Worth confirming against the source docs.`
-        : `Still need a look: ${listPhrase(names)}.`,
-      status: 'open',
-      jump: { type: 'field', field: openImportFlags[0] },
-      jumpLabel: 'View first flag',
+      title: 'Import flags',
+      count: openImportFlags.length,
+      countLabel: `${openImportFlags.length} open import flag${openImportFlags.length === 1 ? '' : 's'}`,
+      items: openImportFlags.map(flag => ({
+        id: `import-${flag}`,
+        label: fieldLabel(flag),
+        detail: isBriefing
+          ? 'Still needs a look against the source document.'
+          : 'Import flag still open.',
+        status: 'open' as const,
+        jump: { type: 'field' as const, field: flag },
+        jumpLabel: 'View field',
+      })),
     })
   }
 
   if (diagsOpen.length) {
-    const names = diagsOpen.map(k => DIAG_LABELS[k] ?? k)
-    openItems.push({
+    openGroups.push({
       id: 'ai-diagnostics',
-      label: `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'} not reviewed yet`,
-      detail: isBriefing
-        ? `${listPhrase(names)}. Not marked reviewed in Pass 1 — pick up after the import picture feels solid.`
-        : `${listPhrase(names)} — not marked reviewed yet.`,
-      status: 'open',
-      jump: { type: 'diagnostic', issueKey: diagsOpen[0] },
-      jumpLabel: 'Open AI review',
+      title: 'AI diagnostics',
+      count: diagsOpen.length,
+      countLabel: `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}`,
+      items: diagsOpen.map(k => ({
+        id: `diag-${k}`,
+        label: DIAG_LABELS[k] ?? k,
+        detail: isBriefing
+          ? 'Not marked reviewed in Pass 1 — pick up after import accuracy feels solid.'
+          : 'Not marked reviewed yet.',
+        status: 'open' as const,
+        jump: { type: 'diagnostic' as const, issueKey: k },
+        jumpLabel: 'Open AI review',
+      })),
     })
   }
 
   if (unverifiedDocs.length) {
-    openItems.push({
+    openGroups.push({
       id: 'unverified-docs',
-      label: `${unverifiedDocs.length} source document${unverifiedDocs.length === 1 ? '' : 's'} not verified`,
-      detail: listPhrase(unverifiedDocs.map(docLabel)),
-      status: 'open',
-      jump: { type: 'doc', docId: unverifiedDocs[0] },
-      jumpLabel: 'Open first document',
+      title: 'Unverified docs',
+      count: unverifiedDocs.length,
+      countLabel: `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}`,
+      items: unverifiedDocs.map(docId => ({
+        id: `doc-${docId}`,
+        label: docLabel(docId),
+        status: 'open' as const,
+        jump: { type: 'doc' as const, docId },
+        jumpLabel: 'Open document',
+      })),
     })
   }
+
+  if (humanFlags.length) {
+    openGroups.push({
+      id: 'preparer-flags',
+      title: 'Preparer flags',
+      count: humanFlags.length,
+      countLabel: `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}`,
+      items: humanFlags.map(([field, meta]) => {
+        const note = input.summaryFlagNotes[field]
+        const name = fieldLabel(field) !== field ? fieldLabel(field) : field
+        return {
+          id: `flag-${field}`,
+          label: isBriefing ? `${name} flagged for follow-up` : `Flagged: ${name}`,
+          detail: note
+            ? `"${note}" · ${formatCheckMeta(meta)}`
+            : `Marked for follow-up · ${formatCheckMeta(meta)}`,
+          status: 'open' as const,
+          jump: { type: 'field' as const, field },
+          jumpLabel: 'View field',
+        }
+      }),
+    })
+  }
+
+  const granularOpenCount = openGroups.reduce((sum, g) => sum + g.count, 0)
 
   // ── What happened (connected story) ───────────────────────────────────
   const doneItems: HandoffItem[] = []
@@ -474,18 +509,12 @@ export function buildHandoffSnapshot(
   }
 
   const doneOnlyCount = doneItems.filter(i => i.status === 'done').length
-  const hasOpen = openItems.length > 0
+  const hasOpen = granularOpenCount > 0
 
   // ── Conversational story + verdict ────────────────────────────────────
   const story: string[] = []
   if (isBriefing) {
-    if (hasOpen) {
-      story.push(
-        openItems.length === 1
-          ? 'Pass 1 has 1 open item in this snapshot — start there before spot-checking the rest.'
-          : `Pass 1 has ${openItems.length} open items in this snapshot — work through those first, then spot-check the rest.`,
-      )
-    }
+    story.push(`${actorLabel} concluded her review. This is what you should know before you start Pass 2.`)
     const beats: string[] = []
     if (clearedFlags.length) {
       beats.push(
@@ -530,8 +559,8 @@ export function buildHandoffSnapshot(
     openNotes.length ? `${openNotes.length} note${openNotes.length === 1 ? '' : 's'}` : null,
     openImportFlags.length ? `${openImportFlags.length} open import flag${openImportFlags.length === 1 ? '' : 's'}` : null,
     diagsOpen.length ? `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}` : null,
-    humanFlags.length ? `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}` : null,
     unverifiedDocs.length ? `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}` : null,
+    humanFlags.length ? `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}` : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -546,7 +575,7 @@ export function buildHandoffSnapshot(
       }
     : {
         tone: 'attention' as const,
-        title: attentionVerdictTitle(openItems.length),
+        title: attentionVerdictTitle(granularOpenCount),
         detail: isBriefing
           ? `${openBreakdown}.`
           : `${openBreakdown}. Work through open notes and flags first, then AI diagnostics and any documents still unverified.`,
@@ -570,17 +599,18 @@ export function buildHandoffSnapshot(
   const openSection: HandoffSection = {
     id: 'needsAttention',
     title: isBriefing ? 'Still open for you' : 'Still open',
-    count: hasOpen ? openItems.length : 0,
+    count: hasOpen ? granularOpenCount : 0,
     countLabel: hasOpen
-      ? `${openItems.length} open`
+      ? `${granularOpenCount} open`
       : 'All clear',
     intro: isBriefing
-      ? 'Suggested order: notes and flags first (intent + data accuracy), then AI diagnostics, then any docs still unverified.'
+      ? 'Expand each group to see every item — notes and flags first, then AI diagnostics, then any docs still unverified.'
       : 'Clear these before you hand off or file.',
     bucket: 'critical',
     defaultOpen: true,
+    groups: hasOpen ? openGroups : undefined,
     items: hasOpen
-      ? openItems
+      ? []
       : [
           {
             label: isBriefing ? 'Nothing waiting on you in this snapshot' : 'Nothing critical left',
@@ -593,35 +623,8 @@ export function buildHandoffSnapshot(
   // Open items first, then completed work — same order for self and reviewer briefing.
   const sections: HandoffSection[] = [openSection, storySection]
 
-  const openNav: HandoffOpenNavItem[] = openItems
-    .filter((item): item is HandoffItem & { id: string } => Boolean(item.id))
-    .map(item => ({ id: item.id, label: item.label }))
-
-  const nextSteps: string[] = isBriefing
-    ? [
-        hasOpen
-          ? `Start with ${who}’s notes and any open import flags — that context will make the AI diagnostics easier to judge.`
-          : `Spot-check what ${who} verified, then walk the AI diagnostics catalog if you want a second pass.`,
-        'You can reply on notes, add your own checks or flags, then wrap Pass 2 when you’re ready.',
-      ]
-    : mode === 'finish-and-file'
-      ? [
-          hasOpen
-            ? 'Clear or document what’s still open before transmitting.'
-            : 'Return looks clear of open follow-ups — proceed to file.',
-          'Confirm e-file checklist and state returns if applicable.',
-        ]
-      : mode === 'pass-to-reviewer' || mode === 'signoff-review'
-        ? [
-            hasOpen
-              ? 'If you pass this on, the next reviewer will see your open notes and flags first.'
-              : 'Looks like a clean handoff — the next reviewer can spot-check your trail.',
-            'They can reply on notes and add their own checks or flags.',
-          ]
-        : [
-            'Waiting for the next reviewer.',
-            'Use “Open as reviewer” to start Pass 2 in this prototype.',
-          ]
+  const openNav: HandoffOpenNavItem[] = []
+  const nextSteps: string[] = []
 
   return {
     mode,
