@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
-import { PageMessage } from '@ids-ts/page-message'
+import PageMessage from '@ids-ts/page-message'
 import '@ids-ts/page-message/dist/main.css'
 import { B3 } from '@ids-ts/typography'
 import '@ids-ts/typography/dist/main.css'
