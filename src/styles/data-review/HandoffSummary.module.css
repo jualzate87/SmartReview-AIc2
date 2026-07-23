@@ -343,6 +343,10 @@
   padding: 4px 8px;
 }
 
+.passBarLink + .passBarLink {
+  margin-left: 0;
+}
+
 .filterChips {
   display: flex;
   align-items: center;

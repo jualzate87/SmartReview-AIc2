@@ -702,6 +702,7 @@ export default function DataReviewPage() {
 
   const handleHandoffJump = useCallback((jump: HandoffJump) => {
     setHandoffSnapshot(null)
+    setShowPassHandoff(false)
     if (jump.type === 'notesPane' || jump.type === 'note') {
       if (jump.type === 'note') setFocusNoteId(jump.noteId)
       setNotesOpen(true)
@@ -740,7 +741,6 @@ export default function DataReviewPage() {
       return
     }
     if (jump.type === 'diagnostic') {
-      setShowPassHandoff(false)
       setAgentView('report')
       setPhase('diagnostics')
     }
@@ -750,6 +750,20 @@ export default function DataReviewPage() {
     setOutputFormId,
     applyVerifyNavigation,
   ])
+
+  /** Reopen live handoff / progress report after jumping out to clear items */
+  const handleOpenHandoffReport = () => {
+    if (reviewRole === 'reviewer') {
+      setHandoffSnapshot(null)
+      setShowPassHandoff(true)
+      setAgentView('report')
+      setPhase('diagnostics')
+      setRightPanelVisible(true)
+      return
+    }
+    setShowPassHandoff(false)
+    setHandoffSnapshot(buildSnapshot('signoff-review'))
+  }
 
   const handleOpenAsReviewer = () => {
     setReviewPass(2)
@@ -1030,7 +1044,7 @@ export default function DataReviewPage() {
 
   return (
     <div className={styles.page}>
-      {reviewRole === 'reviewer' && (
+      {reviewRole === 'reviewer' ? (
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
           <span>· Pass {reviewPass} · {REVIEWER_NAME}</span>
@@ -1063,18 +1077,27 @@ export default function DataReviewPage() {
               </button>
             ))}
           </div>
-          <button type="button" className={handoffStyles.passBarLink} onClick={handleFinishReviewerPass}>
-            Finish reviewer pass
-          </button>
           <button
             type="button"
             className={handoffStyles.passBarLink}
-            onClick={() => {
-              setShowPassHandoff(true)
-              setAgentView('report')
-            }}
+            onClick={handleOpenHandoffReport}
           >
-            View Pass 1 summary
+            Handoff report
+          </button>
+          <button type="button" className={handoffStyles.passBarLink} onClick={handleFinishReviewerPass}>
+            Finish reviewer pass
+          </button>
+        </div>
+      ) : (
+        <div className={handoffStyles.passBar} role="status">
+          <span className={handoffStyles.passBarStrong}>Preparer mode</span>
+          <span>· Pass {reviewPass} · {PREPARER_NAME}</span>
+          <button
+            type="button"
+            className={handoffStyles.passBarLink}
+            onClick={handleOpenHandoffReport}
+          >
+            Review snapshot
           </button>
         </div>
       )}
@@ -1912,6 +1935,12 @@ export default function DataReviewPage() {
                       passHandoffSubtitle="Pass 1 → your review · Read the story, then work what’s still open"
                       onHandoffJump={handleHandoffJump}
                       onDismissPassHandoff={() => setShowPassHandoff(false)}
+                      onOpenPassHandoff={handleOpenHandoffReport}
+                      handoffReopenLabel={
+                        reviewRole === 'reviewer'
+                          ? `Handoff from ${pass1ActorLabel}`
+                          : 'Review snapshot'
+                      }
                       onFieldValueChange={(key, value) => {
                         if (key === 'withholding' && typeof value === 'number') {
                           updateField('withholding', { techCircle: value })

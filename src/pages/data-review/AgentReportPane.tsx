@@ -68,8 +68,12 @@ interface AgentReportPaneProps {
   showPassHandoff?: boolean
   onHandoffJump?: (jump: HandoffJump) => void
   onDismissPassHandoff?: () => void
+  /** Reopen handoff after dismissing to clear items */
+  onOpenPassHandoff?: () => void
   passHandoffTitle?: string
   passHandoffSubtitle?: string
+  /** Label for reopen control (preparer vs reviewer) */
+  handoffReopenLabel?: string
 }
 
 const REPORT_CARDS = [
@@ -406,8 +410,10 @@ export default function AgentReportPane({
   showPassHandoff = false,
   onHandoffJump,
   onDismissPassHandoff,
+  onOpenPassHandoff,
   passHandoffTitle,
   passHandoffSubtitle,
+  handoffReopenLabel = 'Handoff report',
 }: AgentReportPaneProps) {
   const live = liveTotals ?? computeLiveReturn(amounts)
   const ALL_ISSUES = buildAllIssues(live, amounts)
@@ -566,7 +572,7 @@ export default function AgentReportPane({
             <div style={{ padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {onDismissPassHandoff && (
                 <button type="button" className={styles.completionSecondaryBtn} onClick={onDismissPassHandoff}>
-                  View diagnostics catalog
+                  Keep reviewing
                 </button>
               )}
               {onWrapUpPass && (
@@ -578,6 +584,17 @@ export default function AgentReportPane({
           </div>
         ) : (
         <div className={styles.chat}>
+
+          {onOpenPassHandoff && (
+            <button
+              type="button"
+              className={styles.handoffReopenBar}
+              onClick={onOpenPassHandoff}
+            >
+              <span className={styles.handoffReopenLabel}>{handoffReopenLabel}</span>
+              <span className={styles.handoffReopenHint}>Updated as you clear items</span>
+            </button>
+          )}
 
           <p className={styles.agentMessage}>
             Filing stoppers, compliance checks, and opportunities for this return.
