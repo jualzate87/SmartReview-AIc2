@@ -40,10 +40,14 @@ function CountBadge({
 }) {
   if (count <= 0) return null
   if (warning) {
+    // Rect warning badge — round shape skips IDS orange background for numeric values.
     return (
-      <Badge shape="round" status="warning" aria-label={countLabel}>
-        {count}
-      </Badge>
+      <Badge
+        status="warning"
+        value={count}
+        aria-label={countLabel}
+        className={styles.openCountBadge}
+      />
     )
   }
   return (

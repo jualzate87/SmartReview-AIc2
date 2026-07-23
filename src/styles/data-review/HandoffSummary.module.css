@@ -252,6 +252,23 @@
   margin-left: auto;
 }
 
+/* IDS warning badge: rect shape gets orange fill; pill styling for open counts */
+.openCountBadge:global(.idsTSBadge) {
+  flex-shrink: 0;
+}
+
+.openCountBadge:global(.idsTSBadge) :global([class*='Badge-value']) {
+  border-radius: 999px;
+  min-width: 22px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sectionToggle .sectionBadge,
+.groupToggle .sectionBadge {
+  color: unset;
+}
+
 .sectionSummary {
   font-family: var(--font-family-component);
   font-size: var(--font-size-component-x-small);

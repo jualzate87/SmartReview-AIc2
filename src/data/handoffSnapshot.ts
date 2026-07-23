@@ -269,7 +269,14 @@ export function buildHandoffSnapshot(
     amounts: input.amounts,
   })
   const diagsReviewed = p2.activeKeys.filter(k => input.reviewedFields.has(k))
-  const diagsOpen = p2.activeKeys.filter(k => !input.reviewedFields.has(k))
+  const diagsOpenRaw = p2.activeKeys.filter(k => !input.reviewedFields.has(k))
+  // Phase 1 import flags and the importMismatches diagnostic describe the same gaps.
+  // Keep field-level flags under Import flags; drop importMismatches from AI diagnostics
+  // while any Phase 1 import flags remain open so the handoff list does not double-count.
+  const diagsOpen =
+    openImportFlags.length > 0
+      ? diagsOpenRaw.filter(k => k !== 'importMismatches')
+      : diagsOpenRaw
 
   const openNotes = input.notes.filter(n => (n.status ?? 'open') === 'open')
   const verifiedList = [...input.verifiedDocs]
@@ -335,7 +342,7 @@ export function buildHandoffSnapshot(
         id: `diag-${k}`,
         label: DIAG_LABELS[k] ?? k,
         detail: isBriefing
-          ? 'Not marked reviewed in Pass 1 — pick up after import accuracy feels solid.'
+          ? 'Not marked reviewed in Pass 1. Finish import accuracy first.'
           : 'Not marked reviewed yet.',
         status: 'open' as const,
         jump: { type: 'diagnostic' as const, issueKey: k },
@@ -404,7 +411,7 @@ export function buildHandoffSnapshot(
       doneItems.push({
         label: isBriefing
           ? `Marked ${markedOnly.length} flagged field${markedOnly.length === 1 ? '' : 's'} correct without changing amounts`
-          : `Marked ${markedOnly.length} correct — no amount edit`,
+          : `Marked ${markedOnly.length} correct, no amount edit`,
         detail: listPhrase(markedOnly.map(fieldLabel)),
         status: 'done',
         jump: { type: 'field', field: markedOnly[0] },
@@ -476,7 +483,7 @@ export function buildHandoffSnapshot(
     if (cleanDocs.length) {
       doneItems.push({
         label: isBriefing
-          ? `Verified ${cleanDocs.length} document${cleanDocs.length === 1 ? '' : 's'} that looked clean — no flags or edits`
+          ? `Verified ${cleanDocs.length} document${cleanDocs.length === 1 ? '' : 's'} with no flags or edits`
           : `Verified ${cleanDocs.length} clean document${cleanDocs.length === 1 ? '' : 's'}`,
         detail: listPhrase(cleanDocs.map(docLabel)),
         status: 'done',
@@ -531,20 +538,20 @@ export function buildHandoffSnapshot(
     if (beats.length) {
       story.push(`In Pass 1, ${who} ${listPhrase(beats)}.`)
     } else if (!hasOpen) {
-      story.push(`Pass 1 doesn’t show much completed work yet — you may want a fuller first pass before digging into AI.`)
+      story.push(`Pass 1 does not show much completed work yet. Consider a fuller first pass before AI diagnostics.`)
     }
     if (openNotes.length) {
       story.push(
         openNotes.length === 1
-          ? 'There is 1 open note — read it first if you want the preparer’s intent in their own words.'
-          : `There are ${openNotes.length} open notes — read those first if you want the preparer’s intent in their own words.`,
+          ? 'There is 1 open note. Read it first for the preparer’s intent in their own words.'
+          : `There are ${openNotes.length} open notes. Read those first for the preparer’s intent in their own words.`,
       )
     }
   } else {
     story.push(
       pass === 2
         ? `Here’s where Pass 2 stands with your work, ${who}.`
-        : `Here’s the story of this pass so far — what’s still open, then what you’ve already handled.`,
+        : `Here’s where this pass stands: what’s still open, then what you’ve already handled.`,
     )
     if (clearedFlags.length || verifiedList.length || diagsReviewed.length) {
       const bits: string[] = []
@@ -589,7 +596,7 @@ export function buildHandoffSnapshot(
       ? `${doneOnlyCount} completed`
       : 'Nothing completed yet',
     intro: isBriefing
-      ? 'This is the trail they left — edits tied to flags, clean verifies, and anything they already walked through in AI.'
+      ? 'Edits tied to flags, clean verifies, and AI diagnostics they already reviewed.'
       : 'Edits, clears, verifies, and diagnostics you’ve already handled.',
     bucket: 'done',
     defaultOpen: true,
@@ -604,7 +611,7 @@ export function buildHandoffSnapshot(
       ? `${granularOpenCount} open`
       : 'All clear',
     intro: isBriefing
-      ? 'Expand each group to see every item — notes and flags first, then AI diagnostics, then any docs still unverified.'
+      ? 'Expand each group to see every item. Start with notes and import flags, then AI diagnostics and unverified docs.'
       : 'Clear these before you hand off or file.',
     bucket: 'critical',
     defaultOpen: true,
