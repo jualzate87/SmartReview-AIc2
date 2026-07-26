@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
 import { Badge, NumericBadge } from '@ids-ts/badge'
@@ -7,9 +7,9 @@ import PageMessage from '@ids-ts/page-message'
 import '@ids-ts/page-message/dist/main.css'
 import { B3 } from '@ids-ts/typography'
 import '@ids-ts/typography/dist/main.css'
-import { ChevronDown, ChevronRight, Close } from '@design-systems/icons'
 import type { HandoffItem, HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import { jumpActionLabel } from '../../data/handoffSnapshot'
+import ReviewSidePanel, { sidePanelStyles } from './ReviewSidePanel'
 import styles from '../../styles/data-review/HandoffSummary.module.css'
 
 type Props = {
@@ -42,8 +42,6 @@ function CountBadge({
 }) {
   if (count <= 0) return null
   if (warning) {
-    // NumericBadge is neutral-only. Badge `value` skips Badge-value (no orange fill).
-    // Children render inside Badge-value, which gets warning orange from IDS + our pill CSS.
     return (
       <span className={styles.openCountBadgeWrap}>
         <Badge
@@ -97,6 +95,48 @@ function ItemRow({
   )
 }
 
+/** Compact “Show details” disclosure — story brief, not a findings accordion */
+function DetailsDisclosure({
+  id,
+  label,
+  count,
+  countLabel,
+  warning,
+  defaultOpen = false,
+  children,
+}: {
+  id: string
+  label: string
+  count?: number
+  countLabel?: string
+  warning?: boolean
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div id={id} className={styles.disclosure}>
+      <button
+        type="button"
+        className={styles.disclosureToggle}
+        aria-expanded={open}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span className={styles.disclosureLabel}>
+          {open ? 'Hide details' : 'Show details'}
+          <span className={styles.disclosureHint}> · {label}</span>
+        </span>
+        {count != null && countLabel && (
+          <span className={styles.sectionBadge}>
+            <CountBadge count={count} countLabel={countLabel} warning={warning} />
+          </span>
+        )}
+      </button>
+      {open && <div className={styles.disclosureBody}>{children}</div>}
+    </div>
+  )
+}
+
 export default function HandoffSummary({
   snapshot,
   variant = 'drawer',
@@ -112,33 +152,6 @@ export default function HandoffSummary({
   hideFooter = false,
   closing = false,
 }: Props) {
-  const [openSectionIds, setOpenSectionIds] = useState<Set<string>>(() => {
-    const initial = new Set<string>()
-    for (const s of snapshot.sections) {
-      if (s.defaultOpen) initial.add(s.id)
-    }
-    return initial
-  })
-  const [openGroupIds, setOpenGroupIds] = useState<Set<string>>(() => new Set())
-
-  const toggleSection = (id: string) => {
-    setOpenSectionIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const toggleGroup = (id: string) => {
-    setOpenGroupIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
   const title =
     titleOverride ??
     (snapshot.mode === 'finish-and-file'
@@ -157,25 +170,83 @@ export default function HandoffSummary({
         : snapshot.mode === 'awaiting-reviewer'
           ? `Pass ${snapshot.pass} complete · Next person can open as reviewer`
           : snapshot.mode === 'signoff-review'
-            ? `Pass ${snapshot.pass} · ${snapshot.actorLabel} · Outstanding work and history`
+            ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
             : `Pass ${snapshot.pass} · Preview for the next reviewer`
 
   const verdictType = snapshot.verdict.tone === 'clear' ? 'success' : 'warn'
 
-  const body = (
+  const footerActions = !hideFooter ? (
     <>
-      <header className={styles.header}>
-        <div>
-          <h2 id="handoff-title" className={styles.title}>{title}</h2>
-          {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
-        </div>
-        {(variant === 'overlay' || variant === 'drawer') && onClose && (
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close summary">
-            <Close size="small" />
-          </button>
-        )}
-      </header>
+      {snapshot.mode === 'signoff-review' && (
+        <>
+          {onContinue && (
+            <Button priority="tertiary" size="medium" onClick={onContinue}>
+              Keep reviewing
+            </Button>
+          )}
+          <div className={sidePanelStyles.footerSpacer} />
+          {onPassToReviewer && (
+            <Button priority="secondary" size="medium" onClick={onPassToReviewer}>
+              Pass to next reviewer
+            </Button>
+          )}
+          {onFinishAndFile && (
+            <Button priority="primary" size="medium" onClick={onFinishAndFile}>
+              Finish &amp; file
+            </Button>
+          )}
+        </>
+      )}
+      {snapshot.mode === 'pass-to-reviewer' && (
+        <>
+          {onContinue && (
+            <Button priority="tertiary" size="medium" onClick={onContinue}>
+              Back
+            </Button>
+          )}
+          <div className={sidePanelStyles.footerSpacer} />
+          {onOpenAsReviewer && (
+            <Button priority="secondary" size="medium" onClick={onOpenAsReviewer}>
+              Open as reviewer
+            </Button>
+          )}
+          {onConfirmSend && (
+            <Button priority="primary" size="medium" onClick={onConfirmSend}>
+              Send to reviewer
+            </Button>
+          )}
+        </>
+      )}
+      {snapshot.mode === 'awaiting-reviewer' && (
+        <>
+          {onContinue && (
+            <Button priority="tertiary" size="medium" onClick={onContinue}>
+              Close
+            </Button>
+          )}
+          <div className={sidePanelStyles.footerSpacer} />
+          {onOpenAsReviewer && (
+            <Button priority="primary" size="medium" onClick={onOpenAsReviewer}>
+              Open as reviewer
+            </Button>
+          )}
+        </>
+      )}
+      {snapshot.mode === 'finish-and-file' && (
+        <>
+          <div className={sidePanelStyles.footerSpacer} />
+          {onContinue && (
+            <Button priority="primary" size="medium" onClick={onContinue}>
+              Mark ready to file
+            </Button>
+          )}
+        </>
+      )}
+    </>
+  ) : null
 
+  const briefContent = (
+    <div className={`${sidePanelStyles.scroll} ${styles.brief}`}>
       {snapshot.story.length > 0 && (
         <div className={styles.story}>
           {snapshot.story.map((para, i) => (
@@ -196,26 +267,21 @@ export default function HandoffSummary({
         </PageMessage>
       </div>
 
-      <div className={styles.body}>
+      <div className={styles.sections}>
         {snapshot.sections.map(section => {
-          const isOpen = openSectionIds.has(section.id)
           const isCritical = section.bucket === 'critical'
+          const hasGroups = !!(section.groups && section.groups.length > 0)
+          const hasItems = section.items.length > 0
+          const showDetails = hasGroups || (hasItems && section.items.some(i => i.status !== 'info'))
+
           return (
             <section
               key={section.id}
               id={`handoff-sec-${section.id}`}
-              className={styles.section}
+              className={styles.storySection}
             >
-              <button
-                type="button"
-                className={styles.sectionToggle}
-                aria-expanded={isOpen}
-                onClick={() => toggleSection(section.id)}
-              >
-                <span className={styles.sectionChevron}>
-                  {isOpen ? <ChevronDown size="small" /> : <ChevronRight size="small" />}
-                </span>
-                <span className={styles.sectionTitle}>{section.title}</span>
+              <div className={styles.storySectionHead}>
+                <h3 className={styles.storySectionTitle}>{section.title}</h3>
                 <span className={styles.sectionBadge}>
                   <CountBadge
                     count={section.count}
@@ -223,168 +289,128 @@ export default function HandoffSummary({
                     warning={isCritical && section.count > 0}
                   />
                 </span>
-              </button>
-              {isOpen && (
-                <>
-                  {section.intro && <p className={styles.sectionIntro}>{section.intro}</p>}
-                  {section.groups && section.groups.length > 0 ? (
-                    <div className={styles.groupList}>
-                      {section.groups.map(group => {
-                        const groupOpen = openGroupIds.has(group.id)
-                        return (
-                          <div
-                            key={group.id}
-                            id={`handoff-group-${group.id}`}
-                            className={styles.group}
-                          >
-                            <button
-                              type="button"
-                              className={styles.groupToggle}
-                              aria-expanded={groupOpen}
-                              onClick={() => toggleGroup(group.id)}
-                            >
-                              <span className={styles.sectionChevron}>
-                                {groupOpen ? <ChevronDown size="small" /> : <ChevronRight size="small" />}
-                              </span>
-                              <span className={styles.groupTitle}>{group.title}</span>
-                              <span className={styles.sectionBadge}>
-                                <CountBadge
-                                  count={group.count}
-                                  countLabel={group.countLabel}
-                                  warning
-                                />
-                              </span>
-                            </button>
-                            {groupOpen && (
-                              <ul className={styles.list}>
-                                {group.items.map((item, i) => (
-                                  <ItemRow
-                                    key={item.id ?? `${group.id}-${i}`}
-                                    item={item}
-                                    itemKey={item.id ?? `${group.id}-${i}`}
-                                    onJump={onJump}
-                                  />
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <ul className={styles.list}>
-                      {section.items.map((item, i) => (
-                        <ItemRow
-                          key={item.id ?? `${section.id}-${i}`}
-                          item={item}
-                          itemKey={item.id ?? `${section.id}-${i}`}
-                          onJump={onJump}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </>
+              </div>
+              {section.intro && (
+                <p className={styles.sectionIntro}>{section.intro}</p>
+              )}
+
+              {!showDetails && hasItems && (
+                <ul className={styles.list}>
+                  {section.items.map((item, i) => (
+                    <ItemRow
+                      key={item.id ?? `${section.id}-${i}`}
+                      item={item}
+                      itemKey={item.id ?? `${section.id}-${i}`}
+                      onJump={onJump}
+                    />
+                  ))}
+                </ul>
+              )}
+
+              {hasGroups && (
+                <div className={styles.groupStack}>
+                  {section.groups!.map(group => (
+                    <DetailsDisclosure
+                      key={group.id}
+                      id={`handoff-group-${group.id}`}
+                      label={group.title}
+                      count={group.count}
+                      countLabel={group.countLabel}
+                      warning={isCritical}
+                      defaultOpen={false}
+                    >
+                      <ul className={styles.list}>
+                        {group.items.map((item, i) => (
+                          <ItemRow
+                            key={item.id ?? `${group.id}-${i}`}
+                            item={item}
+                            itemKey={item.id ?? `${group.id}-${i}`}
+                            onJump={onJump}
+                          />
+                        ))}
+                      </ul>
+                    </DetailsDisclosure>
+                  ))}
+                </div>
+              )}
+
+              {!hasGroups && showDetails && (
+                <DetailsDisclosure
+                  id={`handoff-details-${section.id}`}
+                  label={section.title}
+                  count={section.count}
+                  countLabel={section.countLabel}
+                  warning={isCritical && section.count > 0}
+                  defaultOpen={section.defaultOpen}
+                >
+                  <ul className={styles.list}>
+                    {section.items.map((item, i) => (
+                      <ItemRow
+                        key={item.id ?? `${section.id}-${i}`}
+                        item={item}
+                        itemKey={item.id ?? `${section.id}-${i}`}
+                        onJump={onJump}
+                      />
+                    ))}
+                  </ul>
+                </DetailsDisclosure>
               )}
             </section>
           )
         })}
       </div>
-
-      {!hideFooter && (
-      <footer className={styles.footer}>
-        {snapshot.mode === 'signoff-review' && (
-          <>
-            {onContinue && (
-              <Button priority="tertiary" size="medium" onClick={onContinue}>
-                Keep reviewing
-              </Button>
-            )}
-            <div className={styles.footerSpacer} />
-            {onPassToReviewer && (
-              <Button priority="secondary" size="medium" onClick={onPassToReviewer}>
-                Pass to next reviewer
-              </Button>
-            )}
-            {onFinishAndFile && (
-              <Button priority="primary" size="medium" onClick={onFinishAndFile}>
-                Finish &amp; file
-              </Button>
-            )}
-          </>
-        )}
-        {snapshot.mode === 'pass-to-reviewer' && (
-          <>
-            {onContinue && (
-              <Button priority="tertiary" size="medium" onClick={onContinue}>
-                Back
-              </Button>
-            )}
-            <div className={styles.footerSpacer} />
-            {onOpenAsReviewer && (
-              <Button priority="secondary" size="medium" onClick={onOpenAsReviewer}>
-                Open as reviewer
-              </Button>
-            )}
-            {onConfirmSend && (
-              <Button priority="primary" size="medium" onClick={onConfirmSend}>
-                Send to reviewer
-              </Button>
-            )}
-          </>
-        )}
-        {snapshot.mode === 'awaiting-reviewer' && (
-          <>
-            {onContinue && (
-              <Button priority="tertiary" size="medium" onClick={onContinue}>
-                Close
-              </Button>
-            )}
-            <div className={styles.footerSpacer} />
-            {onOpenAsReviewer && (
-              <Button priority="primary" size="medium" onClick={onOpenAsReviewer}>
-                Open as reviewer
-              </Button>
-            )}
-          </>
-        )}
-        {snapshot.mode === 'finish-and-file' && (
-          <>
-            <div className={styles.footerSpacer} />
-            {onContinue && (
-              <Button priority="primary" size="medium" onClick={onContinue}>
-                Mark ready to file
-              </Button>
-            )}
-          </>
-        )}
-      </footer>
-      )}
-    </>
+    </div>
   )
 
   if (variant === 'embedded') {
     return (
       <div className={styles.embedded} role="region" aria-labelledby="handoff-title">
-        {body}
+        <h2 id="handoff-title" className={styles.embeddedTitle}>{title}</h2>
+        {subtitle ? <p className={styles.embeddedSubtitle}>{subtitle}</p> : null}
+        {briefContent}
+        {!hideFooter && footerActions && (
+          <footer className={styles.embeddedFooter}>{footerActions}</footer>
+        )}
       </div>
     )
   }
 
   if (variant === 'drawer') {
+    if (!onClose) return null
     return (
-      <aside
-        className={`${styles.drawer} ${closing ? styles.drawerClosing : ''}`}
-        role="complementary"
-        aria-labelledby="handoff-title"
+      <ReviewSidePanel
+        title={title}
+        subtitle={subtitle || undefined}
+        titleId="handoff-title"
+        onClose={onClose}
+        closeLabel="Close summary"
+        closing={closing}
+        footer={!hideFooter ? footerActions : undefined}
       >
-        {body}
-      </aside>
+        {briefContent}
+      </ReviewSidePanel>
     )
   }
 
   return (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="handoff-title">
-      <div className={styles.panel}>{body}</div>
+      <div className={styles.panel}>
+        <header className={styles.overlayHeader}>
+          <div>
+            <h2 id="handoff-title" className={styles.embeddedTitle}>{title}</h2>
+            {subtitle ? <p className={styles.embeddedSubtitle}>{subtitle}</p> : null}
+          </div>
+          {onClose && (
+            <button type="button" className={styles.overlayClose} onClick={onClose} aria-label="Close summary">
+              ×
+            </button>
+          )}
+        </header>
+        {briefContent}
+        {!hideFooter && footerActions && (
+          <footer className={styles.embeddedFooter}>{footerActions}</footer>
+        )}
+      </div>
     </div>
   )
 }

@@ -292,10 +292,11 @@ export function buildHandoffSnapshot(
   // ── Still open — granular items grouped by category ───────────────────
   const openGroups: HandoffItemGroup[] = []
 
+  // Soften group titles — categories in a brief, not a findings catalog
   if (openNotes.length) {
     openGroups.push({
       id: 'notes',
-      title: 'Notes',
+      title: 'Open notes',
       count: openNotes.length,
       countLabel: `${openNotes.length} note${openNotes.length === 1 ? '' : 's'}`,
       items: openNotes.map(n => ({
@@ -316,7 +317,7 @@ export function buildHandoffSnapshot(
   if (openImportFlags.length) {
     openGroups.push({
       id: 'import-flags',
-      title: 'Import flags',
+      title: 'Import accuracy',
       count: openImportFlags.length,
       countLabel: `${openImportFlags.length} open import flag${openImportFlags.length === 1 ? '' : 's'}`,
       items: openImportFlags.map(flag => ({
@@ -335,7 +336,7 @@ export function buildHandoffSnapshot(
   if (diagsOpen.length) {
     openGroups.push({
       id: 'ai-diagnostics',
-      title: 'AI diagnostics',
+      title: 'AI diagnostics still open',
       count: diagsOpen.length,
       countLabel: `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}`,
       items: diagsOpen.map(k => ({
@@ -354,7 +355,7 @@ export function buildHandoffSnapshot(
   if (unverifiedDocs.length) {
     openGroups.push({
       id: 'unverified-docs',
-      title: 'Unverified docs',
+      title: 'Documents not yet verified',
       count: unverifiedDocs.length,
       countLabel: `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}`,
       items: unverifiedDocs.map(docId => ({
@@ -370,7 +371,7 @@ export function buildHandoffSnapshot(
   if (humanFlags.length) {
     openGroups.push({
       id: 'preparer-flags',
-      title: 'Preparer flags',
+      title: 'Preparer follow-ups',
       count: humanFlags.length,
       countLabel: `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}`,
       items: humanFlags.map(([field, meta]) => {
@@ -524,18 +525,44 @@ export function buildHandoffSnapshot(
     story.push(
       `${actorLabel} finished Pass 1. Here’s what you should know before you pick up the return.`,
     )
-  } else {
-    story.push(
-      pass === 2
-        ? `${who}, here’s the outstanding work and what you’ve already cleared on this pass.`
-        : `${who}, here’s the outstanding work on this pass, then what you’ve already handled.`,
-    )
     if (clearedFlags.length || verifiedList.length || diagsReviewed.length) {
       const bits: string[] = []
       if (clearedFlags.length) bits.push(`${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} cleared`)
       if (verifiedList.length) bits.push(`${verifiedList.length} doc${verifiedList.length === 1 ? '' : 's'} verified`)
       if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'} reviewed`)
-      story.push(`Completed so far: ${listPhrase(bits)}.`)
+      story.push(`So far they completed: ${listPhrase(bits)}.`)
+    }
+    if (hasOpen) {
+      story.push(
+        granularOpenCount === 1
+          ? '1 item still needs your attention before this return is ready to hand off or file.'
+          : `${granularOpenCount} items still need your attention before this return is ready to hand off or file.`,
+      )
+    } else {
+      story.push('Nothing is left open in this snapshot — spot-check Pass 1 work if you want a second pair of eyes.')
+    }
+  } else {
+    story.push(
+      pass === 2
+        ? `${who}, here’s where this pass stands — what’s still open, then what you’ve already cleared.`
+        : `${who}, here’s a brief on this pass: what’s outstanding, then what you’ve already handled.`,
+    )
+    if (clearedFlags.length || verifiedList.length || diagsReviewed.length || edits.length) {
+      const bits: string[] = []
+      if (clearedFlags.length) bits.push(`${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} cleared`)
+      if (verifiedList.length) bits.push(`${verifiedList.length} doc${verifiedList.length === 1 ? '' : 's'} verified`)
+      if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'} reviewed`)
+      if (edits.length && !clearedFlags.length) bits.push(`${edits.length} amount change${edits.length === 1 ? '' : 's'}`)
+      if (bits.length) story.push(`Completed so far: ${listPhrase(bits)}.`)
+    }
+    if (hasOpen) {
+      story.push(
+        granularOpenCount === 1
+          ? '1 item still needs attention before you finish or pass this on.'
+          : `${granularOpenCount} items still need attention before you finish or pass this on.`,
+      )
+    } else {
+      story.push('Everything tracked in this snapshot looks clear — you can finish & file or pass to the next reviewer when you’re ready.')
     }
   }
 
@@ -567,14 +594,14 @@ export function buildHandoffSnapshot(
 
   const storySection: HandoffSection = {
     id: 'whatWasDone',
-    title: isBriefing ? `What ${who} did in Pass 1` : 'What happened this pass',
+    title: isBriefing ? `What ${who} reviewed` : 'What was reviewed',
     count: doneOnlyCount,
     countLabel: doneOnlyCount
       ? `${doneOnlyCount} completed`
       : 'Nothing completed yet',
     intro: isBriefing
-      ? 'Edits tied to flags, clean verifies, and AI diagnostics they already reviewed.'
-      : 'Edits, clears, verifies, and diagnostics you’ve already handled.',
+      ? 'A short account of edits, verifies, and diagnostics already handled in Pass 1.'
+      : 'What you already cleared or verified on this pass.',
     bucket: 'done',
     // Secondary disclosure — outstanding work stays primary
     defaultOpen: false,
@@ -583,14 +610,18 @@ export function buildHandoffSnapshot(
 
   const openSection: HandoffSection = {
     id: 'needsAttention',
-    title: isBriefing ? 'Still open for you' : 'Still open',
+    title: 'Still needs attention',
     count: hasOpen ? granularOpenCount : 0,
     countLabel: hasOpen
       ? `${granularOpenCount} open`
       : 'All clear',
     intro: isBriefing
-      ? 'Expand each group to see every item. Start with notes and import flags, then AI diagnostics and unverified docs.'
-      : 'Clear these before you hand off or file.',
+      ? openBreakdown
+        ? `${openBreakdown}. Expand a category when you want the full list and jump links.`
+        : 'Nothing is waiting in this snapshot.'
+      : openBreakdown
+        ? `${openBreakdown}. Expand a category for jumpable details.`
+        : 'Nothing critical left before handoff or filing.',
     bucket: 'critical',
     defaultOpen: true,
     groups: hasOpen ? openGroups : undefined,

@@ -1085,7 +1085,8 @@ export default function DataReviewPage() {
     <div
       className={styles.page}
       style={{
-        ['--app-header-offset' as string]: !inImportPhase ? '120px' : '68px',
+        /* Product header only — Sign-off lives on the Step 2 banner row now */
+        ['--app-header-offset' as string]: '68px',
       }}
     >
       {reviewRole === 'reviewer' ? (
@@ -1145,7 +1146,7 @@ export default function DataReviewPage() {
           </button>
         </div>
       )}
-      {/* Header — row 1: title + peer icon controls; row 2 (Phase 2): Sign-off */}
+      {/* Header — title + peer icon controls (Sign-off lives on Step 2 banner) */}
       <div className={styles.headerBlock}>
         <div className={styles.header}>
           <div className={styles.headerLeft}>
@@ -1248,18 +1249,6 @@ export default function DataReviewPage() {
             )}
           </div>
         </div>
-        {!inImportPhase && (
-          <div className={styles.headerSecondRow}>
-            <Button
-              priority="primary"
-              size="medium"
-              onClick={handleWrapUpPass}
-              automationId="phase2-sign-off"
-            >
-              Sign-off
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* ProtoC Phase 1 — Import Accuracy banner (flags-only gate for Phase 2 CTA) */}
@@ -1288,6 +1277,16 @@ export default function DataReviewPage() {
           complete={phase2Complete}
           diagnosticsOpen={agentView !== 'idle'}
           onOpenDiagnostics={() => handleAgentOpen()}
+          signOffSlot={(
+            <Button
+              priority="primary"
+              size="medium"
+              onClick={handleWrapUpPass}
+              automationId="phase2-sign-off"
+            >
+              Sign-off
+            </Button>
+          )}
         />
       )}
 

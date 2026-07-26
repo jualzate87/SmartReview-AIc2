@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Close, CircleCheck, Edit } from '@design-systems/icons'
+import { CircleCheck, Edit } from '@design-systems/icons'
+import ReviewSidePanel, { sidePanelStyles } from './ReviewSidePanel'
 import styles from '../../styles/data-review/NotesPane.module.css'
 
 export type NoteReply = {
@@ -116,17 +117,45 @@ export default function NotesPane({
     setReplyDraft('')
   }
 
-  return (
-    <div className={`${styles.panel} ${closing ? styles.panelClosing : ''}`}>
-
-      <div className={styles.header}>
-        <span className={styles.title}>Comments</span>
-        <button className={styles.closeBtn} aria-label="Close comments" onClick={onClose}>
-          <Close size="small" />
+  const compose = (
+    <div className={styles.compose}>
+      <div className={styles.composeBox}>
+        <textarea
+          ref={textareaRef}
+          className={styles.composeInput}
+          placeholder="Add a note… Use @ to mention a team member"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handlePost()
+          }}
+          rows={3}
+        />
+      </div>
+      <div className={styles.composeActions}>
+        <button className={styles.cancelBtn} onClick={() => setDraft('')}>Clear</button>
+        <button
+          className={`${styles.postBtn} ${draft.trim() ? styles.postBtnActive : ''}`}
+          disabled={!draft.trim()}
+          onClick={handlePost}
+        >
+          Post note
         </button>
       </div>
+    </div>
+  )
 
-      <div className={styles.notesList}>
+  return (
+    <ReviewSidePanel
+      title="Comments"
+      titleId="comments-panel-title"
+      onClose={onClose}
+      closeLabel="Close comments"
+      closing={closing}
+      className={styles.notesZ}
+      footer={compose}
+    >
+      <div className={`${sidePanelStyles.scroll} ${styles.notesList}`}>
         {notes.length === 0 ? (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>
@@ -272,33 +301,6 @@ export default function NotesPane({
           </div>
         )}
       </div>
-
-      <div className={styles.compose}>
-        <div className={styles.composeBox}>
-          <textarea
-            ref={textareaRef}
-            className={styles.composeInput}
-            placeholder="Add a note… Use @ to mention a team member"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handlePost()
-            }}
-            rows={3}
-          />
-        </div>
-        <div className={styles.composeActions}>
-          <button className={styles.cancelBtn} onClick={() => setDraft('')}>Clear</button>
-          <button
-            className={`${styles.postBtn} ${draft.trim() ? styles.postBtnActive : ''}`}
-            disabled={!draft.trim()}
-            onClick={handlePost}
-          >
-            Post note
-          </button>
-        </div>
-      </div>
-
-    </div>
+    </ReviewSidePanel>
   )
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { CircleCheck } from '@design-systems/icons'
 import intuitAssistIcon from '../../assets/icons/intuit-assist.svg'
 import styles from '../../styles/data-review/Phase1Banner.module.css'
@@ -10,6 +11,8 @@ interface Phase2BannerProps {
   onOpenDiagnostics?: () => void
   /** True while Review AI panel is open (counter stays plain text) */
   diagnosticsOpen?: boolean
+  /** Sign-off CTA — sits on the same row as Step 2 title / progress */
+  signOffSlot?: ReactNode
 }
 
 export default function Phase2Banner({
@@ -18,6 +21,7 @@ export default function Phase2Banner({
   complete,
   onOpenDiagnostics,
   diagnosticsOpen = false,
+  signOffSlot,
 }: Phase2BannerProps) {
   const remaining = Math.max(0, total - reviewed)
   const showProgressLink = !complete && !!onOpenDiagnostics && !diagnosticsOpen && remaining > 0
@@ -60,13 +64,13 @@ export default function Phase2Banner({
             </span>
           )
         )}
+        {complete && (
+          <span className={styles.completeBadge}>
+            <CircleCheck size="small" /> All diagnostics reviewed
+          </span>
+        )}
+        {signOffSlot}
       </div>
-
-      {complete && (
-        <span className={styles.completeBadge}>
-          <CircleCheck size="small" /> All diagnostics reviewed
-        </span>
-      )}
     </div>
   )
 }

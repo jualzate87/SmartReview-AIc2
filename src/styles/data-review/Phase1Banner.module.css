@@ -1,9 +1,9 @@
-/* ProtoC — Phase 1 (Import Accuracy) banner */
+/* ProtoC — Phase 1 (Import Accuracy) + Phase 2 banner shell */
 .banner {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 14px 22px;
+  gap: var(--space-large, 24px);
+  padding: var(--space-container-padding-large, 24px) var(--space-large, 24px);
   background: var(--color-container-background-primary, #ffffff);
   border-bottom: 1px solid #C3CED5;
   flex-shrink: 0;
@@ -53,7 +53,7 @@
 .right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-large, 24px);
   flex-shrink: 0;
 }
 
