@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
-import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close } from '@design-systems/icons'
+import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close, ClockCounterclockwise } from '@design-systems/icons'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
 import { IconControl } from '@ids-ts/icon-control'
@@ -11,9 +11,11 @@ import HandoffSummary from './data-review/HandoffSummary'
 import handoffStyles from '../styles/data-review/HandoffSummary.module.css'
 import {
   buildHandoffSnapshot,
+  getOutstandingOpenCount,
   type HandoffJump,
   type HandoffMode,
   type HandoffSnapshot,
+  type HandoffVoice,
 } from '../data/handoffSnapshot'
 import {
   PREPARER_NAME,
@@ -189,12 +191,17 @@ export default function DataReviewPage() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [notesClosing, setNotesClosing] = useState(false)
 
-  // C2: multi-pass handoff — summary overlay (sign-off → decide)
+  // C2: multi-pass handoff — dedicated summary panel (independent from AI Review)
   const [reviewPass, setReviewPass] = useState<1 | 2>(1)
   const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>('preparer')
-  const [handoffSnapshot, setHandoffSnapshot] = useState<HandoffSnapshot | null>(null)
-  /** Pass 2: AI panel shows Pass 1 briefing first */
-  const [showPassHandoff, setShowPassHandoff] = useState(false)
+  const [summaryPanelOpen, setSummaryPanelOpen] = useState(false)
+  const [summaryClosing, setSummaryClosing] = useState(false)
+  const [summaryMode, setSummaryMode] = useState<HandoffMode>('signoff-review')
+  const [summaryOpts, setSummaryOpts] = useState<{
+    pass?: 1 | 2
+    actor?: string
+    voice?: HandoffVoice
+  }>({})
   /** Pass 2 open-items filter */
   type Pass2Filter = 'all' | 'flags' | 'notes'
   const [pass2Filter, setPass2Filter] = useState<Pass2Filter>('all')
@@ -683,26 +690,45 @@ export default function DataReviewPage() {
       amounts,
     }, { voice })
 
-  /** Sign-off CTA → detailed summary first (then Finish & file / Pass to reviewer) */
+  const openSummaryPanel = (
+    mode: HandoffMode = 'signoff-review',
+    opts: { pass?: 1 | 2; actor?: string; voice?: HandoffVoice } = {},
+  ) => {
+    setSummaryMode(mode)
+    setSummaryOpts(opts)
+    setSummaryClosing(false)
+    setSummaryPanelOpen(true)
+  }
+
+  const handleCloseSummaryPanel = () => {
+    setSummaryClosing(true)
+    setTimeout(() => {
+      setSummaryPanelOpen(false)
+      setSummaryClosing(false)
+      setSummaryMode('signoff-review')
+      setSummaryOpts({})
+    }, 200)
+  }
+
+  /** Sign-off CTA (Phase 2 header) → summary panel, then Finish & file / Pass to reviewer */
   const handleWrapUpPass = () => {
-    setHandoffSnapshot(buildSnapshot('signoff-review'))
+    openSummaryPanel('signoff-review')
   }
 
   const handlePreviewFinishAndFile = () => {
-    setHandoffSnapshot(buildSnapshot('finish-and-file'))
+    openSummaryPanel('finish-and-file', summaryOpts)
   }
 
   const handlePreviewPassToReviewer = () => {
-    setHandoffSnapshot(buildSnapshot('pass-to-reviewer'))
+    openSummaryPanel('pass-to-reviewer', summaryOpts)
   }
 
   const handleConfirmHandoffSend = () => {
-    setHandoffSnapshot(buildSnapshot('awaiting-reviewer'))
+    openSummaryPanel('awaiting-reviewer', summaryOpts)
   }
 
+  /** Keep summary panel open for continuous interaction while jumping */
   const handleHandoffJump = useCallback((jump: HandoffJump) => {
-    setHandoffSnapshot(null)
-    setShowPassHandoff(false)
     if (jump.type === 'notesPane' || jump.type === 'note') {
       if (jump.type === 'note') setFocusNoteId(jump.noteId)
       setNotesOpen(true)
@@ -751,31 +777,33 @@ export default function DataReviewPage() {
     applyVerifyNavigation,
   ])
 
-  /** Reopen live handoff / progress report after jumping out to clear items */
-  const handleOpenHandoffReport = () => {
+  /** History icon / pass-bar — open dedicated summary panel (not AI Review) */
+  const handleOpenSummaryReport = () => {
     if (reviewRole === 'reviewer') {
-      setHandoffSnapshot(null)
-      setShowPassHandoff(true)
-      setAgentView('report')
-      setPhase('diagnostics')
-      setRightPanelVisible(true)
+      openSummaryPanel('signoff-review', {
+        pass: 1,
+        actor: pass1ActorLabel,
+        voice: 'reviewer-briefing',
+      })
       return
     }
-    setShowPassHandoff(false)
-    setHandoffSnapshot(buildSnapshot('signoff-review'))
+    openSummaryPanel('signoff-review')
   }
 
   const handleOpenAsReviewer = () => {
     setReviewPass(2)
     setReviewRole('reviewer')
     setReviewActor(REVIEWER_NAME)
-    setHandoffSnapshot(null)
     setPhase('diagnostics')
     setShow1040(true)
     setOutputFormId('summary')
-    setShowPassHandoff(true)
     setPass2Filter('flags')
     setAgentView('report')
+    openSummaryPanel('signoff-review', {
+      pass: 1,
+      actor: pass1ActorLabel,
+      voice: 'reviewer-briefing',
+    })
     // Seed a preparer note if none exist so Pass 2 has something to resolve
     setNotes(prev => {
       if (prev.length > 0) return prev
@@ -793,7 +821,7 @@ export default function DataReviewPage() {
   }
 
   const handleFinishReviewerPass = () => {
-    setHandoffSnapshot(buildSnapshot('signoff-review', 2, REVIEWER_NAME))
+    openSummaryPanel('signoff-review', { pass: 2, actor: REVIEWER_NAME })
   }
 
   /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
@@ -807,12 +835,20 @@ export default function DataReviewPage() {
     setReviewActor(PREPARER_NAME)
     setPass2Filter('all')
     setFocusNoteId(null)
-    setShowPassHandoff(false)
+    if (summaryPanelOpen) handleCloseSummaryPanel()
   }
 
-  const pass2BriefingSnapshot = reviewRole === 'reviewer'
-    ? buildSnapshot('signoff-review', 1, pass1ActorLabel, 'reviewer-briefing')
-    : null
+  const handoffSnapshot: HandoffSnapshot | null =
+    summaryPanelOpen || summaryClosing
+      ? buildSnapshot(
+          summaryMode,
+          summaryOpts.pass ?? reviewPass,
+          summaryOpts.actor ?? actorLabel,
+          summaryOpts.voice ?? 'self',
+        )
+      : null
+
+  const outstandingOpenCount = getOutstandingOpenCount(buildSnapshot('signoff-review'))
 
   /**
    * Shared drag bootstrap: pointer events + document-level move/up while dragging.
@@ -1046,7 +1082,12 @@ export default function DataReviewPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div
+      className={styles.page}
+      style={{
+        ['--app-header-offset' as string]: !inImportPhase ? '120px' : '68px',
+      }}
+    >
       {reviewRole === 'reviewer' ? (
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
@@ -1083,9 +1124,9 @@ export default function DataReviewPage() {
           <button
             type="button"
             className={handoffStyles.passBarLink}
-            onClick={handleOpenHandoffReport}
+            onClick={handleOpenSummaryReport}
           >
-            Handoff report
+            Review summary
           </button>
           <button type="button" className={handoffStyles.passBarLink} onClick={handleFinishReviewerPass}>
             Finish reviewer pass
@@ -1098,90 +1139,127 @@ export default function DataReviewPage() {
           <button
             type="button"
             className={handoffStyles.passBarLink}
-            onClick={handleOpenHandoffReport}
+            onClick={handleOpenSummaryReport}
           >
-            Review snapshot
+            Review summary
           </button>
         </div>
       )}
-      {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <span className={styles.headerTitle}>Data Review - Form 1040</span>
-          <span className={handoffStyles.roleSwitcher} role="group" aria-label="Demo role">
+      {/* Header — row 1: title + peer icon controls; row 2 (Phase 2): Sign-off */}
+      <div className={styles.headerBlock}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <span className={styles.headerTitle}>Data Review - Form 1040</span>
+            <span className={handoffStyles.roleSwitcher} role="group" aria-label="Demo role">
+              <button
+                type="button"
+                className={`${handoffStyles.roleBtn} ${reviewRole === 'preparer' ? handoffStyles.roleBtnActive : ''}`}
+                onClick={() => handleSwitchRole('preparer')}
+              >
+                Preparer
+              </button>
+              <button
+                type="button"
+                className={`${handoffStyles.roleBtn} ${reviewRole === 'reviewer' ? handoffStyles.roleBtnActive : ''}`}
+                onClick={() => handleSwitchRole('reviewer')}
+              >
+                Reviewer
+              </button>
+            </span>
+          </div>
+          <div className={styles.headerRight}>
+            <div className={styles.headerIconGroup}>
+              <span className={styles.headerIconWrap}>
+                <IconControl
+                  label="Comments"
+                  size="medium"
+                  selected={notesOpen}
+                  aria-label="Comments"
+                  onClick={notesOpen ? handleCloseNotes : handleOpenNotes}
+                >
+                  <Comment size="medium" />
+                </IconControl>
+                {notes.length > 0 && (
+                  <span className={styles.notesBadge}>{notes.length}</span>
+                )}
+              </span>
+              <span className={styles.headerIconWrap}>
+                <IconControl
+                  label="Summary"
+                  size="medium"
+                  selected={summaryPanelOpen}
+                  aria-label={
+                    outstandingOpenCount > 0
+                      ? `Review summary, ${outstandingOpenCount} outstanding items`
+                      : 'Review summary'
+                  }
+                  onClick={
+                    summaryPanelOpen ? handleCloseSummaryPanel : handleOpenSummaryReport
+                  }
+                >
+                  <ClockCounterclockwise size="medium" />
+                </IconControl>
+                {outstandingOpenCount > 0 && (
+                  <span className={styles.notesBadge}>{outstandingOpenCount}</span>
+                )}
+              </span>
+            </div>
             <button
-              type="button"
-              className={`${handoffStyles.roleBtn} ${reviewRole === 'preparer' ? handoffStyles.roleBtnActive : ''}`}
-              onClick={() => handleSwitchRole('preparer')}
+              className={`${styles.intuitIntelBtn} ${rightPanelVisible && agentView === 'idle' ? styles.intuitIntelBtnActive : ''}`}
+              aria-label="Toggle panel"
+              onClick={() => {
+                if (agentView !== 'idle') {
+                  handleAgentClose()
+                } else if (rightPanelVisible) {
+                  handleCloseSourcePanel()
+                } else if (importsStarted) {
+                  setRightPanelVisible(true)
+                  requestAnimationFrame(() => requestAnimationFrame(() => {
+                    setRightPanelAnimating(true)
+                    setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
+                  }))
+                } else {
+                  // Same as Phase 1 banner CTA — open sources and mark imports started
+                  startReviewingImports()
+                }
+              }}
             >
-              Preparer
+              <Panel size="medium" />
+              <span className={styles.intuitIntelLabel}>Source Documents</span>
             </button>
-            <button
-              type="button"
-              className={`${handoffStyles.roleBtn} ${reviewRole === 'reviewer' ? handoffStyles.roleBtnActive : ''}`}
-              onClick={() => handleSwitchRole('reviewer')}
-            >
-              Reviewer
-            </button>
-          </span>
-        </div>
-        <div className={styles.headerRight}>
-
-          <button
-            className={`${styles.intuitIntelBtn} ${notesOpen ? styles.intuitIntelBtnActive : ''}`}
-            aria-label="Comments"
-            style={{ position: 'relative' }}
-            onClick={notesOpen ? handleCloseNotes : handleOpenNotes}
-          >
-            <Comment size="medium" />
-            <span className={styles.intuitIntelLabel}>Comments</span>
-            {notes.length > 0 && (
-              <span className={styles.notesBadge}>{notes.length}</span>
+            {/* ProtoC: AI Review is Phase 2 only — hidden during Phase 1 (import accuracy) */}
+            {!inImportPhase && (
+              <button
+                className={`${styles.intuitIntelBtn} ${agentView !== 'idle' ? styles.intuitIntelBtnActive : ''}`}
+                aria-label={
+                  agentView === 'idle' && phase2Progress.remaining > 0
+                    ? `AI Review, ${phase2Progress.remaining} diagnostics remaining`
+                    : 'Intuit Intelligence'
+                }
+                style={{ position: 'relative' }}
+                onClick={() => handleAgentOpen()}
+              >
+                <img src={intuitAssistIcon} alt="" className={styles.intuitIntelIcon} />
+                <span className={styles.intuitIntelLabel}>AI Review</span>
+                {agentView === 'idle' && phase2Progress.remaining > 0 && (
+                  <span className={styles.notesBadge}>{phase2Progress.remaining}</span>
+                )}
+              </button>
             )}
-          </button>
-          <button
-            className={`${styles.intuitIntelBtn} ${rightPanelVisible && agentView === 'idle' ? styles.intuitIntelBtnActive : ''}`}
-            aria-label="Toggle panel"
-            onClick={() => {
-              if (agentView !== 'idle') {
-                handleAgentClose()
-              } else if (rightPanelVisible) {
-                handleCloseSourcePanel()
-              } else if (importsStarted) {
-                setRightPanelVisible(true)
-                requestAnimationFrame(() => requestAnimationFrame(() => {
-                  setRightPanelAnimating(true)
-                  setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
-                }))
-              } else {
-                // Same as Phase 1 banner CTA — open sources and mark imports started
-                startReviewingImports()
-              }
-            }}
-          >
-            <Panel size="medium" />
-            <span className={styles.intuitIntelLabel}>Source Documents</span>
-          </button>
-          {/* ProtoC: AI Review is Phase 2 only — hidden during Phase 1 (import accuracy) */}
-          {!inImportPhase && (
-            <button
-              className={`${styles.intuitIntelBtn} ${agentView !== 'idle' ? styles.intuitIntelBtnActive : ''}`}
-              aria-label={
-                agentView === 'idle' && phase2Progress.remaining > 0
-                  ? `AI Review, ${phase2Progress.remaining} diagnostics remaining`
-                  : 'Intuit Intelligence'
-              }
-              style={{ position: 'relative' }}
-              onClick={() => handleAgentOpen()}
-            >
-              <img src={intuitAssistIcon} alt="" className={styles.intuitIntelIcon} />
-              <span className={styles.intuitIntelLabel}>AI Review</span>
-              {agentView === 'idle' && phase2Progress.remaining > 0 && (
-                <span className={styles.notesBadge}>{phase2Progress.remaining}</span>
-              )}
-            </button>
-          )}
+          </div>
         </div>
+        {!inImportPhase && (
+          <div className={styles.headerSecondRow}>
+            <Button
+              priority="primary"
+              size="medium"
+              onClick={handleWrapUpPass}
+              automationId="phase2-sign-off"
+            >
+              Sign-off
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* ProtoC Phase 1 — Import Accuracy banner (flags-only gate for Phase 2 CTA) */}
@@ -1936,23 +2014,6 @@ export default function DataReviewPage() {
                           setShow1040(true)
                         }
                       }}
-                      onWrapUpPass={handleWrapUpPass}
-                      wrapUpLabel={
-                        reviewRole === 'reviewer'
-                          ? 'Sign-off and move to next step'
-                          : 'Sign-off and move to next step'
-                      }
-                      showPassHandoff={showPassHandoff && reviewRole === 'reviewer'}
-                      passHandoffSnapshot={pass2BriefingSnapshot}
-                      passHandoffTitle={`Handoff from ${pass1ActorLabel}`}
-                      onHandoffJump={handleHandoffJump}
-                      onDismissPassHandoff={() => setShowPassHandoff(false)}
-                      onOpenPassHandoff={handleOpenHandoffReport}
-                      handoffReopenLabel={
-                        reviewRole === 'reviewer'
-                          ? `Handoff from ${pass1ActorLabel}`
-                          : 'Review snapshot'
-                      }
                       onFieldValueChange={(key, value) => {
                         if (key === 'withholding' && typeof value === 'number') {
                           updateField('withholding', { techCircle: value })
@@ -1980,15 +2041,17 @@ export default function DataReviewPage() {
         />
       )}
 
-      {handoffSnapshot && (
+      {(summaryPanelOpen || summaryClosing) && handoffSnapshot && (
         <HandoffSummary
+          variant="drawer"
           snapshot={handoffSnapshot}
-          onClose={() => setHandoffSnapshot(null)}
+          closing={summaryClosing}
+          onClose={handleCloseSummaryPanel}
           onContinue={() => {
             if (handoffSnapshot.mode === 'pass-to-reviewer') {
-              setHandoffSnapshot(buildSnapshot('signoff-review'))
+              openSummaryPanel('signoff-review', summaryOpts)
             } else {
-              setHandoffSnapshot(null)
+              handleCloseSummaryPanel()
             }
           }}
           onJump={handleHandoffJump}

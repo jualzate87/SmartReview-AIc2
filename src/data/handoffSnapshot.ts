@@ -518,22 +518,24 @@ export function buildHandoffSnapshot(
   const doneOnlyCount = doneItems.filter(i => i.status === 'done').length
   const hasOpen = granularOpenCount > 0
 
-  // ── Conversational story + verdict ────────────────────────────────────
+  // ── Briefing narrative (review history tone, not diagnostics catalog) ─
   const story: string[] = []
   if (isBriefing) {
-    story.push(`${actorLabel} concluded her review. This is what you should know before you start Pass 2.`)
+    story.push(
+      `${actorLabel} finished Pass 1. Here’s what you should know before you pick up the return.`,
+    )
   } else {
     story.push(
       pass === 2
-        ? `Here’s where Pass 2 stands with your work, ${who}.`
-        : `Here’s where this pass stands: what’s still open, then what you’ve already handled.`,
+        ? `${who}, here’s the outstanding work and what you’ve already cleared on this pass.`
+        : `${who}, here’s the outstanding work on this pass, then what you’ve already handled.`,
     )
     if (clearedFlags.length || verifiedList.length || diagsReviewed.length) {
       const bits: string[] = []
       if (clearedFlags.length) bits.push(`${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} cleared`)
       if (verifiedList.length) bits.push(`${verifiedList.length} doc${verifiedList.length === 1 ? '' : 's'} verified`)
       if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'} reviewed`)
-      story.push(`So far you’ve got ${listPhrase(bits)}.`)
+      story.push(`Completed so far: ${listPhrase(bits)}.`)
     }
   }
 
@@ -574,7 +576,8 @@ export function buildHandoffSnapshot(
       ? 'Edits tied to flags, clean verifies, and AI diagnostics they already reviewed.'
       : 'Edits, clears, verifies, and diagnostics you’ve already handled.',
     bucket: 'done',
-    defaultOpen: true,
+    // Secondary disclosure — outstanding work stays primary
+    defaultOpen: false,
     items: doneItems,
   }
 
@@ -620,4 +623,9 @@ export function buildHandoffSnapshot(
     nextSteps,
     quickLinks: [],
   }
+}
+
+/** Granular open-item total from a snapshot (notes + flags + diags + docs + preparer flags). */
+export function getOutstandingOpenCount(snapshot: HandoffSnapshot): number {
+  return snapshot.sections.find(s => s.id === 'needsAttention')?.count ?? 0
 }

@@ -7,19 +7,46 @@
   overflow: hidden;
 }
 
-/* Header — white bg, bottom border; +16px vertical padding vs prior 16px so
+/* Header stack — row 1 chrome + optional Phase 2 Sign-off row */
+.headerBlock {
+  flex-shrink: 0;
+  background: var(--color-container-background-primary, #ffffff);
+  border-bottom: 1px solid #C3CED5;
+}
+
+/* Header — white bg; +16px vertical padding vs prior 16px so
    Comments / Source Documents buttons aren't clipped by a fixed height */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 68px;
-  padding: var(--space-container-padding-x-large, 32px) var(--space-medium, 16px) var(--space-container-padding-x-large, 32px) 22px;
-  background: var(--color-container-background-primary, #ffffff);
-  border-bottom: 1px solid #C3CED5;
+  padding: var(--space-container-padding-x-large, 32px) var(--space-medium, 16px) var(--space-container-padding-medium, 16px) 22px;
+  background: transparent;
+  border-bottom: none;
   flex-shrink: 0;
   overflow: visible;
   box-sizing: border-box;
+}
+
+.headerSecondRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-component-gap-small);
+  padding: 0 var(--space-medium, 16px) var(--space-container-padding-medium, 16px);
+  box-sizing: border-box;
+}
+
+.headerIconGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-component-gap-small, 8px);
+}
+
+.headerIconWrap {
+  position: relative;
+  display: inline-flex;
 }
 
 .headerLeft {

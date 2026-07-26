@@ -11,7 +11,7 @@
 
 .panel {
   position: fixed;
-  top: 68px; /* below the page header */
+  top: var(--app-header-offset, 68px); /* below page header (+ Phase 2 Sign-off row) */
   right: 0;
   bottom: 0;
   width: 360px;

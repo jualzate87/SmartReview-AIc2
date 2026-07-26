@@ -14,7 +14,8 @@ import styles from '../../styles/data-review/HandoffSummary.module.css'
 
 type Props = {
   snapshot: HandoffSnapshot
-  variant?: 'overlay' | 'embedded'
+  /** drawer = right-rail panel (default for continuous review); overlay kept for rare blocking confirms */
+  variant?: 'drawer' | 'overlay' | 'embedded'
   onJump?: (jump: HandoffJump) => void
   onClose?: () => void
   onContinue?: () => void
@@ -27,6 +28,7 @@ type Props = {
   titleOverride?: string
   subtitleOverride?: string
   hideFooter?: boolean
+  closing?: boolean
 }
 
 function CountBadge({
@@ -97,7 +99,7 @@ function ItemRow({
 
 export default function HandoffSummary({
   snapshot,
-  variant = 'overlay',
+  variant = 'drawer',
   onJump,
   onClose,
   onContinue,
@@ -108,6 +110,7 @@ export default function HandoffSummary({
   titleOverride,
   subtitleOverride,
   hideFooter = false,
+  closing = false,
 }: Props) {
   const [openSectionIds, setOpenSectionIds] = useState<Set<string>>(() => {
     const initial = new Set<string>()
@@ -143,7 +146,7 @@ export default function HandoffSummary({
       : snapshot.mode === 'awaiting-reviewer'
         ? 'Handoff sent'
         : snapshot.mode === 'signoff-review'
-          ? 'Where things stand'
+          ? 'Review summary'
           : 'Handoff preview')
 
   const subtitle =
@@ -154,7 +157,7 @@ export default function HandoffSummary({
         : snapshot.mode === 'awaiting-reviewer'
           ? `Pass ${snapshot.pass} complete · Next person can open as reviewer`
           : snapshot.mode === 'signoff-review'
-            ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
+            ? `Pass ${snapshot.pass} · ${snapshot.actorLabel} · Outstanding work and history`
             : `Pass ${snapshot.pass} · Preview for the next reviewer`
 
   const verdictType = snapshot.verdict.tone === 'clear' ? 'success' : 'warn'
@@ -166,8 +169,8 @@ export default function HandoffSummary({
           <h2 id="handoff-title" className={styles.title}>{title}</h2>
           {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
         </div>
-        {variant === 'overlay' && onClose && (
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
+        {(variant === 'overlay' || variant === 'drawer') && onClose && (
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close summary">
             <Close size="small" />
           </button>
         )}
@@ -364,6 +367,18 @@ export default function HandoffSummary({
       <div className={styles.embedded} role="region" aria-labelledby="handoff-title">
         {body}
       </div>
+    )
+  }
+
+  if (variant === 'drawer') {
+    return (
+      <aside
+        className={`${styles.drawer} ${closing ? styles.drawerClosing : ''}`}
+        role="complementary"
+        aria-labelledby="handoff-title"
+      >
+        {body}
+      </aside>
     )
   }
 

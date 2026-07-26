@@ -21,8 +21,6 @@ import {
 } from './phase2FlagSync'
 import type { QuestionnaireResponseId } from './questionnaireData'
 import type { TopTab } from './ReviewTab'
-import HandoffSummary from './HandoffSummary'
-import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import styles from '../../styles/data-review/AgentReportPane.module.css'
 
 export const TOTAL_REVIEW_ITEMS = PHASE2_DIAGNOSTIC_ORDER.length
@@ -59,20 +57,6 @@ interface AgentReportPaneProps {
   amounts?: LiveAmounts
   /** Open an output form / schedule in the left panel (Sch C, 8960, …) */
   onOpenForm?: (formLabel: string) => void
-  /** C2: end-of-pass wrap-up (Finish & file vs Pass to reviewer) */
-  onWrapUpPass?: () => void
-  /** C2: label for the completion primary CTA */
-  wrapUpLabel?: string
-  /** C2 Pass 2: show handoff summary in this panel */
-  passHandoffSnapshot?: HandoffSnapshot | null
-  showPassHandoff?: boolean
-  onHandoffJump?: (jump: HandoffJump) => void
-  onDismissPassHandoff?: () => void
-  /** Reopen handoff after dismissing to clear items */
-  onOpenPassHandoff?: () => void
-  passHandoffTitle?: string
-  /** Label for reopen control (preparer vs reviewer) */
-  handoffReopenLabel?: string
 }
 
 const REPORT_CARDS = [
@@ -403,15 +387,6 @@ export default function AgentReportPane({
   liveTotals,
   amounts = SEED_AMOUNTS,
   onOpenForm,
-  onWrapUpPass,
-  wrapUpLabel = 'Sign-off and move to next step',
-  passHandoffSnapshot = null,
-  showPassHandoff = false,
-  onHandoffJump,
-  onDismissPassHandoff,
-  onOpenPassHandoff,
-  passHandoffTitle,
-  handoffReopenLabel = 'Handoff report',
 }: AgentReportPaneProps) {
   const live = liveTotals ?? computeLiveReturn(amounts)
   const ALL_ISSUES = buildAllIssues(live, amounts)
@@ -557,42 +532,7 @@ export default function AgentReportPane({
       )}
 
       <div className={styles.pane}>
-        {showPassHandoff && passHandoffSnapshot ? (
-          <div className={styles.chat} style={{ padding: 0, overflow: 'hidden' }}>
-            <HandoffSummary
-              variant="embedded"
-              snapshot={passHandoffSnapshot}
-              hideFooter
-              titleOverride={passHandoffTitle}
-              subtitleOverride=""
-              onJump={onHandoffJump}
-            />
-            <div style={{ padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {onDismissPassHandoff && (
-                <button type="button" className={styles.completionSecondaryBtn} onClick={onDismissPassHandoff}>
-                  Keep reviewing
-                </button>
-              )}
-              {onWrapUpPass && (
-                <Button priority="primary" size="medium" onClick={() => onWrapUpPass()}>
-                  {wrapUpLabel}
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : (
         <div className={styles.chat}>
-
-          {onOpenPassHandoff && (
-            <button
-              type="button"
-              className={styles.handoffReopenBar}
-              onClick={onOpenPassHandoff}
-            >
-              <span className={styles.handoffReopenLabel}>{handoffReopenLabel}</span>
-              <span className={styles.handoffReopenHint}>Updated as you clear items</span>
-            </button>
-          )}
 
           <p className={styles.agentMessage}>
             Filing stoppers, compliance checks, and opportunities for this return.
@@ -624,13 +564,9 @@ export default function AgentReportPane({
                 </p>
               ))}
               <div className={styles.completionActions}>
-                <Button
-                  priority="primary"
-                  size="medium"
-                  onClick={() => onWrapUpPass?.()}
-                >
-                  {wrapUpLabel}
-                </Button>
+                <p className={styles.completionBody}>
+                  Use Sign-off in the header when you are ready to finish or pass this return on.
+                </p>
                 <button className={styles.completionSecondaryBtn} onClick={() => setShowCompletion(false)}>
                   Review again
                 </button>
@@ -712,10 +648,8 @@ export default function AgentReportPane({
           </div>
 
         </div>
-        )}
       </div>
 
-      {!showPassHandoff && (
       <div className={styles.inputArea}>
         <div className={styles.inputFade} />
         <div className={styles.inputBox}>
@@ -753,9 +687,8 @@ export default function AgentReportPane({
         </div>
         <span className={styles.legal}>Important information about how we use generative AI</span>
       </div>
-      )}
 
-      {(!!issueDetailOpen || issueDetailClosing) && activeIssue && !showPassHandoff && (
+      {(!!issueDetailOpen || issueDetailClosing) && activeIssue && (
         <IssueDetailPane
           closing={issueDetailClosing}
           issueKey={activeIssue.issueKey}
