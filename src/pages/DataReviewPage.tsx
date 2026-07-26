@@ -305,6 +305,29 @@ export default function DataReviewPage() {
     if (summaryToggleTimerRef.current) clearTimeout(summaryToggleTimerRef.current)
   }, [])
 
+  /** Instant dismiss — used when another exclusive panel is opening (no exit stack). */
+  const dismissSummaryPanel = () => {
+    setSummaryPanelOpen(false)
+    setSummaryClosing(false)
+    setSummaryMode('signoff-review')
+    setSummaryOpts({})
+  }
+  const dismissNotesPanel = () => {
+    setNotesOpen(false)
+    setNotesClosing(false)
+  }
+  /** Drop AI rail without re-animating Source Documents (peer swap). */
+  const dismissAgentPanel = () => {
+    if (agentView === 'idle') return
+    setAgentView('idle')
+    setYoyExpanded(false)
+    setFromAgent(false)
+  }
+  const dismissSourcePanel = () => {
+    setRightPanelExiting(false)
+    setRightPanelVisible(false)
+  }
+
   const ensureSourcePanelVisible = useCallback(() => {
     if (!rightPanelVisible) {
       setRightPanelVisible(true)
@@ -329,6 +352,7 @@ export default function DataReviewPage() {
   }, [rightPanelVisible, rightPanelExiting])
 
   const startReviewingImports = useCallback(() => {
+    dismissSummaryPanel()
     setImportsStarted(true)
     // Keep Summary visible so the Hide Summary coach tip can teach the control
     setShow1040(true)
@@ -488,6 +512,7 @@ export default function DataReviewPage() {
   const handleNavigateToSourceDoc = useCallback((docId: string) => {
     const nav = navigationForSourceDoc(docId)
     if (!nav) return
+    dismissSummaryPanel()
     setActiveTopTab(nav.tab)
     if (nav.subTab) setActiveSubTab(nav.subTab)
     if (nav.divPayer) setActiveDivPayer(nav.divPayer)
@@ -559,6 +584,8 @@ export default function DataReviewPage() {
   // not by the ?agent=true entry param. See handleBeginDiagnostics below.
 
   const handleAgentOpen = (subView?: 'overview' | 'yoyDetail') => {
+    // Mutual exclusion: AI Review ↔ Summary (same slot model as Sources ↔ AI)
+    dismissSummaryPanel()
     setSelectedField(null)
     if (subView) setAgentSubView(subView)
     const alreadyLoaded = sessionStorage.getItem('agentLoaded')
@@ -612,7 +639,11 @@ export default function DataReviewPage() {
     }, 350)
   }
 
-  const handleOpenNotes = () => setNotesOpen(true)
+  const handleOpenNotes = () => {
+    // Mutual exclusion: Comments ↔ Summary
+    dismissSummaryPanel()
+    setNotesOpen(true)
+  }
   const handleCloseNotes = () => {
     setNotesClosing(true)
     setTimeout(() => { setNotesOpen(false); setNotesClosing(false) }, 200)
@@ -631,6 +662,7 @@ export default function DataReviewPage() {
       role: reviewRole,
       replies: [],
     }])
+    dismissSummaryPanel()
     setNotesOpen(true)
   }
 
@@ -658,6 +690,7 @@ export default function DataReviewPage() {
 
   const openNotesFocus = (noteId?: string) => {
     if (noteId) setFocusNoteId(noteId)
+    dismissSummaryPanel()
     setNotesOpen(true)
   }
 
@@ -694,6 +727,10 @@ export default function DataReviewPage() {
     mode: HandoffMode = 'signoff-review',
     opts: { pass?: 1 | 2; actor?: string; voice?: HandoffVoice } = {},
   ) => {
+    // Mutual exclusion: Summary closes AI, Sources, and Comments (no overlay stack)
+    dismissNotesPanel()
+    dismissAgentPanel()
+    dismissSourcePanel()
     setSummaryMode(mode)
     setSummaryOpts(opts)
     setSummaryClosing(false)
@@ -727,10 +764,11 @@ export default function DataReviewPage() {
     openSummaryPanel('awaiting-reviewer', summaryOpts)
   }
 
-  /** Keep summary panel open for continuous interaction while jumping */
+  /** Jump from summary — peer panels replace Summary when they would overlap */
   const handleHandoffJump = useCallback((jump: HandoffJump) => {
     if (jump.type === 'notesPane' || jump.type === 'note') {
       if (jump.type === 'note') setFocusNoteId(jump.noteId)
+      dismissSummaryPanel()
       setNotesOpen(true)
       return
     }
@@ -763,10 +801,12 @@ export default function DataReviewPage() {
       return
     }
     if (jump.type === 'doc') {
+      dismissSummaryPanel()
       handleNavigateToSourceDoc(jump.docId)
       return
     }
     if (jump.type === 'diagnostic') {
+      dismissSummaryPanel()
       setAgentView('report')
       setPhase('diagnostics')
     }
@@ -798,7 +838,7 @@ export default function DataReviewPage() {
     setShow1040(true)
     setOutputFormId('summary')
     setPass2Filter('flags')
-    setAgentView('report')
+    // Summary owns the right rail — do not also open AI Review (mutual exclusion)
     openSummaryPanel('signoff-review', {
       pass: 1,
       actor: pass1ActorLabel,
@@ -1209,6 +1249,8 @@ export default function DataReviewPage() {
               className={`${styles.intuitIntelBtn} ${rightPanelVisible && agentView === 'idle' ? styles.intuitIntelBtnActive : ''}`}
               aria-label="Toggle panel"
               onClick={() => {
+                // Mutual exclusion: Source Documents ↔ Summary (and AI as already handled)
+                dismissSummaryPanel()
                 if (agentView !== 'idle') {
                   handleAgentClose()
                 } else if (rightPanelVisible) {
