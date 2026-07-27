@@ -11,13 +11,13 @@ type Props = {
   closing?: boolean
   children: ReactNode
   footer?: ReactNode
-  /** Extra class on the shell (e.g. lower z-index for notes under summary) */
+  /** Extra class on the shell */
   className?: string
 }
 
 /**
- * Shared right-rail chassis for Comments and Review summary —
- * same width, header chrome, padding, close control, and header offset.
+ * In-rail chassis for Comments and Review summary.
+ * Fills the unified DataReview right panel — never a fixed overlay.
  */
 export default function ReviewSidePanel({
   title,

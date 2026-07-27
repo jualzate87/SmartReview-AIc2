@@ -111,6 +111,9 @@ const RIGHT_PANEL_MIN_WIDTH = 360
 /** Matches DragHandle.module.css .handleVertical width */
 const PANEL_DRAG_HANDLE_WIDTH = 16
 
+/** Exactly one right-rail content mode at a time — never stack overlays. */
+type RightPanelMode = 'closed' | 'sources' | 'ai' | 'comments' | 'summary'
+
 export default function DataReviewPage() {
   // Source-doc review state — flags, reviewed fields, active tab, editable field
   // values — persisted in sessionStorage via useSyncedReviewState.
@@ -164,14 +167,16 @@ export default function DataReviewPage() {
   const [panelResizing, setPanelResizing] = useState(false)
   // Top/bottom section height ratio in right panel (0-100, where value = preview percentage)
   const [previewHeight, setPreviewHeight] = useState(40)
-  // Whether the right document panel is visible — hidden until "Start reviewing imports"
-  const [rightPanelVisible, setRightPanelVisible] = useState(false)
-  // Whether the right panel is animating out (slide-out before display:none)
+  // Unified right rail — one shell, one active mode (sources | ai | comments | summary)
+  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>('closed')
+  // Whether the right panel is animating out (slide-out before mode → closed)
   const [rightPanelExiting, setRightPanelExiting] = useState(false)
-  // Agent panel view state: idle → loading → report → closing → idle
+  // Agent sub-state when mode === 'ai': idle → loading → report → closing
   const [agentView, setAgentView] = useState<'idle' | 'loading' | 'report' | 'closing'>('idle')
-  // Right panel animating-in: true during the 'closing' state so enter CSS fires
+  // Right panel animating-in after open
   const [rightPanelAnimating, setRightPanelAnimating] = useState(false)
+  // Fade-out for comments / summary close
+  const [panelClosing, setPanelClosing] = useState(false)
   // Whether YoY analysis is expanded (screen 4) — drives -15% badge on 1040
   const [yoyExpanded, setYoyExpanded] = useState(false)
   // Whether user navigated to source docs from the agent panel — shows back link
@@ -188,14 +193,9 @@ export default function DataReviewPage() {
     } catch { /* ignore */ }
     return []
   })
-  const [notesOpen, setNotesOpen] = useState(false)
-  const [notesClosing, setNotesClosing] = useState(false)
-
-  // C2: multi-pass handoff — dedicated summary panel (independent from AI Review)
+  // C2: multi-pass handoff — summary content when rightPanelMode === 'summary'
   const [reviewPass, setReviewPass] = useState<1 | 2>(1)
   const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>('preparer')
-  const [summaryPanelOpen, setSummaryPanelOpen] = useState(false)
-  const [summaryClosing, setSummaryClosing] = useState(false)
   const [summaryMode, setSummaryMode] = useState<HandoffMode>('signoff-review')
   const [summaryOpts, setSummaryOpts] = useState<{
     pass?: 1 | 2
@@ -305,76 +305,91 @@ export default function DataReviewPage() {
     if (summaryToggleTimerRef.current) clearTimeout(summaryToggleTimerRef.current)
   }, [])
 
-  /** Instant dismiss — used when another exclusive panel is opening (no exit stack). */
-  const dismissSummaryPanel = () => {
-    setSummaryPanelOpen(false)
-    setSummaryClosing(false)
-    setSummaryMode('signoff-review')
-    setSummaryOpts({})
-  }
-  const dismissNotesPanel = () => {
-    setNotesOpen(false)
-    setNotesClosing(false)
-  }
-  /** Drop AI rail without re-animating Source Documents (peer swap). */
-  const dismissAgentPanel = () => {
-    if (agentView === 'idle') return
-    setAgentView('idle')
-    setYoyExpanded(false)
-    setFromAgent(false)
-  }
-  const dismissSourcePanel = () => {
+  // Derived — single source of truth for which rail content is active
+  const rightPanelOpen = rightPanelMode !== 'closed' || rightPanelExiting || panelClosing
+  const rightPanelVisible = rightPanelMode === 'sources'
+  const notesOpen = rightPanelMode === 'comments'
+  const summaryPanelOpen = rightPanelMode === 'summary'
+  const agentPanelActive = rightPanelMode === 'ai'
+
+  const animatePanelEnter = useCallback(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setRightPanelAnimating(true)
+      setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
+    }))
+  }, [])
+
+  /** Open the unified right rail in exactly one mode (replaces any current mode). */
+  const openRightPanel = useCallback((mode: Exclude<RightPanelMode, 'closed'>) => {
+    setPanelClosing(false)
     setRightPanelExiting(false)
-    setRightPanelVisible(false)
-  }
+    const wasClosed = rightPanelMode === 'closed'
+    setRightPanelMode(mode)
+    if (wasClosed) animatePanelEnter()
+  }, [rightPanelMode, animatePanelEnter])
+
+  /** Close the unified right rail (mode-specific exit animation). */
+  const closeRightPanel = useCallback(() => {
+    if (rightPanelMode === 'closed' && !rightPanelExiting && !panelClosing) return
+
+    if (rightPanelMode === 'comments' || rightPanelMode === 'summary') {
+      setPanelClosing(true)
+      setTimeout(() => {
+        setRightPanelMode('closed')
+        setPanelClosing(false)
+        setSummaryMode('signoff-review')
+        setSummaryOpts({})
+      }, 200)
+      return
+    }
+
+    if (rightPanelMode === 'ai') {
+      setAgentView('closing')
+      setYoyExpanded(false)
+      setSelectedField(null)
+      setActiveIssueField(null)
+      setTimeout(() => {
+        setRightPanelMode('closed')
+        setAgentView('idle')
+      }, 350)
+      return
+    }
+
+    if (rightPanelMode === 'sources') {
+      setRightPanelExiting(true)
+      setTimeout(() => {
+        setRightPanelMode('closed')
+        setRightPanelExiting(false)
+      }, SOURCE_PANEL_EXIT_MS)
+    }
+  }, [rightPanelMode, setSelectedField])
 
   const ensureSourcePanelVisible = useCallback(() => {
-    if (!rightPanelVisible) {
-      setRightPanelVisible(true)
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        setRightPanelAnimating(true)
-        setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
-      }))
-    }
-  }, [rightPanelVisible])
+    if (rightPanelMode !== 'sources') openRightPanel('sources')
+  }, [rightPanelMode, openRightPanel])
 
   /** Collapse outputs when focusing source docs; pink pointer on Show outputs. */
   const hideOutputsForSourceFocusRef = useRef<() => void>(() => {})
 
-  /** Hide the imported-documents panel with the same slide-out used by the toolbar toggle */
   const handleCloseSourcePanel = useCallback(() => {
-    if (!rightPanelVisible || rightPanelExiting) return
-    setRightPanelExiting(true)
-    setTimeout(() => {
-      setRightPanelExiting(false)
-      setRightPanelVisible(false)
-    }, SOURCE_PANEL_EXIT_MS)
-  }, [rightPanelVisible, rightPanelExiting])
+    if (rightPanelMode === 'sources') closeRightPanel()
+  }, [rightPanelMode, closeRightPanel])
 
   const startReviewingImports = useCallback(() => {
-    dismissSummaryPanel()
     setImportsStarted(true)
-    // Keep Summary visible so the Hide Summary coach tip can teach the control
     setShow1040(true)
     const body = bodyRef.current
     const bodyW = body
       ? (body.clientWidth || body.getBoundingClientRect().width)
       : window.innerWidth
     setBodyWidth(bodyW)
-    // ~65% of body for Sources; Details stays full-width of Sources while
-    // Summary is open (stacked). Clamp so Summary stays ≥ LEFT_PANEL_MIN_WIDTH.
     const preferred = Math.round(bodyW * 0.65)
     const maxRight = Math.max(0, bodyW - LEFT_PANEL_MIN_WIDTH - PANEL_DRAG_HANDLE_WIDTH)
     const floor = Math.min(RIGHT_PANEL_MIN_WIDTH, maxRight)
     setRightPanelWidth(Math.max(floor, Math.min(preferred, maxRight)))
-    setRightPanelVisible(true)
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      setRightPanelAnimating(true)
-      setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
-      // Give documents the room — outputs collapse; Show outputs gets the pink pointer
-      hideOutputsForSourceFocusRef.current()
-    }))
-  }, [])
+    openRightPanel('sources')
+    hideOutputsForSourceFocusRef.current()
+  }, [openRightPanel])
 
   const dismissCoachTip = useCallback((id: CoachTipId) => {
     markCoachTipShown(id)
@@ -512,7 +527,7 @@ export default function DataReviewPage() {
   const handleNavigateToSourceDoc = useCallback((docId: string) => {
     const nav = navigationForSourceDoc(docId)
     if (!nav) return
-    dismissSummaryPanel()
+    
     setActiveTopTab(nav.tab)
     if (nav.subTab) setActiveSubTab(nav.subTab)
     if (nav.divPayer) setActiveDivPayer(nav.divPayer)
@@ -520,12 +535,10 @@ export default function DataReviewPage() {
 
     if (!importsStarted) {
       startReviewingImports()
-    } else if (agentView !== 'idle') {
+    } else if (agentPanelActive) {
       setFromAgent(true)
       setAgentSubView('overview')
-      setAgentView('closing')
-      setYoyExpanded(false)
-      setTimeout(() => setAgentView('idle'), 350)
+      handleAgentClose(true)
       hideOutputsForSourceFocusRef.current()
     } else {
       ensureSourcePanelVisible()
@@ -584,10 +597,9 @@ export default function DataReviewPage() {
   // not by the ?agent=true entry param. See handleBeginDiagnostics below.
 
   const handleAgentOpen = (subView?: 'overview' | 'yoyDetail') => {
-    // Mutual exclusion: AI Review ↔ Summary (same slot model as Sources ↔ AI)
-    dismissSummaryPanel()
     setSelectedField(null)
     if (subView) setAgentSubView(subView)
+    openRightPanel('ai')
     const alreadyLoaded = sessionStorage.getItem('agentLoaded')
     if (alreadyLoaded) {
       setAgentView('report')
@@ -612,7 +624,7 @@ export default function DataReviewPage() {
 
   // ProtoC: return to Phase 1 (source docs) from the completion banner
   const handleReturnToImport = () => {
-    if (agentView !== 'idle') handleAgentClose()
+    if (agentPanelActive) handleAgentClose()
     setPhase('import')
     setShow1040(true)
     setSelectedField(null)
@@ -625,28 +637,24 @@ export default function DataReviewPage() {
       setSelectedField(null)
       setActiveIssueField(null)
     }
-    // Step 1: agent plays panelSlideOut (350ms)
-    // Step 2: switch to idle (display:flex appears on right panel)
-    // Step 3: one rAF later, add the enter animation class (browser has painted display:flex)
     setTimeout(() => {
-      setAgentView('idle')          // right panel: display:flex now
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => { // second rAF: browser has rendered the flex layout
-          setRightPanelAnimating(true)
-          setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
-        })
-      })
+      setAgentView('idle')
+      if (preserveSelection) {
+        setRightPanelMode('sources')
+        animatePanelEnter()
+      } else {
+        setRightPanelMode('closed')
+      }
     }, 350)
   }
 
   const handleOpenNotes = () => {
     // Mutual exclusion: Comments ↔ Summary
-    dismissSummaryPanel()
-    setNotesOpen(true)
+    
+    openRightPanel('comments')
   }
   const handleCloseNotes = () => {
-    setNotesClosing(true)
-    setTimeout(() => { setNotesOpen(false); setNotesClosing(false) }, 200)
+    if (rightPanelMode === 'comments') closeRightPanel()
   }
   const formatNoteAt = () =>
     new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
@@ -662,8 +670,8 @@ export default function DataReviewPage() {
       role: reviewRole,
       replies: [],
     }])
-    dismissSummaryPanel()
-    setNotesOpen(true)
+    
+    openRightPanel('comments')
   }
 
   const handleEditNote = (id: string, text: string) => {
@@ -690,8 +698,8 @@ export default function DataReviewPage() {
 
   const openNotesFocus = (noteId?: string) => {
     if (noteId) setFocusNoteId(noteId)
-    dismissSummaryPanel()
-    setNotesOpen(true)
+    
+    openRightPanel('comments')
   }
 
   const pass2FocusFields: Set<string> | null = (() => {
@@ -727,24 +735,15 @@ export default function DataReviewPage() {
     mode: HandoffMode = 'signoff-review',
     opts: { pass?: 1 | 2; actor?: string; voice?: HandoffVoice } = {},
   ) => {
-    // Mutual exclusion: Summary closes AI, Sources, and Comments (no overlay stack)
-    dismissNotesPanel()
-    dismissAgentPanel()
-    dismissSourcePanel()
     setSummaryMode(mode)
     setSummaryOpts(opts)
-    setSummaryClosing(false)
-    setSummaryPanelOpen(true)
+    setAgentView('idle')
+    setYoyExpanded(false)
+    openRightPanel('summary')
   }
 
   const handleCloseSummaryPanel = () => {
-    setSummaryClosing(true)
-    setTimeout(() => {
-      setSummaryPanelOpen(false)
-      setSummaryClosing(false)
-      setSummaryMode('signoff-review')
-      setSummaryOpts({})
-    }, 200)
+    if (rightPanelMode === 'summary') closeRightPanel()
   }
 
   /** Sign-off CTA (Phase 2 header) → summary panel, then Finish & file / Pass to reviewer */
@@ -768,8 +767,8 @@ export default function DataReviewPage() {
   const handleHandoffJump = useCallback((jump: HandoffJump) => {
     if (jump.type === 'notesPane' || jump.type === 'note') {
       if (jump.type === 'note') setFocusNoteId(jump.noteId)
-      dismissSummaryPanel()
-      setNotesOpen(true)
+      
+      openRightPanel('comments')
       return
     }
     if (jump.type === 'field') {
@@ -801,20 +800,21 @@ export default function DataReviewPage() {
       return
     }
     if (jump.type === 'doc') {
-      dismissSummaryPanel()
+      
       handleNavigateToSourceDoc(jump.docId)
       return
     }
     if (jump.type === 'diagnostic') {
-      dismissSummaryPanel()
-      setAgentView('report')
       setPhase('diagnostics')
+      openRightPanel('ai')
+      setAgentView('report')
     }
   }, [
     handleNavigateToSourceDoc,
     setSelectedField,
     setOutputFormId,
     applyVerifyNavigation,
+    openRightPanel,
   ])
 
   /** History icon / pass-bar — open dedicated summary panel (not AI Review) */
@@ -879,7 +879,7 @@ export default function DataReviewPage() {
   }
 
   const handoffSnapshot: HandoffSnapshot | null =
-    summaryPanelOpen || summaryClosing
+    rightPanelMode === 'summary'
       ? buildSnapshot(
           summaryMode,
           summaryOpts.pass ?? reviewPass,
@@ -977,10 +977,10 @@ export default function DataReviewPage() {
 
   // Clamp Sources width when the viewport shrinks so Summary stays ≥ LEFT_PANEL_MIN_WIDTH.
   useEffect(() => {
-    if (bodyWidth <= 0 || !rightPanelVisible) return
+    if (bodyWidth <= 0 || rightPanelMode === 'closed' || rightPanelMode === 'ai') return
     const maxRight = Math.max(0, bodyWidth - LEFT_PANEL_MIN_WIDTH - PANEL_DRAG_HANDLE_WIDTH)
     setRightPanelWidth((w) => Math.min(w, maxRight))
-  }, [bodyWidth, rightPanelVisible])
+  }, [bodyWidth, rightPanelMode])
 
   // Side-by-side (doc LEFT / Details RIGHT) when:
   //   1. Hide Summary (!show1040), OR
@@ -989,7 +989,7 @@ export default function DataReviewPage() {
   // Sources panel is ≤60% of body.
   // freezePreviewSideBySide holds orientation steady during Hide/Show Summary.
   const sourcesPanelWide =
-    rightPanelVisible &&
+    rightPanelMode === 'sources' &&
     !rightPanelExiting &&
     bodyWidth > 0 &&
     rightPanelWidth / bodyWidth > 0.6
@@ -1018,7 +1018,10 @@ export default function DataReviewPage() {
   }, [previewHeight, previewSideBySide, beginPanelDrag])
 
   // While Summary is animating or collapsed, right/agent panel flex-fills
-  const rightPanelFills = (!show1040 || leftAnimWidth !== null) && (rightPanelVisible || agentView !== 'idle')
+  const panelUsesAgentWidth = rightPanelMode === 'ai'
+  const activePanelWidth = panelUsesAgentWidth ? agentPanelWidth : rightPanelWidth
+  const shellHidden = !rightPanelOpen && !rightPanelExiting
+  const rightPanelFills = (!show1040 || leftAnimWidth !== null) && rightPanelOpen
 
   const handleHideSummary = useCallback(() => {
     const body = bodyRef.current
@@ -1110,7 +1113,7 @@ export default function DataReviewPage() {
             setPhase('import')
             setShow1040(true)
             setOutputFormId('summary')
-            setRightPanelVisible(false)
+            setRightPanelMode('closed')
             setImportsStarted(false)
             // Fresh review — always show the sources tip first
             try { sessionStorage.removeItem('protoc2-coach-tip:outputSourcesFirst') } catch { /* ignore */ }
@@ -1246,23 +1249,18 @@ export default function DataReviewPage() {
               </span>
             </div>
             <button
-              className={`${styles.intuitIntelBtn} ${rightPanelVisible && agentView === 'idle' ? styles.intuitIntelBtnActive : ''}`}
+              className={`${styles.intuitIntelBtn} ${rightPanelVisible && !agentPanelActive ? styles.intuitIntelBtnActive : ''}`}
               aria-label="Toggle panel"
               onClick={() => {
-                // Mutual exclusion: Source Documents ↔ Summary (and AI as already handled)
-                dismissSummaryPanel()
-                if (agentView !== 'idle') {
+                if (agentPanelActive) {
                   handleAgentClose()
-                } else if (rightPanelVisible) {
-                  handleCloseSourcePanel()
+                } else if (rightPanelMode === 'comments' || rightPanelMode === 'summary') {
+                  openRightPanel('sources')
+                } else if (rightPanelMode === 'sources') {
+                  closeRightPanel()
                 } else if (importsStarted) {
-                  setRightPanelVisible(true)
-                  requestAnimationFrame(() => requestAnimationFrame(() => {
-                    setRightPanelAnimating(true)
-                    setTimeout(() => setRightPanelAnimating(false), SOURCE_PANEL_ENTER_MS)
-                  }))
+                  openRightPanel('sources')
                 } else {
-                  // Same as Phase 1 banner CTA — open sources and mark imports started
                   startReviewingImports()
                 }
               }}
@@ -1273,9 +1271,9 @@ export default function DataReviewPage() {
             {/* ProtoC: AI Review is Phase 2 only — hidden during Phase 1 (import accuracy) */}
             {!inImportPhase && (
               <button
-                className={`${styles.intuitIntelBtn} ${agentView !== 'idle' ? styles.intuitIntelBtnActive : ''}`}
+                className={`${styles.intuitIntelBtn} ${agentPanelActive ? styles.intuitIntelBtnActive : ''}`}
                 aria-label={
-                  agentView === 'idle' && phase2Progress.remaining > 0
+                  !agentPanelActive && phase2Progress.remaining > 0
                     ? `AI Review, ${phase2Progress.remaining} diagnostics remaining`
                     : 'Intuit Intelligence'
                 }
@@ -1284,7 +1282,7 @@ export default function DataReviewPage() {
               >
                 <img src={intuitAssistIcon} alt="" className={styles.intuitIntelIcon} />
                 <span className={styles.intuitIntelLabel}>AI Review</span>
-                {agentView === 'idle' && phase2Progress.remaining > 0 && (
+                {!agentPanelActive && phase2Progress.remaining > 0 && (
                   <span className={styles.notesBadge}>{phase2Progress.remaining}</span>
                 )}
               </button>
@@ -1317,7 +1315,7 @@ export default function DataReviewPage() {
           reviewed={phase2Reviewed}
           total={phase2Total}
           complete={phase2Complete}
-          diagnosticsOpen={agentView !== 'idle'}
+          diagnosticsOpen={agentPanelActive}
           onOpenDiagnostics={() => handleAgentOpen()}
           signOffSlot={(
             <Button
@@ -1391,7 +1389,7 @@ export default function DataReviewPage() {
             transition: panelResizing ? 'none' : undefined,
           }}
         >
-          {show1040 && (rightPanelVisible || notesOpen || (!inImportPhase && agentView !== 'idle')) && (
+          {show1040 && rightPanelOpen && (
             <CoachTip
               open={coachTip === 'hideSummary'}
               title="Hide outputs"
@@ -1475,7 +1473,7 @@ export default function DataReviewPage() {
 
               if (!importsStarted) {
                 startReviewingImports()
-              } else if (agentView !== 'idle') {
+              } else if (agentPanelActive) {
                 // Agent is open — close it preserving the field selection
                 setFromAgent(true)
                 setAgentSubView('overview')
@@ -1489,13 +1487,13 @@ export default function DataReviewPage() {
 
         {/* Left/right drag handle — stays mounted and collapses width with Summary
             so the gutter doesn't pop out of the row mid-animation. */}
-        {agentView === 'idle' && rightPanelVisible && !rightPanelExiting && (
+        {rightPanelOpen && !rightPanelExiting && show1040 && (
               <div
                 className={`${dragStyles.handleVertical} ${styles.summarySplitter}`}
-                onPointerDown={show1040 ? handleRightPanelDrag : undefined}
+                onPointerDown={show1040 ? (panelUsesAgentWidth ? handleAgentDrag : handleRightPanelDrag) : undefined}
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize Summary and Source Documents"
+                aria-label="Resize right panel"
                 aria-hidden={!show1040}
                 style={{
                   width: !show1040 ? 0 : PANEL_DRAG_HANDLE_WIDTH,
@@ -1508,29 +1506,25 @@ export default function DataReviewPage() {
               </div>
             )}
 
-            {/* Right panel — always in DOM, width animates to 0 when hidden. During Summary
-                toggle/collapse it flex-fills so it grows as the left width eases to 0
-                (no hard px→flex flip after the row is already side-by-side). */}
+            {/* Unified right rail — one shell; inner content switches by rightPanelMode */}
             <div
               className={`${styles.rightPanel} ${rightPanelAnimating ? styles.rightPanelEntering : ''} ${rightPanelExiting ? styles.rightPanelExiting : ''} ${rightPanelFills ? styles.rightPanelFills : ''}`}
               ref={rightRef}
               style={{
-                width: (agentView === 'loading' || agentView === 'report' || agentView === 'closing' || (!rightPanelVisible && !rightPanelExiting))
-                  ? 0
-                  : rightPanelFills ? undefined : rightPanelWidth,
-                flex: (rightPanelFills && rightPanelVisible)
-                  ? '1 1 0%'
-                  : '0 0 auto',
+                width: shellHidden ? 0 : (rightPanelFills ? undefined : activePanelWidth),
+                flex: (rightPanelFills && rightPanelOpen) ? '1 1 0%' : '0 0 auto',
                 minWidth: 0,
                 overflow: 'hidden',
-                opacity: (agentView === 'loading' || agentView === 'report' || agentView === 'closing' || (!rightPanelVisible && !rightPanelExiting)) ? 0 : 1,
+                opacity: shellHidden ? 0 : 1,
                 transition: panelResizing ? 'none' : undefined,
               }}
             >
+              {rightPanelMode === 'sources' && (
+              <>
               {/* Source panel header — title left; Close on right */}
               <div className={styles.sourcePanelHeader}>
                 {/* "Back to agent insights" only makes sense in Phase 2, after navigating from the agent */}
-                {!inImportPhase && fromAgent && agentView === 'idle' && rightPanelVisible ? (
+                {!inImportPhase && fromAgent ? (
                   <button
                     className={styles.agentBackBtn}
                     onClick={() => { setFromAgent(false); setActiveIssueField(null); handleAgentOpen(agentSubView) }}
@@ -1925,32 +1919,10 @@ export default function DataReviewPage() {
               )}
               </div>
               </div>
-            </div>
+              </>
+              )}
 
-            {/* Drag handle between left panel and agent panel — only when agent open */}
-            {agentView !== 'idle' && show1040 && (
-              <div
-                className={dragStyles.handleVertical}
-                onPointerDown={handleAgentDrag}
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Resize AI panel"
-              >
-                <VerticalGripIcon />
-              </div>
-            )}
-
-            {/* Agent panel — always mounted, width animates between 0 and agentPanelWidth.
-                When outputs are hidden, flex-fill so AI review uses the freed space. */}
-            <div
-              className={styles.agentPanelWrapper}
-              style={{
-                width: agentView === 'idle' ? 0 : (!show1040 ? undefined : agentPanelWidth),
-                flex: (agentView !== 'idle' && !show1040) ? '1 1 0%' : '0 0 auto',
-                minWidth: 0,
-                transition: panelResizing ? 'none' : undefined,
-              }}
-            >
+              {rightPanelMode === 'ai' && (
                 <AgentLoadingPane
                   onClose={handleAgentClose}
                   isLoading={agentView === 'loading'}
@@ -2065,43 +2037,43 @@ export default function DataReviewPage() {
                     />
                   }
                 />
+              )}
+
+              {rightPanelMode === 'comments' && (
+                <NotesPane
+                  notes={notes}
+                  onAdd={(text) => handleAddNote(text)}
+                  onEdit={handleEditNote}
+                  onResolve={handleResolveNote}
+                  onReply={handleReplyNote}
+                  focusNoteId={focusNoteId}
+                  onClose={handleCloseNotes}
+                  closing={panelClosing}
+                />
+              )}
+
+              {rightPanelMode === 'summary' && handoffSnapshot && (
+                <HandoffSummary
+                  variant="drawer"
+                  snapshot={handoffSnapshot}
+                  closing={panelClosing}
+                  onClose={handleCloseSummaryPanel}
+                  onContinue={() => {
+                    if (handoffSnapshot.mode === 'pass-to-reviewer') {
+                      openSummaryPanel('signoff-review', summaryOpts)
+                    } else {
+                      handleCloseSummaryPanel()
+                    }
+                  }}
+                  onJump={handleHandoffJump}
+                  onFinishAndFile={handlePreviewFinishAndFile}
+                  onPassToReviewer={handlePreviewPassToReviewer}
+                  onConfirmSend={handleConfirmHandoffSend}
+                  onOpenAsReviewer={handleOpenAsReviewer}
+                />
+              )}
             </div>
       </div>
-
-      {/* Notes / Comments pane — page-level overlay */}
-      {(notesOpen || notesClosing) && (
-        <NotesPane
-          notes={notes}
-          onAdd={(text) => handleAddNote(text)}
-          onEdit={handleEditNote}
-          onResolve={handleResolveNote}
-          onReply={handleReplyNote}
-          focusNoteId={focusNoteId}
-          onClose={handleCloseNotes}
-          closing={notesClosing}
-        />
-      )}
-
-      {(summaryPanelOpen || summaryClosing) && handoffSnapshot && (
-        <HandoffSummary
-          variant="drawer"
-          snapshot={handoffSnapshot}
-          closing={summaryClosing}
-          onClose={handleCloseSummaryPanel}
-          onContinue={() => {
-            if (handoffSnapshot.mode === 'pass-to-reviewer') {
-              openSummaryPanel('signoff-review', summaryOpts)
-            } else {
-              handleCloseSummaryPanel()
-            }
-          }}
-          onJump={handleHandoffJump}
-          onFinishAndFile={handlePreviewFinishAndFile}
-          onPassToReviewer={handlePreviewPassToReviewer}
-          onConfirmSend={handleConfirmHandoffSend}
-          onOpenAsReviewer={handleOpenAsReviewer}
-        />
-      )}
     </div>
   )
 }

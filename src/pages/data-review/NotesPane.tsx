@@ -152,7 +152,6 @@ export default function NotesPane({
       onClose={onClose}
       closeLabel="Close comments"
       closing={closing}
-      className={styles.notesZ}
       footer={compose}
     >
       <div className={`${sidePanelStyles.scroll} ${styles.notesList}`}>

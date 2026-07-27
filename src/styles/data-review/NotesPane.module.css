@@ -1,8 +1,5 @@
 /* Notes content styles — shell chrome lives in ReviewSidePanel.module.css */
 
-.notesZ {
-  z-index: 50;
-}
 
 /* ── Notes list (scrollable) ── */
 .notesList {
