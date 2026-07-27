@@ -24,10 +24,8 @@ export const DIV_PAYER_TABS: { key: DivPayer; label: string }[] = [
   { key: 'beaconDividend', label: 'Beacon Dividend Trust' },
 ]
 
-/** Verified-docs key used by Mark as verified — keep PeelTab / ReviewTab in sync */
-export function divVerifiedDocKey(payer: DivPayer): string {
-  return `1099-div-${payer}`
-}
+/** Verified-docs key — canonical definition in verifiedDocKeys.ts */
+export { divVerifiedDocKey } from '../../data/verifiedDocKeys'
 
 // 1099-DIV payers — Jessica Drake TY 2025
 const PAYER_DATA: Record<DivPayer, { ein: string; name: string; street: string; city: string; state: string; zip: string; payerPhone: string }> = {

@@ -1,5 +1,6 @@
 import type { TopTab } from './ReviewTab'
 import type { DivPayer } from './DetailFieldsDiv'
+import { normalizeVerifiedDocKey } from '../../data/verifiedDocKeys'
 import type { IntPayer } from './DetailFields1099'
 import type { W2Employer } from './DetailFields'
 
@@ -301,6 +302,7 @@ export function countPhase1FlagsForIntPayer(
  * for a given verified-docs key. Single source of truth for verify → clear flags.
  */
 export function getPhase1FlagKeysForVerifiedDoc(docKey: string): string[] {
+  docKey = normalizeVerifiedDocKey(docKey)
   if (docKey === 'techCircle' || docKey === 'bingEquipment') {
     const flags = W2_PAYER_FLAG_KEYS[docKey]
     if (flags.includes('box12')) {

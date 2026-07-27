@@ -45,8 +45,8 @@ import {
   buildTypeReviewed,
   getNextUnreviewedSourceDoc,
   getUnreviewedSourceDocs,
-  isDocReviewed,
 } from './data-review/docReviewStatus'
+import { isDocShownVerified } from '../data/verifiedDocKeys'
 import DetailFields1099R, { R_PAYER_TABS } from './data-review/DetailFields1099R'
 import DetailFieldsNec, { NEC_PAYER_TABS } from './data-review/DetailFieldsNec'
 import PeelTab from './data-review/PeelTab'
@@ -277,6 +277,7 @@ export default function DataReviewPage() {
   const tabVerifiedKeys = buildTabVerifiedKeys()
   const typeReviewed = buildTypeReviewed({
     verifiedDocs,
+    reviewerConfirmedDocs,
     w2Counts: w2PayerFieldCounts,
     divCounts: divPayerFieldCounts,
     intCounts: intPayerFieldCounts,
@@ -1402,7 +1403,7 @@ export default function DataReviewPage() {
             so the transition is smooth. */}
         {/* Collapsed "Show outputs" edge tab — available in import and AI phases */}
         <div
-          className={styles.form1040HandleWrap}
+          className={`${styles.form1040HandleWrap} ${coachTip === 'showOutputs' && !show1040 ? styles.form1040HandleWrapCoach : ''}`}
           style={{
             width: show1040 ? 0 : SHOW_SUMMARY_HANDLE_WIDTH,
             opacity: show1040 ? 0 : 1,
@@ -1415,7 +1416,7 @@ export default function DataReviewPage() {
             title="Show outputs"
             message="Bring Summary back anytime with Show outputs."
             onClose={() => dismissCoachTip('showOutputs')}
-            position="right"
+            position="left"
             alignment="middle"
           >
             <button
@@ -1452,13 +1453,13 @@ export default function DataReviewPage() {
             transition: panelResizing ? 'none' : undefined,
           }}
         >
-          {show1040 && rightPanelOpen && (
+          {show1040 && (
             <CoachTip
               open={coachTip === 'hideSummary'}
               title="Hide outputs"
               message="Need more room for source documents? Hide outputs to collapse this panel. You can bring it back anytime with Show outputs."
               onClose={() => dismissCoachTip('hideSummary')}
-              position="bottom"
+              position="top"
               alignment="left"
             >
               <Button
@@ -1645,12 +1646,7 @@ export default function DataReviewPage() {
                   tabs={DIV_PAYER_TABS.map(t => ({
                     ...t,
                     badge: divPayerFieldCounts[t.key],
-                    showClearedCheck: isDocReviewed(
-                      verifiedDocs,
-                      divVerifiedDocKey(t.key),
-                      divPayerFieldCounts[t.key],
-                      getInitialDivPayerFlagCount(t.key),
-                    ),
+                    showClearedCheck: isDocShownVerified(verifiedDocs, divVerifiedDocKey(t.key), reviewerConfirmedDocs),
                   }))}
                   activeKey={activeDivPayer}
                   onChange={key => setActiveDivPayer(key as DivPayer)}
@@ -1661,12 +1657,7 @@ export default function DataReviewPage() {
                   tabs={INT_PAYER_TABS.map(t => ({
                     ...t,
                     badge: intPayerFieldCounts[t.key],
-                    showClearedCheck: isDocReviewed(
-                      verifiedDocs,
-                      intVerifiedDocKey(t.key),
-                      intPayerFieldCounts[t.key],
-                      getInitialIntPayerFlagCount(t.key),
-                    ),
+                    showClearedCheck: isDocShownVerified(verifiedDocs, intVerifiedDocKey(t.key), reviewerConfirmedDocs),
                   }))}
                   activeKey={activeIntPayer}
                   onChange={key => setActiveIntPayer(key as IntPayer)}
@@ -1677,12 +1668,7 @@ export default function DataReviewPage() {
                   tabs={W2_PAYER_TABS.map(t => ({
                     ...t,
                     badge: w2PayerFieldCounts[t.key],
-                    showClearedCheck: isDocReviewed(
-                      verifiedDocs,
-                      t.key,
-                      w2PayerFieldCounts[t.key],
-                      getInitialW2PayerFlagCount(t.key),
-                    ),
+                    showClearedCheck: isDocShownVerified(verifiedDocs, t.key, reviewerConfirmedDocs),
                   }))}
                   activeKey={activeSubTab}
                   onChange={key => setActiveSubTab(key as W2Employer)}
@@ -1693,12 +1679,7 @@ export default function DataReviewPage() {
                   tabs={R_PAYER_TABS.map(t => ({
                     ...t,
                     badge: tabFlagCounts['1099-rs'],
-                    showClearedCheck: isDocReviewed(
-                      verifiedDocs,
-                      '1099-r',
-                      tabFlagCounts['1099-rs'],
-                      getInitialRPayerFlagCount(),
-                    ),
+                    showClearedCheck: isDocShownVerified(verifiedDocs, '1099-r', reviewerConfirmedDocs),
                   }))}
                   activeKey="meridian"
                   onChange={() => {}}
@@ -1709,7 +1690,7 @@ export default function DataReviewPage() {
                   tabs={NEC_PAYER_TABS.map(t => ({
                     ...t,
                     badge: 0,
-                    showClearedCheck: verifiedDocs.has('1099-nec'),
+                    showClearedCheck: isDocShownVerified(verifiedDocs, '1099-nec', reviewerConfirmedDocs),
                   }))}
                   activeKey="summit"
                   onChange={() => {}}

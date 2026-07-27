@@ -6,6 +6,7 @@ import type { DivPayer } from '../pages/data-review/DetailFieldsDiv'
 import type { IntPayer } from '../pages/data-review/DetailFields1099'
 import { PHASE1_TO_PHASE2_ISSUES } from '../pages/data-review/phase2FlagSync'
 import { getPhase1FlagKeysForVerifiedDoc } from '../pages/data-review/phase1FieldSync'
+import { normalizeVerifiedDocEntries, normalizeVerifiedDocKey } from '../data/verifiedDocKeys'
 
 // ProtoC: source-doc review state persisted in sessionStorage. BroadcastChannel
 // remains available for cross-tab sync if a second view is added later.
@@ -67,7 +68,7 @@ interface SyncedState {
 
 const CHANNEL_NAME = 'protoc2-data-review-sync'
 // Bump whenever DEFAULT_STATE shape or seed values change so stale sessions reset.
-const STATE_VERSION = 23
+const STATE_VERSION = 24
 const STORAGE_KEY = 'protoc2-data-review-state-v' + STATE_VERSION
 export const PREPARER_NAME = 'Sara Chen'
 export const REVIEWER_NAME = 'Jordan Lee'
@@ -301,6 +302,11 @@ function loadInitialState(): SyncedState {
         summaryFlaggedFieldsList?: unknown
       }
       const dualSlots = migrateDualSlotLists(parsed)
+      const normalizedDualSlots = {
+        ...dualSlots,
+        verifiedDocsList: normalizeVerifiedDocEntries(dualSlots.verifiedDocsList),
+        reviewerConfirmedDocsList: normalizeVerifiedDocEntries(dualSlots.reviewerConfirmedDocsList),
+      }
       const loaded: SyncedState = {
         ...DEFAULT_STATE,
         ...parsed,
@@ -313,7 +319,7 @@ function loadInitialState(): SyncedState {
           },
         },
         editedFieldsList: migrateActivityList(parsed.editedFieldsList),
-        ...dualSlots,
+        ...normalizedDualSlots,
         manualChecklistItems: parsed.manualChecklistItems && typeof parsed.manualChecklistItems === 'object'
           ? parsed.manualChecklistItems as Record<string, boolean>
           : {},
@@ -474,18 +480,21 @@ export function useSyncedReviewState() {
   const summaryFlagNotes = state.summaryFlagNotes
   const summaryFlagActivity = state.summaryFlagActivity
 
-  const toggleVerifiedDoc = (docKey: string) => {
+  const toggleVerifiedDoc = (rawDocKey: string) => {
+    const docKey = normalizeVerifiedDocKey(rawDocKey)
     if (isReviewerActor()) {
       const nextConfirmed = new Map(stateRef.current.reviewerConfirmedDocsList)
-      if (nextConfirmed.has(docKey)) nextConfirmed.delete(docKey)
+      const existing = [...nextConfirmed.keys()].find(k => normalizeVerifiedDocKey(k) === docKey)
+      if (existing) nextConfirmed.delete(existing)
       else nextConfirmed.set(docKey, nowEntry())
       update({ reviewerConfirmedDocsList: Array.from(nextConfirmed.entries()) })
       return
     }
 
     const nextVerified = new Map(stateRef.current.verifiedDocsList)
-    if (nextVerified.has(docKey)) {
-      nextVerified.delete(docKey)
+    const existing = [...nextVerified.keys()].find(k => normalizeVerifiedDocKey(k) === docKey)
+    if (existing) {
+      nextVerified.delete(existing)
       update({ verifiedDocsList: Array.from(nextVerified.entries()) })
       return
     }

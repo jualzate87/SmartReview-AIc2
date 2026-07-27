@@ -24,10 +24,8 @@ export const INT_PAYER_TABS: { key: IntPayer; label: string }[] = [
   { key: 'cascadeFederal',      label: 'Cascade Federal Savings' },
 ]
 
-/** Verified-docs key used by Mark as verified — keep PeelTab / ReviewTab in sync */
-export function intVerifiedDocKey(payer: IntPayer): string {
-  return `1099-int-${payer}`
-}
+/** Verified-docs key — canonical definition in verifiedDocKeys.ts */
+export { intVerifiedDocKey } from '../../data/verifiedDocKeys'
 
 // 1099-INT payers — Jessica Drake TY 2025
 const PAYER_DATA: Record<IntPayer, { ein: string; name: string; street: string; city: string; state: string; zip: string; payerPhone: string }> = {

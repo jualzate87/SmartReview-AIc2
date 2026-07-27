@@ -14,6 +14,7 @@ import {
 } from './phase1FieldSync'
 import type { TopTab } from './ReviewTab'
 import { QUESTIONNAIRE_DOC_KEY } from './questionnaireData'
+import { isDocShownVerified, isVerifiedInSet } from '../../data/verifiedDocKeys'
 
 /**
  * A document shows a green check when marked verified, OR when it originally
@@ -24,8 +25,9 @@ export function isDocReviewed(
   docKey: string,
   remainingFlagCount: number,
   initialFlagCount: number,
+  reviewerConfirmedDocs?: Set<string>,
 ): boolean {
-  if (verifiedDocs.has(docKey)) return true
+  if (isDocShownVerified(verifiedDocs, docKey, reviewerConfirmedDocs)) return true
   return initialFlagCount > 0 && remainingFlagCount === 0
 }
 
@@ -41,51 +43,32 @@ export function buildTabVerifiedKeys(): Record<string, string[]> {
   }
 }
 
-/** True when every L2 doc under a type tab is reviewed/verified. */
+/** True when every L2 doc under a type tab is preparer-verified or reviewer-confirmed. */
 export function buildTypeReviewed(args: {
   verifiedDocs: Set<string>
   w2Counts: Record<W2Employer, number>
   divCounts: Record<DivPayer, number>
   intCounts: Record<IntPayer, number>
   rRemaining: number
+  reviewerConfirmedDocs?: Set<string>
 }): Record<string, boolean> {
-  const { verifiedDocs, w2Counts, divCounts, intCounts, rRemaining } = args
+  const { verifiedDocs, w2Counts, divCounts, intCounts, rRemaining, reviewerConfirmedDocs } = args
 
   const w2s = W2_PAYER_TABS.every(t =>
-    isDocReviewed(
-      verifiedDocs,
-      t.key,
-      w2Counts[t.key] ?? 0,
-      getInitialW2PayerFlagCount(t.key),
-    ),
+    isDocShownVerified(verifiedDocs, t.key, reviewerConfirmedDocs),
   )
 
   const divs = DIV_PAYER_TABS.every(t =>
-    isDocReviewed(
-      verifiedDocs,
-      divVerifiedDocKey(t.key),
-      divCounts[t.key] ?? 0,
-      getInitialDivPayerFlagCount(t.key),
-    ),
+    isDocShownVerified(verifiedDocs, divVerifiedDocKey(t.key), reviewerConfirmedDocs),
   )
 
   const ints = INT_PAYER_TABS.every(t =>
-    isDocReviewed(
-      verifiedDocs,
-      intVerifiedDocKey(t.key),
-      intCounts[t.key] ?? 0,
-      getInitialIntPayerFlagCount(t.key),
-    ),
+    isDocShownVerified(verifiedDocs, intVerifiedDocKey(t.key), reviewerConfirmedDocs),
   )
 
-  const rs = isDocReviewed(
-    verifiedDocs,
-    '1099-r',
-    rRemaining,
-    getInitialRPayerFlagCount(),
-  )
+  const rs = isDocShownVerified(verifiedDocs, '1099-r', reviewerConfirmedDocs)
 
-  const necs = verifiedDocs.has('1099-nec')
+  const necs = isDocShownVerified(verifiedDocs, '1099-nec', reviewerConfirmedDocs)
 
   return {
     w2s,
@@ -93,8 +76,8 @@ export function buildTypeReviewed(args: {
     '1099-ints': ints,
     '1099-rs': rs,
     '1099-necs': necs,
-    'prior-1040': verifiedDocs.has('prior-1040'),
-    questionnaire: verifiedDocs.has(QUESTIONNAIRE_DOC_KEY),
+    'prior-1040': isDocShownVerified(verifiedDocs, 'prior-1040', reviewerConfirmedDocs),
+    questionnaire: isDocShownVerified(verifiedDocs, QUESTIONNAIRE_DOC_KEY, reviewerConfirmedDocs),
   }
 }
 
@@ -159,44 +142,8 @@ export function getUnreviewedSourceDocs(args: {
   intCounts: Record<IntPayer, number>
   rRemaining: number
 }): PacketSourceDoc[] {
-  const { verifiedDocs, w2Counts, divCounts, intCounts, rRemaining } = args
-
-  return listPacketSourceDocs().filter((doc) => {
-    if (doc.tab === 'w2s' && doc.w2SubTab) {
-      return !isDocReviewed(
-        verifiedDocs,
-        doc.key,
-        w2Counts[doc.w2SubTab] ?? 0,
-        getInitialW2PayerFlagCount(doc.w2SubTab),
-      )
-    }
-    if (doc.tab === '1099-divs' && doc.divPayer) {
-      return !isDocReviewed(
-        verifiedDocs,
-        doc.key,
-        divCounts[doc.divPayer] ?? 0,
-        getInitialDivPayerFlagCount(doc.divPayer),
-      )
-    }
-    if (doc.tab === '1099-ints' && doc.intPayer) {
-      return !isDocReviewed(
-        verifiedDocs,
-        doc.key,
-        intCounts[doc.intPayer] ?? 0,
-        getInitialIntPayerFlagCount(doc.intPayer),
-      )
-    }
-    if (doc.tab === '1099-rs') {
-      return !isDocReviewed(
-        verifiedDocs,
-        doc.key,
-        rRemaining,
-        getInitialRPayerFlagCount(),
-      )
-    }
-    // NEC, Prior Year 1040, Questionnaire — verified flag only
-    return !verifiedDocs.has(doc.key)
-  })
+  const { verifiedDocs } = args
+  return listPacketSourceDocs().filter(doc => !isVerifiedInSet(verifiedDocs, doc.key))
 }
 
 /** Cycle to the next unreviewed packet doc after the one matching current tab/payer. */

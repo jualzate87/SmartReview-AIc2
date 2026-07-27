@@ -5,6 +5,7 @@ import {
   type ActivityEntry,
 } from '../../hooks/useSyncedReviewState'
 import Tooltip from './Tooltip'
+import { getVerifiedDocEntry, isVerifiedInSet } from '../../data/verifiedDocKeys'
 import styles from '../../styles/data-review/DetailFields.module.css'
 
 function CheckIcon({ size = 14 }: { size?: number }) {
@@ -34,11 +35,11 @@ export default function DocVerifyHeaderActions({
   onVerifyDoc,
   onPreparerMarkVerified,
 }: Props) {
-  const isPreparerVerified = verifiedDocs?.has(docKey) ?? false
-  const isReviewerConfirmed = reviewerConfirmedDocs?.has(docKey) ?? false
+  const isPreparerVerified = verifiedDocs ? isVerifiedInSet(verifiedDocs, docKey) : false
+  const isReviewerConfirmed = reviewerConfirmedDocs ? isVerifiedInSet(reviewerConfirmedDocs, docKey) : false
   const isReviewerActor = getReviewActor() === REVIEWER_NAME
-  const preparerMeta = verifiedDocsMeta?.get(docKey)
-  const reviewerMeta = reviewerConfirmedDocsMeta?.get(docKey)
+  const preparerMeta = getVerifiedDocEntry(verifiedDocsMeta, docKey)
+  const reviewerMeta = getVerifiedDocEntry(reviewerConfirmedDocsMeta, docKey)
   const dualDocTooltip = formatDualCheckTooltip(preparerMeta, reviewerMeta)
   const verifiedTooltip = dualDocTooltip
     || (preparerMeta ? `Verified · ${preparerMeta.by} · ${preparerMeta.at}` : 'Click to unmark verified')

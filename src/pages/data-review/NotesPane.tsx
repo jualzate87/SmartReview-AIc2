@@ -260,7 +260,10 @@ export default function NotesPane({
                           </button>
                         )}
                         {note.status === 'resolved' && (
-                          <span className={styles.noteAt}>Resolved</span>
+                          <span className={styles.resolvedBadge}>
+                            <CircleCheck size="small" />
+                            Resolved
+                          </span>
                         )}
                       </div>
 
