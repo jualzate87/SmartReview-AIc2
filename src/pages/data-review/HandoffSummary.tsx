@@ -15,6 +15,7 @@ import { ChevronDown } from '@design-systems/icons'
 import {
   jumpActionLabel,
   getOpenGroupToggleLabel,
+  getPreparerDoneGroupToggleLabel,
   getDoneSectionToggleLabel,
 } from '../../data/handoffSnapshot'
 import ReviewSidePanel, { sidePanelStyles } from './ReviewSidePanel'
@@ -362,9 +363,12 @@ export default function HandoffSummary({
       <div className={styles.sections}>
         {snapshot.sections.map(section => {
           const isCritical = section.bucket === 'critical'
+          const isDone = section.bucket === 'done'
           const hasGroups = !!(section.groups && section.groups.length > 0)
           const hasItems = section.items.length > 0
-          const showDetails = hasGroups || (hasItems && section.items.some(i => i.status !== 'info'))
+          const preparerFirstName = snapshot.actorLabel.split(/\s+/)[0] || snapshot.actorLabel
+          const showFlatDetails =
+            !hasGroups && hasItems && section.items.some(i => i.status !== 'info')
 
           return (
             <section
@@ -386,7 +390,7 @@ export default function HandoffSummary({
                 <p className={styles.sectionIntro}>{section.intro}</p>
               )}
 
-              {!showDetails && hasItems && (
+              {!hasGroups && !showFlatDetails && hasItems && (
                 <ul className={styles.list}>
                   {section.items.map((item, i) => (
                     <ItemRow
@@ -405,8 +409,34 @@ export default function HandoffSummary({
                     <DetailsDisclosure
                       key={group.id}
                       id={`handoff-group-${group.id}`}
-                      collapsedLabel={getOpenGroupToggleLabel(group, false)}
-                      expandedLabel={getOpenGroupToggleLabel(group, true)}
+                      collapsedLabel={
+                        isDone
+                          ? getPreparerDoneGroupToggleLabel(
+                              group,
+                              false,
+                              snapshot.voice === 'reviewer-briefing',
+                              preparerFirstName,
+                            )
+                          : getOpenGroupToggleLabel(
+                              group,
+                              false,
+                              snapshot.voice === 'reviewer-briefing',
+                            )
+                      }
+                      expandedLabel={
+                        isDone
+                          ? getPreparerDoneGroupToggleLabel(
+                              group,
+                              true,
+                              snapshot.voice === 'reviewer-briefing',
+                              preparerFirstName,
+                            )
+                          : getOpenGroupToggleLabel(
+                              group,
+                              true,
+                              snapshot.voice === 'reviewer-briefing',
+                            )
+                      }
                       countLabel={group.countLabel}
                       defaultOpen={false}
                     >
@@ -425,18 +455,20 @@ export default function HandoffSummary({
                 </div>
               )}
 
-              {!hasGroups && showDetails && (
+              {!hasGroups && showFlatDetails && (
                 <DetailsDisclosure
                   id={`handoff-details-${section.id}`}
                   collapsedLabel={getDoneSectionToggleLabel(
                     section.count,
                     false,
                     snapshot.voice === 'reviewer-briefing',
+                    preparerFirstName,
                   )}
                   expandedLabel={getDoneSectionToggleLabel(
                     section.count,
                     true,
                     snapshot.voice === 'reviewer-briefing',
+                    preparerFirstName,
                   )}
                   countLabel={section.countLabel}
                   defaultOpen={section.defaultOpen}

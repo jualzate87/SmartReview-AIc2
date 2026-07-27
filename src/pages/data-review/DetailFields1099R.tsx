@@ -321,7 +321,7 @@ export default function DetailFields1099R({
         <div className={styles.headerActions}>
           <h2 style={{ fontFamily: 'var(--font-family-component)', fontSize: 18, fontWeight: 500, color: '#21262a', margin: 0, flex: 1, textAlign: 'left' }}>Details: Retirement Distribution (1099-R)</h2>
           <DocVerifyHeaderActions
-            docKey="1099-r-meridian"
+            docKey="1099-r"
             verifiedDocs={verifiedDocs}
             verifiedDocsMeta={verifiedDocsMeta}
             reviewerConfirmedDocs={reviewerConfirmedDocs}

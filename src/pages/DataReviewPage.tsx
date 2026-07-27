@@ -46,7 +46,7 @@ import {
   getNextUnreviewedSourceDoc,
   getUnreviewedSourceDocs,
 } from './data-review/docReviewStatus'
-import { isDocShownVerified } from '../data/verifiedDocKeys'
+import { isDocShownVerified, navigationForVerifiedDocKey } from '../data/verifiedDocKeys'
 import DetailFields1099R, { R_PAYER_TABS } from './data-review/DetailFields1099R'
 import DetailFieldsNec, { NEC_PAYER_TABS } from './data-review/DetailFieldsNec'
 import PeelTab from './data-review/PeelTab'
@@ -538,7 +538,7 @@ export default function DataReviewPage() {
   }, [phase, setSelectedField, importsStarted, startReviewingImports, ensureSourcePanelVisible])
 
   const handleNavigateToSourceDoc = useCallback((docId: string) => {
-    const nav = navigationForSourceDoc(docId)
+    const nav = navigationForVerifiedDocKey(docId) ?? navigationForSourceDoc(docId)
     if (!nav) return
     
     setActiveTopTab(nav.tab)
@@ -1025,6 +1025,8 @@ export default function DataReviewPage() {
 
   const outstandingOpenCount = getOutstandingOpenCount(buildSnapshot('signoff-review'))
 
+  const inImportPhase = phase === 'import'
+
   const reviewChecklist = deriveReviewChecklist({
     reviewedFields,
     verifiedDocs,
@@ -1043,8 +1045,6 @@ export default function DataReviewPage() {
   const signOffBlockerMessage = signOffGatingActive
     ? signOffBlockerText(reviewChecklist, outstandingOpenCount)
     : null
-
-  const inImportPhase = phase === 'import'
 
   // Resize drag between the document preview and detail fields. Axis is frozen
   // for the gesture (matches flexDirection at pointer-down). previewHeight

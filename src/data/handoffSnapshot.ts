@@ -16,6 +16,7 @@ import type { Note } from '../pages/data-review/NotesPane'
 import {
   normalizeVerifiedDocKey,
   isVerifiedInSet,
+  isPreparerDocVerified,
   getVerifiedDocEntry,
   PACKET_VERIFY_DOC_KEYS,
   PHASE1_FLAG_TO_VERIFY_DOC,
@@ -197,13 +198,22 @@ function listPhrase(parts: string[], max = 3): string {
   return `${shown.join(', ')}, and ${rest} more`
 }
 
+/** Packet docs the preparer marked verified (canonical, deduped). */
+function preparerVerifiedPacketDocs(verifiedDocs: Set<string>): string[] {
+  return KNOWN_DOCS.filter(d => isPreparerDocVerified(verifiedDocs, d))
+}
+
 /** Progressive disclosure trigger for open-item groups (action + count, no dot-separated hints). */
-export function getOpenGroupToggleLabel(group: HandoffItemGroup, expanded: boolean): string {
+export function getOpenGroupToggleLabel(
+  group: HandoffItemGroup,
+  expanded: boolean,
+  isBriefing = false,
+): string {
   const n = group.count
   if (expanded) {
     switch (group.id) {
       case 'unverified-docs':
-        return 'Hide unverified documents'
+        return isBriefing ? 'Hide documents not verified in Pass 1' : 'Hide unverified documents'
       case 'notes':
         return 'Hide open notes'
       case 'import-flags':
@@ -222,7 +232,13 @@ export function getOpenGroupToggleLabel(group: HandoffItemGroup, expanded: boole
   }
   switch (group.id) {
     case 'unverified-docs':
-      return n === 1 ? 'View 1 unverified document' : `View ${n} unverified documents`
+      return isBriefing
+        ? n === 1
+          ? 'View 1 document not verified in Pass 1'
+          : `View ${n} documents not verified in Pass 1`
+        : n === 1
+          ? 'View 1 unverified document'
+          : `View ${n} unverified documents`
     case 'notes':
       return n === 1 ? 'View 1 open note' : `View ${n} open notes`
     case 'import-flags':
@@ -240,20 +256,65 @@ export function getOpenGroupToggleLabel(group: HandoffItemGroup, expanded: boole
   }
 }
 
-/** Progressive disclosure trigger for the completed-work section (distinct from section heading). */
+/** Progressive disclosure trigger for preparer-done groups (mirrors open-item copy). */
+export function getPreparerDoneGroupToggleLabel(
+  group: HandoffItemGroup,
+  expanded: boolean,
+  isBriefing: boolean,
+  preparerFirstName: string,
+): string {
+  const n = group.count
+  if (expanded) {
+    switch (group.id) {
+      case 'verified-docs':
+        return 'Hide verified documents'
+      case 'import-flags-cleared':
+        return 'Hide cleared import flags'
+      case 'summary-lines':
+        return 'Hide verified summary lines'
+      case 'amount-edits':
+        return 'Hide amount edits'
+      case 'ai-diagnostics-reviewed':
+        return 'Hide reviewed AI diagnostics'
+      default:
+        return `Hide ${group.title.toLowerCase()}`
+    }
+  }
+  switch (group.id) {
+    case 'verified-docs':
+      return n === 1 ? 'View 1 verified document' : `View ${n} verified documents`
+    case 'import-flags-cleared':
+      return n === 1 ? 'View 1 cleared import flag' : `View ${n} cleared import flags`
+    case 'summary-lines':
+      return n === 1 ? 'View 1 verified summary line' : `View ${n} verified summary lines`
+    case 'amount-edits':
+      return n === 1 ? 'View 1 amount edit' : `View ${n} amount edits`
+    case 'ai-diagnostics-reviewed':
+      return n === 1 ? 'View 1 reviewed AI diagnostic' : `View ${n} reviewed AI diagnostics`
+    default:
+      return n === 1 ? 'View 1 item' : `View ${n} items`
+  }
+}
+
+/** Section-level fallback when the done plate has a flat list (no sub-groups). */
 export function getDoneSectionToggleLabel(
   count: number,
   expanded: boolean,
   isBriefing: boolean,
+  preparerFirstName: string,
 ): string {
   if (expanded) {
-    return isBriefing ? 'Hide verified items' : 'Hide reviewed items'
+    return isBriefing
+      ? `Hide what ${preparerFirstName} cleared`
+      : 'Hide what you cleared'
   }
   if (count <= 0) {
-    return isBriefing ? 'See what was verified' : 'See what you cleared'
+    return isBriefing ? `See what ${preparerFirstName} cleared` : 'See what you cleared'
   }
   if (isBriefing) {
-    return count === 1 ? 'Show 1 verified item' : `Show ${count} verified items`
+    return count === 1
+      ? `See what ${preparerFirstName} cleared (1 item)`
+      : `See what ${preparerFirstName} cleared (${count} items)`
   }
   return count === 1
     ? 'See what you cleared (1 item)'
@@ -323,16 +384,21 @@ export function buildHandoffSnapshot(
       : diagsOpenRaw
 
   const openNotes = input.notes.filter(n => (n.status ?? 'open') === 'open')
-  const verifiedList = [...input.verifiedDocs].map(normalizeVerifiedDocKey)
-  const unverifiedDocs = KNOWN_DOCS.filter(d => !isVerifiedInSet(input.verifiedDocs, d))
+  const reviewerConfirmedDocs = input.reviewerConfirmedDocs ?? new Set<string>()
+
+  // Preparer-verified packet docs only — aligns with tab checkmarks (isDocShownVerified preparer slot).
+  const preparerVerifiedDocs = preparerVerifiedPacketDocs(input.verifiedDocs)
+  // Not preparer-verified — never overlaps with preparerVerifiedDocs or done-list doc rows.
+  const unverifiedDocs = KNOWN_DOCS.filter(d => !isPreparerDocVerified(input.verifiedDocs, d))
+  // Reviewer briefing: preparer verified but reviewer has not confirmed yet.
+  const docsAwaitingConfirmation = isBriefing
+    ? preparerVerifiedDocs.filter(d => !isVerifiedInSet(reviewerConfirmedDocs, d))
+    : []
 
   const checks = [...input.summaryChecked.entries()]
-  const reviewerConfirms = [...(input.reviewerConfirmed ?? new Map()).entries()]
   const humanFlags = [...input.summaryFlagged.entries()]
   const edits = [...input.editedFields.entries()]
   const editKeys = edits.map(([k]) => k)
-  const editedClears = clearedFlags.filter(k => editKeys.some(ek => editTouchesFlag(ek, k)))
-  const markedOnly = clearedFlags.filter(k => !editKeys.some(ek => editTouchesFlag(ek, k)))
 
   // ── Still open — granular items grouped by category ───────────────────
   const openGroups: HandoffItemGroup[] = []
@@ -400,12 +466,17 @@ export function buildHandoffSnapshot(
   if (unverifiedDocs.length) {
     openGroups.push({
       id: 'unverified-docs',
-      title: 'Documents not yet verified',
+      title: isBriefing ? 'Documents not verified in Pass 1' : 'Documents not yet verified',
       count: unverifiedDocs.length,
-      countLabel: `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}`,
+      countLabel: isBriefing
+        ? `${unverifiedDocs.length} not verified in Pass 1`
+        : `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}`,
       items: unverifiedDocs.map(docId => ({
         id: `doc-${docId}`,
         label: docLabel(docId),
+        detail: isBriefing
+          ? `${who} has not marked this document verified yet.`
+          : 'Not marked verified yet.',
         status: 'open' as const,
         jump: { type: 'doc' as const, docId },
         jumpLabel: 'Open document',
@@ -457,15 +528,13 @@ export function buildHandoffSnapshot(
     })
   }
 
-  const reviewerConfirmedDocs = input.reviewerConfirmedDocs ?? new Set<string>()
-  const docsVerifiedOnly = verifiedList.filter(d => !isVerifiedInSet(reviewerConfirmedDocs, d))
-  if (isBriefing && docsVerifiedOnly.length) {
+  if (isBriefing && docsAwaitingConfirmation.length) {
     openGroups.push({
       id: 'docs-needs-confirmation',
       title: 'Documents awaiting confirmation',
-      count: docsVerifiedOnly.length,
-      countLabel: `${docsVerifiedOnly.length} verified-only doc${docsVerifiedOnly.length === 1 ? '' : 's'}`,
-      items: docsVerifiedOnly.map(docId => {
+      count: docsAwaitingConfirmation.length,
+      countLabel: `${docsAwaitingConfirmation.length} awaiting confirmation`,
+      items: docsAwaitingConfirmation.map(docId => {
         const meta = getVerifiedDocEntry(input.verifiedDocsMeta, docId)
         return {
           id: `doc-confirm-${docId}`,
@@ -483,167 +552,120 @@ export function buildHandoffSnapshot(
 
   const granularOpenCount = openGroups.reduce((sum, g) => sum + g.count, 0)
 
-  // ── What happened (connected story) ───────────────────────────────────
-  const doneItems: HandoffItem[] = []
+  // ── Preparer completed work — granular rows (same pattern as open items) ─
+  const preparerDoneGroups: HandoffItemGroup[] = []
 
-  if (editedClears.length || markedOnly.length) {
-    if (editedClears.length) {
-      doneItems.push({
-        label: isBriefing
-          ? `Edited ${editedClears.length} field${editedClears.length === 1 ? '' : 's'} to clear import flags`
-          : `Edited to clear ${editedClears.length} import flag${editedClears.length === 1 ? '' : 's'}`,
-        detail: listPhrase(editedClears.map(fieldLabel)),
-        status: 'done',
-        jump: { type: 'field', field: editedClears[0] },
-        jumpLabel: 'View field',
-      })
-    }
-    if (markedOnly.length) {
-      doneItems.push({
-        label: isBriefing
-          ? `Marked ${markedOnly.length} flagged field${markedOnly.length === 1 ? '' : 's'} correct without changing amounts`
-          : `Marked ${markedOnly.length} correct, no amount edit`,
-        detail: listPhrase(markedOnly.map(fieldLabel)),
-        status: 'done',
-        jump: { type: 'field', field: markedOnly[0] },
-        jumpLabel: 'View field',
-      })
-    }
-  }
-
-  const extraChecks = checks.filter(([field]) => !clearedFlags.includes(field as Phase1FlagKey))
-  const dualConfirmed = extraChecks.filter(([field]) => input.reviewerConfirmed?.has(field))
-  const preparerOnlyChecks = extraChecks.filter(([field]) => !input.reviewerConfirmed?.has(field))
-
-  if (dualConfirmed.length) {
-    doneItems.push({
-      label: isBriefing
-        ? `${dualConfirmed.length} line${dualConfirmed.length === 1 ? '' : 's'} verified and confirmed`
-        : `Verified + confirmed ${dualConfirmed.length} summary line${dualConfirmed.length === 1 ? '' : 's'}`,
-      detail: listPhrase(
-        dualConfirmed.map(([f, prep]) => {
-          const rev = input.reviewerConfirmed?.get(f)
-          return rev
-            ? `${fieldLabel(f)} (${formatCheckMeta(prep)} · ${formatCheckMeta(rev)})`
-            : fieldLabel(f)
-        }),
-        3,
-      ),
-      status: 'done',
-      jump: { type: 'field', field: dualConfirmed[0][0] },
-      jumpLabel: 'View field',
+  if (preparerVerifiedDocs.length) {
+    preparerDoneGroups.push({
+      id: 'verified-docs',
+      title: 'Documents verified',
+      count: preparerVerifiedDocs.length,
+      countLabel: `${preparerVerifiedDocs.length} verified doc${preparerVerifiedDocs.length === 1 ? '' : 's'}`,
+      items: preparerVerifiedDocs.map(docId => {
+        const meta = getVerifiedDocEntry(input.verifiedDocsMeta, docId)
+        const relatedFlags = clearedFlags.filter(f => normalizeVerifiedDocKey(FLAG_TO_DOC[f] ?? '') === docId)
+        const relatedEdits = docRelatedEdits(docId, editKeys)
+        const detailParts: string[] = []
+        if (meta) detailParts.push(`${formatCheckMeta(meta)}`)
+        if (relatedFlags.length) {
+          detailParts.push(`Cleared ${relatedFlags.length} import flag${relatedFlags.length === 1 ? '' : 's'}`)
+        }
+        if (relatedEdits.length) {
+          detailParts.push(`${relatedEdits.length} related edit${relatedEdits.length === 1 ? '' : 's'}`)
+        }
+        return {
+          id: `done-doc-${docId}`,
+          label: docLabel(docId),
+          detail: detailParts.length ? detailParts.join(' · ') : undefined,
+          status: 'done' as const,
+          jump: { type: 'doc' as const, docId },
+          jumpLabel: 'Open document',
+        }
+      }),
     })
   }
 
-  if (preparerOnlyChecks.length) {
-    const editedOnes = preparerOnlyChecks.filter(([field]) => editKeys.some(ek => editTouchesFlag(ek, field)))
-    const reviewOnly = preparerOnlyChecks.filter(([field]) => !editKeys.some(ek => editTouchesFlag(ek, field)))
-    if (editedOnes.length) {
-      doneItems.push({
-        label: isBriefing
-          ? `Verified ${editedOnes.length} summary line${editedOnes.length === 1 ? '' : 's'} after edits (awaiting your confirmation)`
-          : `Edited and verified ${editedOnes.length} summary line${editedOnes.length === 1 ? '' : 's'}`,
-        detail: listPhrase(editedOnes.map(([f]) => fieldLabel(f))),
-        status: isBriefing ? 'info' : 'done',
-        jump: { type: 'field', field: editedOnes[0][0] },
+  if (clearedFlags.length) {
+    preparerDoneGroups.push({
+      id: 'import-flags-cleared',
+      title: 'Import flags cleared',
+      count: clearedFlags.length,
+      countLabel: `${clearedFlags.length} cleared flag${clearedFlags.length === 1 ? '' : 's'}`,
+      items: clearedFlags.map(flag => {
+        const wasEdited = editKeys.some(ek => editTouchesFlag(ek, flag))
+        return {
+          id: `done-flag-${flag}`,
+          label: fieldLabel(flag),
+          detail: wasEdited ? 'Resolved with an amount edit' : 'Marked correct without changing amounts',
+          status: 'done' as const,
+          jump: { type: 'field' as const, field: flag },
+          jumpLabel: 'View field',
+        }
+      }),
+    })
+  }
+
+  if (checks.length) {
+    preparerDoneGroups.push({
+      id: 'summary-lines',
+      title: 'Summary lines verified',
+      count: checks.length,
+      countLabel: `${checks.length} summary line${checks.length === 1 ? '' : 's'}`,
+      items: checks.map(([field, meta]) => {
+        const reviewerMeta = input.reviewerConfirmed?.get(field)
+        const awaiting = isBriefing && !reviewerMeta
+        return {
+          id: `done-summary-${field}`,
+          label: fieldLabel(field),
+          detail: reviewerMeta
+            ? `${formatCheckMeta(meta)} · Confirmed ${formatCheckMeta(reviewerMeta)}`
+            : awaiting
+              ? `${formatCheckMeta(meta)} · awaiting your confirmation`
+              : formatCheckMeta(meta),
+          status: awaiting ? ('info' as const) : ('done' as const),
+          jump: { type: 'field' as const, field },
+          jumpLabel: awaiting ? 'Confirm field' : 'View field',
+        }
+      }),
+    })
+  }
+
+  if (edits.length) {
+    preparerDoneGroups.push({
+      id: 'amount-edits',
+      title: 'Amount edits',
+      count: edits.length,
+      countLabel: `${edits.length} edit${edits.length === 1 ? '' : 's'}`,
+      items: edits.map(([field, meta]) => ({
+        id: `done-edit-${field}`,
+        label: fieldLabel(field) !== field ? fieldLabel(field) : field,
+        detail: formatCheckMeta(meta),
+        status: 'done' as const,
+        jump: { type: 'field' as const, field },
         jumpLabel: 'View field',
-      })
-    }
-    if (reviewOnly.length) {
-      doneItems.push({
-        label: isBriefing
-          ? `Verified ${reviewOnly.length} summary line${reviewOnly.length === 1 ? '' : 's'} without edits (awaiting your confirmation)`
-          : `Verified ${reviewOnly.length} line${reviewOnly.length === 1 ? '' : 's'} without edits`,
-        detail: listPhrase(reviewOnly.map(([f]) => fieldLabel(f))),
-        status: isBriefing ? 'info' : 'done',
-        jump: { type: 'field', field: reviewOnly[0][0] },
-        jumpLabel: 'View field',
-      })
-    }
-  }
-
-  const reviewerOnlyConfirms = reviewerConfirms.filter(([field]) => !input.summaryChecked.has(field))
-  if (reviewerOnlyConfirms.length) {
-    doneItems.push({
-      label: isBriefing
-        ? `You confirmed ${reviewerOnlyConfirms.length} line${reviewerOnlyConfirms.length === 1 ? '' : 's'} without preparer verify`
-        : `Reviewer confirmed ${reviewerOnlyConfirms.length} line${reviewerOnlyConfirms.length === 1 ? '' : 's'}`,
-      detail: listPhrase(reviewerOnlyConfirms.map(([f, meta]) => `${fieldLabel(f)} (${formatCheckMeta(meta)})`)),
-      status: 'done',
-      jump: { type: 'field', field: reviewerOnlyConfirms[0][0] },
-      jumpLabel: 'View field',
+      })),
     })
-  }
-
-  const orphanEdits = edits.filter(
-    ([k]) => !clearedFlags.some(f => editTouchesFlag(k, f)) && !checks.some(([c]) => editTouchesFlag(k, c)),
-  )
-  if (orphanEdits.length) {
-    doneItems.push({
-      label: `${orphanEdits.length} other amount change${orphanEdits.length === 1 ? '' : 's'}`,
-      detail: listPhrase(orphanEdits.map(([k, meta]) => `${k} (${formatCheckMeta(meta)})`), 4),
-      status: 'info',
-      jump: { type: 'field', field: orphanEdits[0][0] },
-      jumpLabel: 'View field',
-    })
-  }
-
-  if (verifiedList.length) {
-    const cleanDocs = verifiedList.filter(docId => {
-      const relatedFlags = clearedFlags.filter(f => FLAG_TO_DOC[f] === docId)
-      const relatedEdits = docRelatedEdits(docId, editKeys)
-      return relatedFlags.length === 0 && relatedEdits.length === 0
-    })
-    const touchedDocs = verifiedList.filter(docId => !cleanDocs.includes(docId))
-
-    if (touchedDocs.length) {
-      doneItems.push({
-        label: isBriefing
-          ? `Verified ${touchedDocs.length} document${touchedDocs.length === 1 ? '' : 's'} after working flags or edits`
-          : `Verified ${touchedDocs.length} document${touchedDocs.length === 1 ? '' : 's'} with related work`,
-        detail: listPhrase(touchedDocs.map(docLabel)),
-        status: 'done',
-        jump: { type: 'doc', docId: touchedDocs[0] },
-        jumpLabel: 'Open document',
-      })
-    }
-    if (cleanDocs.length) {
-      doneItems.push({
-        label: isBriefing
-          ? `Verified ${cleanDocs.length} document${cleanDocs.length === 1 ? '' : 's'} with no flags or edits`
-          : `Verified ${cleanDocs.length} clean document${cleanDocs.length === 1 ? '' : 's'}`,
-        detail: listPhrase(cleanDocs.map(docLabel)),
-        status: 'done',
-        jump: { type: 'doc', docId: cleanDocs[0] },
-        jumpLabel: 'Open document',
-      })
-    }
   }
 
   if (diagsReviewed.length) {
-    doneItems.push({
-      label: isBriefing
-        ? `Walked through ${diagsReviewed.length} AI diagnostic${diagsReviewed.length === 1 ? '' : 's'}`
-        : `Reviewed ${diagsReviewed.length} AI diagnostic${diagsReviewed.length === 1 ? '' : 's'}`,
-      detail: listPhrase(diagsReviewed.map(k => DIAG_LABELS[k] ?? k)),
-      status: 'done',
-      jump: { type: 'diagnostic', issueKey: diagsReviewed[0] },
-      jumpLabel: 'Open AI review',
+    preparerDoneGroups.push({
+      id: 'ai-diagnostics-reviewed',
+      title: 'AI diagnostics reviewed',
+      count: diagsReviewed.length,
+      countLabel: `${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'}`,
+      items: diagsReviewed.map(k => ({
+        id: `done-diag-${k}`,
+        label: DIAG_LABELS[k] ?? k,
+        status: 'done' as const,
+        jump: { type: 'diagnostic' as const, issueKey: k },
+        jumpLabel: 'Open AI review',
+      })),
     })
   }
 
-  if (doneItems.length === 0) {
-    doneItems.push({
-      label: isBriefing
-        ? `${who} hasn’t recorded edits, checks, or verified docs yet`
-        : 'No completed actions recorded yet',
-      detail: 'As work happens, it’ll show up here as the story of the pass.',
-      status: 'info',
-    })
-  }
-
-  const doneOnlyCount = doneItems.filter(i => i.status === 'done').length
+  const preparerDoneCount = preparerDoneGroups.reduce((sum, g) => sum + g.count, 0)
   const hasOpen = granularOpenCount > 0
+  const hasPreparerDone = preparerDoneCount > 0
 
   // ── Briefing narrative (review history tone, not diagnostics catalog) ─
   const story: string[] = []
@@ -651,10 +673,10 @@ export function buildHandoffSnapshot(
     story.push(
       `${actorLabel} finished Pass 1. Here’s what you should know before you pick up the return.`,
     )
-    if (clearedFlags.length || verifiedList.length || diagsReviewed.length) {
+    if (clearedFlags.length || preparerVerifiedDocs.length || diagsReviewed.length) {
       const bits: string[] = []
       if (clearedFlags.length) bits.push(`${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} cleared`)
-      if (verifiedList.length) bits.push(`${verifiedList.length} doc${verifiedList.length === 1 ? '' : 's'} verified`)
+      if (preparerVerifiedDocs.length) bits.push(`${preparerVerifiedDocs.length} doc${preparerVerifiedDocs.length === 1 ? '' : 's'} verified`)
       if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'} reviewed`)
       story.push(`So far they completed: ${listPhrase(bits)}.`)
     }
@@ -680,10 +702,10 @@ export function buildHandoffSnapshot(
         ? `${who}, here’s where this pass stands — what’s still open, then what you’ve already cleared.`
         : `${who}, here’s a brief on this pass: what’s outstanding, then what you’ve already handled.`,
     )
-    if (clearedFlags.length || verifiedList.length || diagsReviewed.length || edits.length) {
+    if (clearedFlags.length || preparerVerifiedDocs.length || diagsReviewed.length || edits.length) {
       const bits: string[] = []
       if (clearedFlags.length) bits.push(`${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} cleared`)
-      if (verifiedList.length) bits.push(`${verifiedList.length} doc${verifiedList.length === 1 ? '' : 's'} verified`)
+      if (preparerVerifiedDocs.length) bits.push(`${preparerVerifiedDocs.length} doc${preparerVerifiedDocs.length === 1 ? '' : 's'} verified`)
       if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'} reviewed`)
       if (edits.length && !clearedFlags.length) bits.push(`${edits.length} amount change${edits.length === 1 ? '' : 's'}`)
       if (bits.length) story.push(`Completed so far: ${listPhrase(bits)}.`)
@@ -703,10 +725,17 @@ export function buildHandoffSnapshot(
     openNotes.length ? `${openNotes.length} note${openNotes.length === 1 ? '' : 's'}` : null,
     openImportFlags.length ? `${openImportFlags.length} open import flag${openImportFlags.length === 1 ? '' : 's'}` : null,
     needsConfirmation.length
-      ? `${needsConfirmation.length} awaiting confirmation`
+      ? `${needsConfirmation.length} summary line${needsConfirmation.length === 1 ? '' : 's'} awaiting confirmation`
+      : null,
+    docsAwaitingConfirmation.length
+      ? `${docsAwaitingConfirmation.length} doc${docsAwaitingConfirmation.length === 1 ? '' : 's'} awaiting confirmation`
       : null,
     diagsOpen.length ? `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}` : null,
-    unverifiedDocs.length ? `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}` : null,
+    unverifiedDocs.length
+      ? isBriefing
+        ? `${unverifiedDocs.length} doc${unverifiedDocs.length === 1 ? '' : 's'} not verified in Pass 1`
+        : `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}`
+      : null,
     humanFlags.length ? `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}` : null,
   ]
     .filter(Boolean)
@@ -728,20 +757,34 @@ export function buildHandoffSnapshot(
           : `${openBreakdown}. Work through open notes and flags first, then AI diagnostics and any documents still unverified.`,
       }
 
-  const storySection: HandoffSection = {
-    id: 'whatWasDone',
-    title: isBriefing ? `What ${who} verified` : 'What was reviewed',
-    count: doneOnlyCount,
-    countLabel: doneOnlyCount
-      ? `${doneOnlyCount} completed`
+  const preparerDoneSection: HandoffSection = {
+    id: 'preparerDone',
+    title: isBriefing ? `What ${who} cleared` : 'What you cleared',
+    count: preparerDoneCount,
+    countLabel: hasPreparerDone
+      ? `${preparerDoneCount} completed`
       : 'Nothing completed yet',
     intro: isBriefing
-      ? 'A short account of edits, verifies, and diagnostics already handled in Pass 1.'
-      : 'What you already cleared or verified on this pass.',
+      ? hasPreparerDone
+        ? `${preparerDoneCount} item${preparerDoneCount === 1 ? '' : 's'} ${who} handled in Pass 1. Expand a group for jump links.`
+        : `${who} hasn’t recorded edits, checks, or verified docs yet.`
+      : hasPreparerDone
+        ? 'Work you already cleared on this pass — expand a group for jump links.'
+        : 'No completed actions recorded yet.',
     bucket: 'done',
-    // Secondary disclosure — outstanding work stays primary
     defaultOpen: false,
-    items: doneItems,
+    groups: hasPreparerDone ? preparerDoneGroups : undefined,
+    items: hasPreparerDone
+      ? []
+      : [
+          {
+            label: isBriefing
+              ? `${who} hasn’t recorded edits, checks, or verified docs yet`
+              : 'No completed actions recorded yet',
+            detail: 'As work happens, it’ll show up here with jump links to each item.',
+            status: 'info',
+          },
+        ],
   }
 
   const openSection: HandoffSection = {
@@ -772,8 +815,8 @@ export function buildHandoffSnapshot(
         ],
   }
 
-  // Open items first, then completed work — same order for self and reviewer briefing.
-  const sections: HandoffSection[] = [openSection, storySection]
+  // Open items first, then preparer completed work — same order for self and reviewer briefing.
+  const sections: HandoffSection[] = [openSection, preparerDoneSection]
 
   const openNav: HandoffOpenNavItem[] = []
   const nextSteps: string[] = []

@@ -100,6 +100,14 @@ export function verifiedDocLabel(docKey: string): string {
   return VERIFY_DOC_LABELS[key] ?? docKey
 }
 
+/** Human-readable document label for handoff rows and summaries. */
+export const getDocDisplayLabel = verifiedDocLabel
+
+/** True when the preparer marked this document verified (normalized keys). */
+export function isPreparerDocVerified(verifiedDocs: Set<string>, docKey: string): boolean {
+  return isVerifiedInSet(verifiedDocs, docKey)
+}
+
 /** Navigate from a verify-doc key (or legacy source-doc id) to the source panel. */
 export function navigationForVerifiedDocKey(docKey: string): {
   tab: TopTab
