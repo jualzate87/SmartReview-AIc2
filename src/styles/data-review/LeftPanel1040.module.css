@@ -558,6 +558,63 @@
   color: #205ea3;
 }
 
+/* Dual-slot: preparer verified + reviewer confirmed */
+.rowCheckedDual {
+  box-shadow: inset 3px 0 0 var(--color-action-success, #00856d), inset 6px 0 0 #205ea3;
+}
+.valueBoxCheckedDual {
+  border-color: #205ea3 !important;
+  background: linear-gradient(90deg, #e6f6ef 0%, #eef5fb 100%) !important;
+}
+.valueNumCheckedDual {
+  color: var(--color-text-primary, #393a3d);
+}
+.checkedIconDual {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.checkTrail {
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  color: var(--color-text-primary, #393a3d);
+}
+.checkBtnDualPending {
+  border-style: dashed;
+}
+
+.reconfirmBadge {
+  display: inline-block;
+  margin-left: var(--space-inline-small, 8px);
+  padding: 0 var(--space-inline-x-small, 6px);
+  border-radius: var(--radius-small, 4px);
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-primary, #393a3d);
+  background: var(--color-input-background-warning);
+  border: 1px solid var(--color-input-border-warning);
+  white-space: nowrap;
+}
+
+.rowNeedsReconfirm .valueBoxChecked,
+.rowNeedsReconfirm .valueBoxCheckedDual {
+  border-color: var(--color-input-border-warning);
+}
+
+.summarySubRowStale {
+  background: var(--color-input-background-warning);
+}
+.summarySubRowStale.summarySubRowChecked,
+.summarySubRowStale.summarySubRowCheckedDual,
+.summarySubRowStale.summarySubRowCheckedReviewer {
+  background: var(--color-input-background-warning);
+}
+
 /* Pass 2 open-items focus — dim rows that aren't in the focus set */
 .rowDimmed {
   opacity: 0.35;
@@ -1085,6 +1142,16 @@
   border-color: #205ea3;
   color: #205ea3;
   background: #eef5fb;
+}
+.summaryActionBtnDualPending {
+  border-style: dashed;
+}
+.summarySubRowCheckedDual {
+  border-left: 3px solid var(--color-action-success, #00856d);
+  box-shadow: inset 3px 0 0 #205ea3;
+}
+.summarySubRowCheckedReviewer {
+  border-left-color: #205ea3;
 }
 /* User flag ON — orange active state (paired with default .summaryActionBtn when off) */
 .summaryActionBtnFlag {

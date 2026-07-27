@@ -98,8 +98,13 @@ export type HandoffInputs = {
   reviewedFields: Map<string, ActivityEntry>
   verifiedDocs: Set<string>
   verifiedDocsMeta?: Map<string, ActivityEntry>
+  reviewerConfirmedDocs?: Set<string>
+  reviewerConfirmedDocsMeta?: Map<string, ActivityEntry>
   editedFields: Map<string, ActivityEntry>
+  /** Preparer verified summary rows */
   summaryChecked: Map<string, ActivityEntry>
+  /** Reviewer confirmed summary rows */
+  reviewerConfirmed?: Map<string, ActivityEntry>
   summaryFlagged: Map<string, ActivityEntry>
   summaryFlagNotes: Record<string, string>
   notes: Note[]
@@ -283,6 +288,7 @@ export function buildHandoffSnapshot(
   const unverifiedDocs = KNOWN_DOCS.filter(d => !input.verifiedDocs.has(d))
 
   const checks = [...input.summaryChecked.entries()]
+  const reviewerConfirms = [...(input.reviewerConfirmed ?? new Map()).entries()]
   const humanFlags = [...input.summaryFlagged.entries()]
   const edits = [...input.editedFields.entries()]
   const editKeys = edits.map(([k]) => k)
@@ -391,6 +397,51 @@ export function buildHandoffSnapshot(
     })
   }
 
+  // Reviewer pass: preparer verified but reviewer has not confirmed yet
+  const needsConfirmation = checks.filter(
+    ([field]) => !input.reviewerConfirmed?.has(field),
+  )
+  if (isBriefing && needsConfirmation.length) {
+    openGroups.push({
+      id: 'needs-confirmation',
+      title: 'Needs your confirmation',
+      count: needsConfirmation.length,
+      countLabel: `${needsConfirmation.length} verified-only`,
+      items: needsConfirmation.map(([field, meta]) => ({
+        id: `confirm-${field}`,
+        label: fieldLabel(field),
+        detail: `${firstName(meta.by)} verified · ${formatCheckMeta(meta)} — confirm for sign-off`,
+        status: 'open' as const,
+        jump: { type: 'field' as const, field },
+        jumpLabel: 'Confirm field',
+      })),
+    })
+  }
+
+  const reviewerConfirmedDocs = input.reviewerConfirmedDocs ?? new Set<string>()
+  const docsVerifiedOnly = verifiedList.filter(d => !reviewerConfirmedDocs.has(d))
+  if (isBriefing && docsVerifiedOnly.length) {
+    openGroups.push({
+      id: 'docs-needs-confirmation',
+      title: 'Documents awaiting confirmation',
+      count: docsVerifiedOnly.length,
+      countLabel: `${docsVerifiedOnly.length} verified-only doc${docsVerifiedOnly.length === 1 ? '' : 's'}`,
+      items: docsVerifiedOnly.map(docId => {
+        const meta = input.verifiedDocsMeta?.get(docId)
+        return {
+          id: `doc-confirm-${docId}`,
+          label: docLabel(docId),
+          detail: meta
+            ? `${firstName(meta.by)} verified · ${formatCheckMeta(meta)} — confirm for sign-off`
+            : 'Preparer verified — confirm for sign-off',
+          status: 'open' as const,
+          jump: { type: 'doc' as const, docId },
+          jumpLabel: 'Confirm document',
+        }
+      }),
+    })
+  }
+
   const granularOpenCount = openGroups.reduce((sum, g) => sum + g.count, 0)
 
   // ── What happened (connected story) ───────────────────────────────────
@@ -422,16 +473,39 @@ export function buildHandoffSnapshot(
   }
 
   const extraChecks = checks.filter(([field]) => !clearedFlags.includes(field as Phase1FlagKey))
-  if (extraChecks.length) {
-    const editedOnes = extraChecks.filter(([field]) => editKeys.some(ek => editTouchesFlag(ek, field)))
-    const reviewOnly = extraChecks.filter(([field]) => !editKeys.some(ek => editTouchesFlag(ek, field)))
+  const dualConfirmed = extraChecks.filter(([field]) => input.reviewerConfirmed?.has(field))
+  const preparerOnlyChecks = extraChecks.filter(([field]) => !input.reviewerConfirmed?.has(field))
+
+  if (dualConfirmed.length) {
+    doneItems.push({
+      label: isBriefing
+        ? `${dualConfirmed.length} line${dualConfirmed.length === 1 ? '' : 's'} verified and confirmed`
+        : `Verified + confirmed ${dualConfirmed.length} summary line${dualConfirmed.length === 1 ? '' : 's'}`,
+      detail: listPhrase(
+        dualConfirmed.map(([f, prep]) => {
+          const rev = input.reviewerConfirmed?.get(f)
+          return rev
+            ? `${fieldLabel(f)} (${formatCheckMeta(prep)} · ${formatCheckMeta(rev)})`
+            : fieldLabel(f)
+        }),
+        3,
+      ),
+      status: 'done',
+      jump: { type: 'field', field: dualConfirmed[0][0] },
+      jumpLabel: 'View field',
+    })
+  }
+
+  if (preparerOnlyChecks.length) {
+    const editedOnes = preparerOnlyChecks.filter(([field]) => editKeys.some(ek => editTouchesFlag(ek, field)))
+    const reviewOnly = preparerOnlyChecks.filter(([field]) => !editKeys.some(ek => editTouchesFlag(ek, field)))
     if (editedOnes.length) {
       doneItems.push({
         label: isBriefing
-          ? `Also edited and checked ${editedOnes.length} summary line${editedOnes.length === 1 ? '' : 's'}`
-          : `Edited and checked ${editedOnes.length} summary line${editedOnes.length === 1 ? '' : 's'}`,
-        detail: listPhrase(editedOnes.map(([f]) => f)),
-        status: 'done',
+          ? `Verified ${editedOnes.length} summary line${editedOnes.length === 1 ? '' : 's'} after edits (awaiting your confirmation)`
+          : `Edited and verified ${editedOnes.length} summary line${editedOnes.length === 1 ? '' : 's'}`,
+        detail: listPhrase(editedOnes.map(([f]) => fieldLabel(f))),
+        status: isBriefing ? 'info' : 'done',
         jump: { type: 'field', field: editedOnes[0][0] },
         jumpLabel: 'View field',
       })
@@ -439,14 +513,27 @@ export function buildHandoffSnapshot(
     if (reviewOnly.length) {
       doneItems.push({
         label: isBriefing
-          ? `Reviewed ${reviewOnly.length} summary line${reviewOnly.length === 1 ? '' : 's'} without edits`
-          : `Reviewed ${reviewOnly.length} line${reviewOnly.length === 1 ? '' : 's'} without edits`,
-        detail: listPhrase(reviewOnly.map(([f]) => f)),
-        status: 'done',
+          ? `Verified ${reviewOnly.length} summary line${reviewOnly.length === 1 ? '' : 's'} without edits (awaiting your confirmation)`
+          : `Verified ${reviewOnly.length} line${reviewOnly.length === 1 ? '' : 's'} without edits`,
+        detail: listPhrase(reviewOnly.map(([f]) => fieldLabel(f))),
+        status: isBriefing ? 'info' : 'done',
         jump: { type: 'field', field: reviewOnly[0][0] },
         jumpLabel: 'View field',
       })
     }
+  }
+
+  const reviewerOnlyConfirms = reviewerConfirms.filter(([field]) => !input.summaryChecked.has(field))
+  if (reviewerOnlyConfirms.length) {
+    doneItems.push({
+      label: isBriefing
+        ? `You confirmed ${reviewerOnlyConfirms.length} line${reviewerOnlyConfirms.length === 1 ? '' : 's'} without preparer verify`
+        : `Reviewer confirmed ${reviewerOnlyConfirms.length} line${reviewerOnlyConfirms.length === 1 ? '' : 's'}`,
+      detail: listPhrase(reviewerOnlyConfirms.map(([f, meta]) => `${fieldLabel(f)} (${formatCheckMeta(meta)})`)),
+      status: 'done',
+      jump: { type: 'field', field: reviewerOnlyConfirms[0][0] },
+      jumpLabel: 'View field',
+    })
   }
 
   const orphanEdits = edits.filter(
@@ -538,6 +625,13 @@ export function buildHandoffSnapshot(
           ? '1 item still needs your attention before this return is ready to hand off or file.'
           : `${granularOpenCount} items still need your attention before this return is ready to hand off or file.`,
       )
+      if (needsConfirmation.length) {
+        story.push(
+          needsConfirmation.length === 1
+            ? '1 summary line was verified in Pass 1 but still needs your confirmation.'
+            : `${needsConfirmation.length} summary lines were verified in Pass 1 but still need your confirmation.`,
+        )
+      }
     } else {
       story.push('Nothing is left open in this snapshot — spot-check Pass 1 work if you want a second pair of eyes.')
     }
@@ -569,6 +663,9 @@ export function buildHandoffSnapshot(
   const openBreakdown = [
     openNotes.length ? `${openNotes.length} note${openNotes.length === 1 ? '' : 's'}` : null,
     openImportFlags.length ? `${openImportFlags.length} open import flag${openImportFlags.length === 1 ? '' : 's'}` : null,
+    needsConfirmation.length
+      ? `${needsConfirmation.length} awaiting confirmation`
+      : null,
     diagsOpen.length ? `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}` : null,
     unverifiedDocs.length ? `${unverifiedDocs.length} unverified doc${unverifiedDocs.length === 1 ? '' : 's'}` : null,
     humanFlags.length ? `${humanFlags.length} preparer flag${humanFlags.length === 1 ? '' : 's'}` : null,
@@ -594,7 +691,7 @@ export function buildHandoffSnapshot(
 
   const storySection: HandoffSection = {
     id: 'whatWasDone',
-    title: isBriefing ? `What ${who} reviewed` : 'What was reviewed',
+    title: isBriefing ? `What ${who} verified` : 'What was reviewed',
     count: doneOnlyCount,
     countLabel: doneOnlyCount
       ? `${doneOnlyCount} completed`

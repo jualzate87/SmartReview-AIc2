@@ -13,6 +13,8 @@ interface Phase2BannerProps {
   diagnosticsOpen?: boolean
   /** Sign-off CTA — sits on the same row as Step 2 title / progress */
   signOffSlot?: ReactNode
+  /** e.g. { complete: 4, total: 6 } for "Review · 4/6 steps" */
+  checklistProgress?: { complete: number; total: number }
 }
 
 export default function Phase2Banner({
@@ -22,6 +24,7 @@ export default function Phase2Banner({
   onOpenDiagnostics,
   diagnosticsOpen = false,
   signOffSlot,
+  checklistProgress,
 }: Phase2BannerProps) {
   const remaining = Math.max(0, total - reviewed)
   const showProgressLink = !complete && !!onOpenDiagnostics && !diagnosticsOpen && remaining > 0
@@ -67,6 +70,11 @@ export default function Phase2Banner({
         {complete && (
           <span className={styles.completeBadge}>
             <CircleCheck size="small" /> All diagnostics reviewed
+          </span>
+        )}
+        {checklistProgress && (
+          <span className={styles.checklistHint} aria-live="polite">
+            Review · {checklistProgress.complete}/{checklistProgress.total} steps
           </span>
         )}
         {signOffSlot}

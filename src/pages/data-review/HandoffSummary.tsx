@@ -8,6 +8,9 @@ import '@ids-ts/page-message/dist/main.css'
 import { B3 } from '@ids-ts/typography'
 import '@ids-ts/typography/dist/main.css'
 import type { HandoffItem, HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
+import type { ReviewChecklistState } from '../../data/reviewChecklist'
+import { Checkbox } from '@ids-ts/checkbox'
+import '@ids-ts/checkbox/dist/main.css'
 import { jumpActionLabel } from '../../data/handoffSnapshot'
 import ReviewSidePanel, { sidePanelStyles } from './ReviewSidePanel'
 import styles from '../../styles/data-review/HandoffSummary.module.css'
@@ -29,6 +32,11 @@ type Props = {
   subtitleOverride?: string
   hideFooter?: boolean
   closing?: boolean
+  /** Process-level review checklist (Phase 2 sign-off) */
+  checklist?: ReviewChecklistState
+  onToggleChecklistItem?: (itemId: string, checked: boolean) => void
+  signOffReady?: boolean
+  signOffBlockerText?: string | null
 }
 
 function CountBadge({
@@ -137,6 +145,78 @@ function DetailsDisclosure({
   )
 }
 
+
+
+function ChecklistRow({
+  item,
+  onJump,
+  onToggle,
+}: {
+  item: import('../../data/reviewChecklist').ReviewChecklistItem
+  onJump?: (jump: HandoffJump) => void
+  onToggle?: (itemId: string, checked: boolean) => void
+}) {
+  const isAuto = item.kind === 'auto'
+  const canToggle = !isAuto && !!onToggle
+
+  return (
+    <li className={`${styles.checklistItem} ${item.complete ? styles.checklistItemComplete : ''}`}>
+      <div className={styles.checklistCheck}>
+        <Checkbox
+          checked={item.complete}
+          disabled={isAuto}
+          onChange={canToggle ? (e) => onToggle!(item.id, e.target.checked) : undefined}
+          size="small"
+        >
+          {item.label}
+        </Checkbox>
+      </div>
+      {item.description && (
+        <p className={styles.checklistDesc}>{item.description}</p>
+      )}
+      {item.jump && onJump && !item.complete && (
+        <button type="button" className={styles.jumpBtn} onClick={() => onJump(item.jump!)}>
+          {item.jumpLabel ?? 'View'}
+        </button>
+      )}
+    </li>
+  )
+}
+
+function ChecklistSection({
+  checklist,
+  onJump,
+  onToggleChecklistItem,
+}: {
+  checklist: ReviewChecklistState
+  onJump?: (jump: HandoffJump) => void
+  onToggleChecklistItem?: (itemId: string, checked: boolean) => void
+}) {
+  return (
+    <section id="handoff-checklist" className={styles.checklistSection}>
+      <div className={styles.storySectionHead}>
+        <h3 className={styles.storySectionTitle}>Review checklist</h3>
+        <span className={styles.checklistProgress} aria-live="polite">
+          {checklist.requiredCompleteCount} of {checklist.requiredTotal} review steps complete
+        </span>
+      </div>
+      <p className={styles.sectionIntro}>
+        Process attestation for sign-off. These steps track readiness, not every open item above.
+      </p>
+      <ul className={styles.checklistList}>
+        {checklist.items.map(item => (
+          <ChecklistRow
+            key={item.id}
+            item={item}
+            onJump={onJump}
+            onToggle={onToggleChecklistItem}
+          />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export default function HandoffSummary({
   snapshot,
   variant = 'drawer',
@@ -151,6 +231,10 @@ export default function HandoffSummary({
   subtitleOverride,
   hideFooter = false,
   closing = false,
+  checklist,
+  onToggleChecklistItem,
+  signOffReady = true,
+  signOffBlockerText,
 }: Props) {
   const title =
     titleOverride ??
@@ -176,7 +260,11 @@ export default function HandoffSummary({
   const verdictType = snapshot.verdict.tone === 'clear' ? 'success' : 'warn'
 
   const footerActions = !hideFooter ? (
-    <>
+    <div className={styles.footerWrap}>
+      {!signOffReady && signOffBlockerText && (
+        <p className={styles.signOffBlocker} role="status">{signOffBlockerText}</p>
+      )}
+      <div className={styles.footerActionsRow}>
       {snapshot.mode === 'signoff-review' && (
         <>
           {onContinue && (
@@ -186,12 +274,12 @@ export default function HandoffSummary({
           )}
           <div className={sidePanelStyles.footerSpacer} />
           {onPassToReviewer && (
-            <Button priority="secondary" size="medium" onClick={onPassToReviewer}>
+            <Button priority="secondary" size="medium" onClick={onPassToReviewer} disabled={!signOffReady}>
               Pass to next reviewer
             </Button>
           )}
           {onFinishAndFile && (
-            <Button priority="primary" size="medium" onClick={onFinishAndFile}>
+            <Button priority="primary" size="medium" onClick={onFinishAndFile} disabled={!signOffReady}>
               Finish &amp; file
             </Button>
           )}
@@ -211,7 +299,7 @@ export default function HandoffSummary({
             </Button>
           )}
           {onConfirmSend && (
-            <Button priority="primary" size="medium" onClick={onConfirmSend}>
+            <Button priority="primary" size="medium" onClick={onConfirmSend} disabled={!signOffReady}>
               Send to reviewer
             </Button>
           )}
@@ -236,13 +324,14 @@ export default function HandoffSummary({
         <>
           <div className={sidePanelStyles.footerSpacer} />
           {onContinue && (
-            <Button priority="primary" size="medium" onClick={onContinue}>
+            <Button priority="primary" size="medium" onClick={onContinue} disabled={!signOffReady}>
               Mark ready to file
             </Button>
           )}
         </>
       )}
-    </>
+      </div>
+    </div>
   ) : null
 
   const briefContent = (
@@ -359,6 +448,14 @@ export default function HandoffSummary({
           )
         })}
       </div>
+
+      {checklist && (
+        <ChecklistSection
+          checklist={checklist}
+          onJump={onJump}
+          onToggleChecklistItem={onToggleChecklistItem}
+        />
+      )}
     </div>
   )
 

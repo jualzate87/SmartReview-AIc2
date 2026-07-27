@@ -124,3 +124,12 @@
   font-weight: 600;
   flex-shrink: 0;
 }
+
+
+.checklistHint {
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}

@@ -18,6 +18,11 @@ import {
   type HandoffVoice,
 } from '../data/handoffSnapshot'
 import {
+  deriveReviewChecklist,
+  canSignOff,
+  signOffBlockerText,
+} from '../data/reviewChecklist'
+import {
   PREPARER_NAME,
   REVIEWER_NAME,
   setReviewActor,
@@ -138,6 +143,11 @@ export default function DataReviewPage() {
     toggleVerifiedDoc,
     summaryCheckedFields,
     summaryCheckedMeta,
+    reviewerConfirmedFields,
+    reviewerConfirmedMeta,
+    reviewerConfirmedDocs,
+    reviewerConfirmedDocsMeta,
+    reviewerConfirmStaleFields,
     toggleSummaryChecked,
     summaryFlaggedFields,
     summaryFlaggedMeta,
@@ -146,6 +156,8 @@ export default function DataReviewPage() {
     summaryFlagActivity,
     setSummaryFlagNote,
     editedFieldsMeta,
+    manualChecklistItems,
+    setManualChecklistItem,
   } = useSyncedReviewState()
   const liveTotals = computeLiveReturn(amounts)
   const total1a = liveTotals.wages
@@ -203,7 +215,7 @@ export default function DataReviewPage() {
     voice?: HandoffVoice
   }>({})
   /** Pass 2 open-items filter */
-  type Pass2Filter = 'all' | 'flags' | 'notes'
+  type Pass2Filter = 'all' | 'flags' | 'notes' | 'confirm'
   const [pass2Filter, setPass2Filter] = useState<Pass2Filter>('all')
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const actorLabel = reviewRole === 'reviewer' ? REVIEWER_NAME : PREPARER_NAME
@@ -705,6 +717,14 @@ export default function DataReviewPage() {
   const pass2FocusFields: Set<string> | null = (() => {
     if (reviewRole !== 'reviewer' || pass2Filter === 'all') return null
     if (pass2Filter === 'flags') return new Set(summaryFlaggedFields)
+    if (pass2Filter === 'confirm') {
+      const set = new Set<string>()
+      for (const field of summaryCheckedFields) {
+        if (!reviewerConfirmedFields.has(field)) set.add(field)
+      }
+      for (const field of reviewerConfirmStaleFields) set.add(field)
+      return set.size ? set : new Set(['__none__'])
+    }
     const set = new Set<string>()
     for (const n of notes) {
       if ((n.status ?? 'open') !== 'open') continue
@@ -712,6 +732,11 @@ export default function DataReviewPage() {
     }
     return set.size ? set : new Set(['__none__'])
   })()
+
+  const pass2ConfirmOpenCount = new Set([
+    ...[...summaryCheckedFields].filter(f => !reviewerConfirmedFields.has(f)),
+    ...reviewerConfirmStaleFields,
+  ]).size
 
   const buildSnapshot = (
     mode: HandoffMode,
@@ -723,8 +748,11 @@ export default function DataReviewPage() {
       reviewedFields,
       verifiedDocs,
       verifiedDocsMeta,
+      reviewerConfirmedDocs,
+      reviewerConfirmedDocsMeta,
       editedFields: editedFieldsMeta,
       summaryChecked: summaryCheckedMeta,
+      reviewerConfirmed: reviewerConfirmedMeta,
       summaryFlagged: summaryFlaggedMeta,
       summaryFlagNotes,
       notes,
@@ -888,7 +916,6 @@ export default function DataReviewPage() {
         )
       : null
 
-  const outstandingOpenCount = getOutstandingOpenCount(buildSnapshot('signoff-review'))
 
   /**
    * Shared drag bootstrap: pointer events + document-level move/up while dragging.
@@ -994,6 +1021,28 @@ export default function DataReviewPage() {
     bodyWidth > 0 &&
     rightPanelWidth / bodyWidth > 0.6
   const previewSideBySide = freezePreviewSideBySide || !show1040 || sourcesPanelWide
+
+  const outstandingOpenCount = getOutstandingOpenCount(buildSnapshot('signoff-review'))
+
+  const reviewChecklist = deriveReviewChecklist({
+    reviewedFields,
+    verifiedDocs,
+    reviewerConfirmedDocs,
+    summaryCheckedFields,
+    reviewerConfirmedFields,
+    reviewerConfirmStaleFields,
+    notes,
+    amounts,
+    manualChecklistItems,
+    outstandingOpenCount,
+  })
+
+  const signOffGatingActive = !inImportPhase && reviewRole === 'reviewer'
+  const signOffReady = !signOffGatingActive || canSignOff(reviewChecklist, outstandingOpenCount)
+  const signOffBlockerMessage = signOffGatingActive
+    ? signOffBlockerText(reviewChecklist, outstandingOpenCount)
+    : null
+
   const inImportPhase = phase === 'import'
 
   // Resize drag between the document preview and detail fields. Axis is frozen
@@ -1139,6 +1188,7 @@ export default function DataReviewPage() {
           <div className={handoffStyles.filterChips} role="group" aria-label="Open items filter">
             {([
               ['all', 'All'],
+              ['confirm', `Needs confirm${pass2ConfirmOpenCount ? ` (${pass2ConfirmOpenCount})` : ''}`],
               ['flags', 'Open flags'],
               ['notes', 'Unresolved notes'],
             ] as const).map(([id, label]) => (
@@ -1153,6 +1203,13 @@ export default function DataReviewPage() {
                     openNotesFocus(open?.id)
                   } else if (id === 'flags') {
                     const first = [...summaryFlaggedFields][0]
+                    if (first) {
+                      setSelectedField(first)
+                      setShow1040(true)
+                      setOutputFormId('summary')
+                    }
+                  } else if (id === 'confirm') {
+                    const first = [...summaryCheckedFields].find(f => !reviewerConfirmedFields.has(f))
                     if (first) {
                       setSelectedField(first)
                       setShow1040(true)
@@ -1317,12 +1374,18 @@ export default function DataReviewPage() {
           complete={phase2Complete}
           diagnosticsOpen={agentPanelActive}
           onOpenDiagnostics={() => handleAgentOpen()}
+          checklistProgress={
+            signOffGatingActive
+              ? { complete: reviewChecklist.requiredCompleteCount, total: reviewChecklist.requiredTotal }
+              : undefined
+          }
           signOffSlot={(
             <Button
               priority="primary"
               size="medium"
               onClick={handleWrapUpPass}
               automationId="phase2-sign-off"
+              disabled={signOffGatingActive && !signOffReady}
             >
               Sign-off
             </Button>
@@ -1422,6 +1485,9 @@ export default function DataReviewPage() {
             reviewedFields={reviewedFields}
             checkedFields={summaryCheckedFields}
             checkedMeta={summaryCheckedMeta}
+            reviewerConfirmedFields={reviewerConfirmedFields}
+            reviewerConfirmedMeta={reviewerConfirmedMeta}
+            reviewerConfirmStaleFields={reviewerConfirmStaleFields}
             onToggleChecked={toggleSummaryChecked}
             flaggedFields={summaryFlaggedFields}
             flaggedMeta={summaryFlaggedMeta}
@@ -1779,6 +1845,8 @@ export default function DataReviewPage() {
                   onFieldOverride={setFieldOverride}
                   verifiedDocs={verifiedDocs}
                   verifiedDocsMeta={verifiedDocsMeta}
+                  reviewerConfirmedDocs={reviewerConfirmedDocs}
+                  reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
                   onVerifyDoc={toggleVerifiedDoc}
                   flaggedFields={mergeInputFlags({
                     ssn: PHASE1_FLAG_MESSAGES.w2.ssn,
@@ -1811,7 +1879,10 @@ export default function DataReviewPage() {
                   fieldOverrides={fieldOverrides}
                   onFieldOverride={setFieldOverride}
                   verifiedDocs={verifiedDocs}
+                  verifiedDocsMeta={verifiedDocsMeta}
                   onVerifyDoc={toggleVerifiedDoc}
+                  reviewerConfirmedDocs={reviewerConfirmedDocs}
+                  reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
                   flaggedFields={mergeInputFlags({
                     divCollectibles: PHASE1_FLAG_MESSAGES.div.divCollectibles,
                     divNonDiv: PHASE1_FLAG_MESSAGES.div.divNonDiv,
@@ -1847,6 +1918,8 @@ export default function DataReviewPage() {
                   verifiedDocs={verifiedDocs}
                   verifiedDocsMeta={verifiedDocsMeta}
                   onVerifyDoc={toggleVerifiedDoc}
+                  reviewerConfirmedDocs={reviewerConfirmedDocs}
+                  reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
                   flaggedFields={mergeInputFlags({
                     taxableInterest: PHASE1_FLAG_MESSAGES.int.taxableInterest,
                   }, yoyInputFlags)}
@@ -1870,7 +1943,10 @@ export default function DataReviewPage() {
                   fieldOverrides={fieldOverrides}
                   onFieldOverride={setFieldOverride}
                   verifiedDocs={verifiedDocs}
+                  verifiedDocsMeta={verifiedDocsMeta}
                   onVerifyDoc={toggleVerifiedDoc}
+                  reviewerConfirmedDocs={reviewerConfirmedDocs}
+                  reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
                   flaggedFields={mergeInputFlags({
                     grossDistrib: PHASE1_FLAG_MESSAGES.r.grossDistrib,
                   }, yoyInputFlags)}
@@ -1894,7 +1970,10 @@ export default function DataReviewPage() {
                   fieldOverrides={fieldOverrides}
                   onFieldOverride={setFieldOverride}
                   verifiedDocs={verifiedDocs}
+                  verifiedDocsMeta={verifiedDocsMeta}
                   onVerifyDoc={toggleVerifiedDoc}
+                  reviewerConfirmedDocs={reviewerConfirmedDocs}
+                  reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
                   onAddFieldNote={(text, context) => handleAddNote(text, context)}
                 />
               )}
@@ -2056,6 +2135,10 @@ export default function DataReviewPage() {
                 <HandoffSummary
                   variant="drawer"
                   snapshot={handoffSnapshot}
+                  checklist={reviewChecklist}
+                  onToggleChecklistItem={setManualChecklistItem}
+                  signOffReady={signOffReady}
+                  signOffBlockerText={signOffBlockerMessage}
                   closing={panelClosing}
                   onClose={handleCloseSummaryPanel}
                   onContinue={() => {

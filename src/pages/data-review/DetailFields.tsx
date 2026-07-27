@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CircleCheck, Comment } from '@design-systems/icons'
-import Tooltip from './Tooltip'
+import DocVerifyHeaderActions from './DocVerifyHeaderActions'
 import { DestinationFieldLabel } from './DestinationFieldLabel'
+import Tooltip from './Tooltip'
 import styles from '../../styles/data-review/DetailFields.module.css'
 import { getBox12SubRowKeys, isBox12FlagResolved } from './phase1FieldSync'
 
@@ -67,8 +68,11 @@ interface DetailFieldsProps {
   /** Map of doc field key → issue summary shown as a hover tooltip */
   flaggedFields?: Record<string, string>
   verifiedDocs?: Set<string>
-  /** Who/when for Mark as verified */
+  /** Who/when for preparer Mark as verified */
   verifiedDocsMeta?: Map<string, { by: string; at: string }>
+  /** Reviewer doc confirmations — separate slot */
+  reviewerConfirmedDocs?: Set<string>
+  reviewerConfirmedDocsMeta?: Map<string, { by: string; at: string }>
   onVerifyDoc?: (docKey: string) => void
   /** Called when user posts a note from a field popover: (text, contextLabel) */
   onAddFieldNote?: (text: string, context: string) => void
@@ -135,6 +139,8 @@ export default function DetailFields({
   flaggedFields = {},
   verifiedDocs,
   verifiedDocsMeta,
+  reviewerConfirmedDocs,
+  reviewerConfirmedDocsMeta,
   onVerifyDoc,
   onAddFieldNote,
 }: DetailFieldsProps) {
@@ -457,42 +463,33 @@ export default function DetailFields({
     )
   }
 
-  const isVerified = verifiedDocs?.has(activeSubTab) ?? false
-  const verifiedMeta = verifiedDocsMeta?.get(activeSubTab)
-  const verifiedTooltip = verifiedMeta
-    ? `Verified · ${verifiedMeta.by} · ${verifiedMeta.at}`
-    : 'Click to unmark verified'
-
   return (
     <div className={styles.container}>
       {/* Page header */}
       <div className={styles.pageHeader}>
         <div className={styles.headerActions}>
           <h2 style={{ fontFamily: 'var(--font-family-component)', fontSize: 18, fontWeight: 500, color: '#21262a', margin: 0, flex: 1, textAlign: 'left' }}>{formTitle}</h2>
-          {isVerified ? (
-            <Tooltip text={verifiedTooltip} placement="top">
-              <button className={styles.verifiedBadge} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 4, display: 'flex', alignItems: 'center' }} onClick={() => onVerifyDoc?.(activeSubTab)}><CheckIcon size={14} /> Verified</button>
-            </Tooltip>
-          ) : (
-            <button
-              className={styles.markVerifiedBtn}
-              onClick={() => {
-                onVerifyDoc?.(activeSubTab)
-                const fieldKeys = [
-                  `ssn-${activeSubTab}`, `wages-${activeSubTab}`,
-                  'withholding', 'box12',
-                  ...getBox12SubRowKeys(activeSubTab),
-                  `ein-${activeSubTab}`, `employerName-${activeSubTab}`,
-                  `street-${activeSubTab}`, `cityStateZip-${activeSubTab}`,
-                  `sswages-${activeSubTab}`, `sstax-${activeSubTab}`,
-                  `medicarewages-${activeSubTab}`, `medicaretax-${activeSubTab}`,
-                  `sstips-${activeSubTab}`, `allocatedtips-${activeSubTab}`,
-                  `dependentcare-${activeSubTab}`, `nonqualified-${activeSubTab}`,
-                ]
-                onMarkReviewedBulk?.(fieldKeys)
-              }}
-            >Mark as verified</button>
-          )}
+          <DocVerifyHeaderActions
+            docKey={activeSubTab}
+            verifiedDocs={verifiedDocs}
+            verifiedDocsMeta={verifiedDocsMeta}
+            reviewerConfirmedDocs={reviewerConfirmedDocs}
+            reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
+            onVerifyDoc={onVerifyDoc}
+            onPreparerMarkVerified={() => {
+              onMarkReviewedBulk?.([
+                `ssn-${activeSubTab}`, `wages-${activeSubTab}`,
+                'withholding', 'box12',
+                ...getBox12SubRowKeys(activeSubTab),
+                `ein-${activeSubTab}`, `employerName-${activeSubTab}`,
+                `street-${activeSubTab}`, `cityStateZip-${activeSubTab}`,
+                `sswages-${activeSubTab}`, `sstax-${activeSubTab}`,
+                `medicarewages-${activeSubTab}`, `medicaretax-${activeSubTab}`,
+                `sstips-${activeSubTab}`, `allocatedtips-${activeSubTab}`,
+                `dependentcare-${activeSubTab}`, `nonqualified-${activeSubTab}`,
+              ])
+            }}
+          />
         </div>
       </div>
 

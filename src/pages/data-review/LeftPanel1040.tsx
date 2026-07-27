@@ -19,6 +19,9 @@ import { CLIENT_ADDRESS, formatClientCityStateZip } from '../../data/clientAddre
 import { summaryFieldHasUnresolvedFlags } from './phase1FieldSync'
 import {
   formatActivityMeta,
+  formatDualCheckTooltip,
+  formatDualCheckTrail,
+  getReviewActor,
   REVIEWER_NAME,
   type ActivityEntry,
 } from '../../hooks/useSyncedReviewState'
@@ -33,6 +36,51 @@ function activityTooltip(primary: string, entry?: ActivityEntry | null): string 
   return meta ? `${primary}\n${meta}` : primary
 }
 
+function checkActionTooltip(
+  actorIsReviewer: boolean,
+  actorHasSlot: boolean,
+  dualTooltip: string,
+): string {
+  if (dualTooltip) {
+    const action = actorHasSlot
+      ? (actorIsReviewer ? 'Remove your confirmation' : 'Remove your verification')
+      : (actorIsReviewer ? 'Confirm for sign-off' : 'Verify against source')
+    return `${action}\n${dualTooltip}`
+  }
+  return actorIsReviewer
+    ? (actorHasSlot ? 'Remove your confirmation' : 'Confirm for sign-off')
+    : (actorHasSlot ? 'Remove your verification' : 'Verify against source')
+}
+
+function fieldCheckState(
+  field: string | undefined,
+  checkedFields: Set<string>,
+  checkedMeta: Map<string, ActivityEntry>,
+  reviewerConfirmedFields: Set<string>,
+  reviewerConfirmedMeta: Map<string, ActivityEntry>,
+  reviewerConfirmStaleFields: Set<string>,
+) {
+  const preparerEntry = field && checkedFields.has(field) ? checkedMeta.get(field) : undefined
+  const reviewerEntry =
+    field && reviewerConfirmedFields.has(field) ? reviewerConfirmedMeta.get(field) : undefined
+  const needsReconfirm = !!field && reviewerConfirmStaleFields.has(field) && !!preparerEntry
+  const isReviewerActor = getReviewActor() === REVIEWER_NAME
+  const actorHasSlot = isReviewerActor ? !!reviewerEntry : !!preparerEntry
+  const hasAnyCheck = !!(preparerEntry || reviewerEntry)
+  const hasDualCheck = !!(preparerEntry && reviewerEntry)
+  return {
+    preparerEntry,
+    reviewerEntry,
+    needsReconfirm,
+    isReviewerActor,
+    actorHasSlot,
+    hasAnyCheck,
+    hasDualCheck,
+    trail: formatDualCheckTrail(preparerEntry, reviewerEntry),
+    tooltip: formatDualCheckTooltip(preparerEntry, reviewerEntry),
+  }
+}
+
 interface LeftPanel1040Props {
   selectedField?: string | null
   /** 1040 row highlight — may differ from selectedField when a detail key maps to a 1040 line */
@@ -43,11 +91,17 @@ interface LeftPanel1040Props {
   /** When true: clicking a field shows YoY badge, not blue popover */
   yoyExpanded?: boolean
   reviewedFields?: Set<string> | Map<string, unknown>
-  /** Summary-row checks — mutually exclusive with user flags */
+  /** Preparer verified summary rows — mutually exclusive with user flags */
   checkedFields?: Set<string>
-  /** Who/when for last check on each field */
+  /** Who/when for preparer verify on each field */
   checkedMeta?: Map<string, ActivityEntry>
-  /** Toggle a field's summary-checked state */
+  /** Reviewer confirmed summary rows — independent of preparer checks */
+  reviewerConfirmedFields?: Set<string>
+  /** Who/when for reviewer confirm on each field */
+  reviewerConfirmedMeta?: Map<string, ActivityEntry>
+  /** Summary fields needing reviewer re-confirm after edit */
+  reviewerConfirmStaleFields?: Set<string>
+  /** Toggle check/confirm for the current actor's slot */
   onToggleChecked?: (fieldName: string) => void
   /** Summary-row user flags — mutually exclusive with checks */
   flaggedFields?: Set<string>
@@ -139,6 +193,9 @@ export default function LeftPanel1040({
   reviewedFields = new Set(),
   checkedFields = new Set(),
   checkedMeta = new Map(),
+  reviewerConfirmedFields = new Set(),
+  reviewerConfirmedMeta = new Map(),
+  reviewerConfirmStaleFields = new Set(),
   onToggleChecked,
   flaggedFields = new Set(),
   flaggedMeta = new Map(),
@@ -616,9 +673,27 @@ export default function LeftPanel1040({
     const isIssueHighlight = !!field && field === issueField
     const isSelected       = !!field && activeHighlight === field
     const isReviewed       = !!field && reviewedHas(field)
-    const isChecked        = !!field && checkedFields.has(field)
-    const checkEntry       = isChecked && field ? checkedMeta.get(field) : undefined
-    const isReviewerCheck  = !!checkEntry && checkEntry.by === REVIEWER_NAME
+    const checkState       = fieldCheckState(
+      field,
+      checkedFields,
+      checkedMeta,
+      reviewerConfirmedFields,
+      reviewerConfirmedMeta,
+      reviewerConfirmStaleFields,
+    )
+    const {
+      preparerEntry: checkEntry,
+      reviewerEntry,
+      needsReconfirm,
+      isReviewerActor,
+      actorHasSlot: isChecked,
+      hasAnyCheck,
+      hasDualCheck,
+      trail: checkTrail,
+      tooltip: dualCheckTooltip,
+    } = checkState
+    const isReviewerCheck  = isReviewerActor && !!reviewerEntry && !checkEntry
+    const isDualCheck      = hasDualCheck
     const isHovered        = !!field && hoveredField === field
     const isPopoverOpen    = !!field && popoverField === field
     const yoy              = field ? YOY[field] : undefined
@@ -646,12 +721,17 @@ export default function LeftPanel1040({
       isOrangeSelected ? styles.rowSelected     : '',
       isBlueSelected   ? styles.rowSelectedBlue : '',
       isReviewed       ? styles.rowReviewed     : '',
-      isChecked && !isReviewed
-        ? (isReviewerCheck ? styles.rowCheckedReviewer : styles.rowChecked)
+      hasAnyCheck && !isReviewed
+        ? (isDualCheck
+          ? styles.rowCheckedDual
+          : isReviewerCheck || (isReviewerActor && !!reviewerEntry && !checkEntry)
+            ? styles.rowCheckedReviewer
+            : styles.rowChecked)
         : '',
       showYoyTint      ? rowYoyClass(yoy!)      : '',
       clickable        ? styles.rowClickable    : '',
       commentField === field ? styles.rowCommentOpen : '',
+      needsReconfirm ? styles.rowNeedsReconfirm : '',
       isDimmed ? styles.rowDimmed : '',
     ].filter(Boolean).join(' ')
 
@@ -664,8 +744,12 @@ export default function LeftPanel1040({
       isOrangeSelected    ? styles.valueBoxSelected : '',
       isBlueSelected      ? styles.valueBoxSelectedBlue : '',
       isReviewed && !isSelected ? styles.valueBoxReviewed : '',
-      isChecked && !isReviewed && !isSelected
-        ? (isReviewerCheck ? styles.valueBoxCheckedReviewer : styles.valueBoxChecked)
+      hasAnyCheck && !isReviewed && !isSelected
+        ? (isDualCheck
+          ? styles.valueBoxCheckedDual
+          : isReviewerCheck || (isReviewerActor && !!reviewerEntry && !checkEntry)
+            ? styles.valueBoxCheckedReviewer
+            : styles.valueBoxChecked)
         : '',
       isCommentOpen && !isSelected ? styles.valueBoxCommentOpen : '',
     ].filter(Boolean).join(' ')
@@ -677,8 +761,12 @@ export default function LeftPanel1040({
       isOrangeSelected  ? styles.valueNumSelected   : '',
       isBlueSelected    ? styles.valueNumSelectedBlue : '',
       isReviewed && !isSelected ? styles.valueNumReviewed : '',
-      isChecked && !isReviewed && !isSelected
-        ? (isReviewerCheck ? styles.valueNumCheckedReviewer : styles.valueNumChecked)
+      hasAnyCheck && !isReviewed && !isSelected
+        ? (isDualCheck
+          ? styles.valueNumCheckedDual
+          : isReviewerCheck || (isReviewerActor && !!reviewerEntry && !checkEntry)
+            ? styles.valueNumCheckedReviewer
+            : styles.valueNumChecked)
         : '',
     ].filter(Boolean).join(' ')
 
@@ -698,6 +786,11 @@ export default function LeftPanel1040({
         <td className={styles.cellLabel}>
           <div className={styles.cellLabelInner}>
             {label}
+            {needsReconfirm && (
+              <span className={styles.reconfirmBadge} title="Preparer verified, then value was edited — confirm again for sign-off">
+                Edited since verify — confirm again
+              </span>
+            )}
           </div>
         </td>
         <td className={styles.cellLineRight}>{line}</td>
@@ -708,10 +801,23 @@ export default function LeftPanel1040({
               {isReviewed && (
                 <span className={styles.reviewedIcon}><CircleCheck size="small" /></span>
               )}
-              {/* User check — inside value box (same pattern; reviewer uses blue) */}
-              {isChecked && !isReviewed && (
-                <span className={isReviewerCheck ? styles.checkedIconReviewer : styles.checkedIcon}>
-                  <CircleCheck size="small" />
+              {/* User check — inside value box; dual trail when both actors checked */}
+              {hasAnyCheck && !isReviewed && (
+                <span
+                  className={
+                    isDualCheck
+                      ? styles.checkedIconDual
+                      : isReviewerCheck || (isReviewerActor && !!reviewerEntry)
+                        ? styles.checkedIconReviewer
+                        : styles.checkedIcon
+                  }
+                  title={dualCheckTooltip || undefined}
+                >
+                  {isDualCheck ? (
+                    <span className={styles.checkTrail}>{checkTrail}</span>
+                  ) : (
+                    <CircleCheck size="small" />
+                  )}
                 </span>
               )}
 
@@ -748,14 +854,13 @@ export default function LeftPanel1040({
             {/* Check toggle — hover affordance; checked state shows inside the value box */}
             {showCheckBtn && !isReviewed && (
               <Tooltip
-                text={activityTooltip(
-                  isChecked ? 'Unmark as correct' : 'Mark as correct',
-                  isChecked ? checkedMeta.get(field!) : undefined,
-                )}
+                text={checkActionTooltip(isReviewerActor, isChecked, dualCheckTooltip)}
                 placement="top"
               ><button
-                className={`${styles.checkBtn} ${isChecked ? styles.checkBtnActive : ''} ${isReviewerCheck ? styles.checkBtnReviewer : ''}`}
-                aria-label={isChecked ? `Unmark ${field} as verified` : `Mark ${field} as verified`}
+                className={`${styles.checkBtn} ${isChecked ? styles.checkBtnActive : ''} ${isReviewerActor ? styles.checkBtnReviewer : ''} ${hasDualCheck && !isChecked ? styles.checkBtnDualPending : ''}`}
+                aria-label={isChecked
+                  ? (isReviewerActor ? `Remove confirmation for ${field}` : `Remove verification for ${field}`)
+                  : (isReviewerActor ? `Confirm ${field} for sign-off` : `Verify ${field} against source`)}
                 onClick={(e) => { e.stopPropagation(); onToggleChecked?.(field!) }}
               >
                 <CircleCheck size="small" />
@@ -986,9 +1091,26 @@ export default function LeftPanel1040({
                       const diff = hasPrior ? row.curr - prior! : null
                       const pctChg = hasPrior && prior !== 0 ? Math.round((row.curr - prior!) / Math.abs(prior!) * 100) : null
                       const isReviewed = !!row.field && reviewedHas(row.field)
-                      const isChecked  = !!row.field && checkedFields.has(row.field)
-                      const checkEntry = isChecked && row.field ? checkedMeta.get(row.field) : undefined
-                      const isReviewerCheck = !!checkEntry && checkEntry.by === REVIEWER_NAME
+                      const rowCheck = fieldCheckState(
+                        row.field,
+                        checkedFields,
+                        checkedMeta,
+                        reviewerConfirmedFields,
+                        reviewerConfirmedMeta,
+                        reviewerConfirmStaleFields,
+                      )
+                      const {
+                        preparerEntry: checkEntry,
+                        reviewerEntry,
+                        needsReconfirm,
+                        isReviewerActor,
+                        actorHasSlot: isChecked,
+                        hasAnyCheck,
+                        hasDualCheck,
+                        tooltip: dualCheckTooltip,
+                      } = rowCheck
+                      const isReviewerCheck =
+                        isReviewerActor && !!reviewerEntry && !checkEntry
                       const isDimmed =
                         !!focusFields &&
                         focusFields.size > 0 &&
@@ -1020,9 +1142,10 @@ export default function LeftPanel1040({
                         flagTooltipPrimary,
                         isFlagged ? flagActivityEntry : undefined,
                       )
-                      const checkTooltip = activityTooltip(
-                        isChecked ? 'Unmark as reviewed' : 'Mark row as reviewed',
-                        isChecked && row.field ? checkedMeta.get(row.field) : undefined,
+                      const checkTooltip = checkActionTooltip(
+                        isReviewerActor,
+                        isChecked,
+                        dualCheckTooltip,
                       )
                       const diffPos = diff !== null && diff > 0
                       const diffNeg = diff !== null && diff < 0
@@ -1032,8 +1155,11 @@ export default function LeftPanel1040({
                         isOrange ? styles.summarySubRowOrange : '',
                         isBlue   ? styles.summarySubRowBlue   : '',
                         isReviewed ? styles.summarySubRowReviewed : '',
-                        isChecked ? styles.summarySubRowChecked : '',
+                        hasAnyCheck ? styles.summarySubRowChecked : '',
+                        hasDualCheck ? styles.summarySubRowCheckedDual : '',
+                        isReviewerCheck ? styles.summarySubRowCheckedReviewer : '',
                         clickable  ? styles.summarySubRowClickable : '',
+                        needsReconfirm ? styles.summarySubRowStale : '',
                         isDimmed ? styles.rowDimmed : '',
                       ].filter(Boolean).join(' ')
 
@@ -1056,6 +1182,9 @@ export default function LeftPanel1040({
                                 {row.label}
                               </span>
                               <span className={styles.summarySubNote}>Line {row.line} · {row.sub}</span>
+                              {needsReconfirm && (
+                                <span className={styles.reconfirmBadge}>Edited since verify — confirm again</span>
+                              )}
                             </div>
                           </div>
                           <div className={styles.summaryRowRight}>
@@ -1179,8 +1308,10 @@ export default function LeftPanel1040({
                                 <Tooltip text={checkTooltip} placement="top">
                                   <button
                                     type="button"
-                                    className={`${styles.summaryActionBtn} ${isChecked ? styles.summaryActionBtnChecked : ''} ${isReviewerCheck ? styles.summaryActionBtnReviewer : ''}`}
-                                    aria-label={isChecked ? 'Unmark' : 'Mark as reviewed'}
+                                    className={`${styles.summaryActionBtn} ${isChecked ? styles.summaryActionBtnChecked : ''} ${isReviewerActor ? styles.summaryActionBtnReviewer : ''} ${hasDualCheck && !isChecked ? styles.summaryActionBtnDualPending : ''}`}
+                                    aria-label={isChecked
+                                      ? (isReviewerActor ? 'Remove confirmation' : 'Remove verification')
+                                      : (isReviewerActor ? 'Confirm for sign-off' : 'Verify against source')}
                                     onClick={e => { e.stopPropagation(); onToggleChecked(row.field!) }}
                                   >
                                     <CircleCheck size="small" />
