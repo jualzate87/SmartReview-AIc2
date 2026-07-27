@@ -12,19 +12,15 @@ import {
 import { getPhase2Progress } from '../pages/data-review/phase2FlagSync'
 import type { Note } from '../pages/data-review/NotesPane'
 import type { HandoffJump } from './handoffSnapshot'
+import {
+  isDocShownVerified,
+  isVerifiedInSet,
+  normalizeVerifiedDocKey,
+  PACKET_VERIFY_DOC_KEYS,
+} from './verifiedDocKeys'
 
-/** Source documents expected on a typical Jessica Drake 1040 return */
-export const EXPECTED_SOURCE_DOCS = [
-  'w2-techCircle',
-  '1099-div-northmark',
-  '1099-div-beacon',
-  '1099-div-token',
-  '1099-int-harborline',
-  '1099-int-cascade',
-  '1099-int-unwavering',
-  '1099-r-meridian',
-  '1099-nec',
-] as const
+/** Source documents expected on a typical Jessica Drake 1040 return (verify-doc keys). */
+export const EXPECTED_SOURCE_DOCS = PACKET_VERIFY_DOC_KEYS
 
 export type ManualChecklistId = 'final-walkthrough' | 'yoy-variances'
 
@@ -94,9 +90,11 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
       ? diagsOpenRaw.filter(k => k !== 'importMismatches')
       : diagsOpenRaw
 
-  const docsMissingVerify = EXPECTED_SOURCE_DOCS.filter(d => !input.verifiedDocs.has(d))
-  const docsMissingConfirm = EXPECTED_SOURCE_DOCS.filter(
-    d => input.verifiedDocs.has(d) && !input.reviewerConfirmedDocs.has(d),
+  const docsMissingVerify = EXPECTED_SOURCE_DOCS.filter(
+    d => !isVerifiedInSet(input.verifiedDocs, d),
+  )
+  const docsMissingConfirm = EXPECTED_SOURCE_DOCS.filter(d =>
+    isVerifiedInSet(input.verifiedDocs, d) && !isVerifiedInSet(input.reviewerConfirmedDocs, d),
   )
   const docsIncomplete = [...new Set([...docsMissingVerify, ...docsMissingConfirm])]
   const sourceDocsComplete = docsIncomplete.length === 0

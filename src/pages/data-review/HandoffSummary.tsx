@@ -11,7 +11,12 @@ import type { HandoffItem, HandoffJump, HandoffSnapshot } from '../../data/hando
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
 import { Checkbox } from '@ids-ts/checkbox'
 import '@ids-ts/checkbox/dist/main.css'
-import { jumpActionLabel } from '../../data/handoffSnapshot'
+import { ChevronDown } from '@design-systems/icons'
+import {
+  jumpActionLabel,
+  getOpenGroupToggleLabel,
+  getDoneSectionToggleLabel,
+} from '../../data/handoffSnapshot'
 import ReviewSidePanel, { sidePanelStyles } from './ReviewSidePanel'
 import styles from '../../styles/data-review/HandoffSummary.module.css'
 
@@ -103,42 +108,40 @@ function ItemRow({
   )
 }
 
-/** Compact “Show details” disclosure — story brief, not a findings accordion */
+/** Progressive disclosure — count lives in the trigger label, not a duplicate section title */
 function DetailsDisclosure({
   id,
-  label,
-  count,
+  collapsedLabel,
+  expandedLabel,
   countLabel,
-  warning,
   defaultOpen = false,
   children,
 }: {
   id: string
-  label: string
-  count?: number
+  collapsedLabel: string
+  expandedLabel: string
+  /** Accessible description of the item count (count is already in the visible label) */
   countLabel?: string
-  warning?: boolean
   defaultOpen?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  const toggleLabel = open ? expandedLabel : collapsedLabel
   return (
     <div id={id} className={styles.disclosure}>
       <button
         type="button"
         className={styles.disclosureToggle}
         aria-expanded={open}
+        aria-label={countLabel ? `${toggleLabel}. ${countLabel}` : toggleLabel}
         onClick={() => setOpen(v => !v)}
       >
-        <span className={styles.disclosureLabel}>
-          {open ? 'Hide details' : 'Show details'}
-          <span className={styles.disclosureHint}> · {label}</span>
-        </span>
-        {count != null && countLabel && (
-          <span className={styles.sectionBadge}>
-            <CountBadge count={count} countLabel={countLabel} warning={warning} />
-          </span>
-        )}
+        <ChevronDown
+          size="small"
+          className={`${styles.disclosureChevron} ${open ? styles.disclosureChevronOpen : ''}`}
+          aria-hidden
+        />
+        <span className={styles.disclosureLabel}>{toggleLabel}</span>
       </button>
       {open && <div className={styles.disclosureBody}>{children}</div>}
     </div>
@@ -402,10 +405,9 @@ export default function HandoffSummary({
                     <DetailsDisclosure
                       key={group.id}
                       id={`handoff-group-${group.id}`}
-                      label={group.title}
-                      count={group.count}
+                      collapsedLabel={getOpenGroupToggleLabel(group, false)}
+                      expandedLabel={getOpenGroupToggleLabel(group, true)}
                       countLabel={group.countLabel}
-                      warning={isCritical}
                       defaultOpen={false}
                     >
                       <ul className={styles.list}>
@@ -426,10 +428,17 @@ export default function HandoffSummary({
               {!hasGroups && showDetails && (
                 <DetailsDisclosure
                   id={`handoff-details-${section.id}`}
-                  label={section.title}
-                  count={section.count}
+                  collapsedLabel={getDoneSectionToggleLabel(
+                    section.count,
+                    false,
+                    snapshot.voice === 'reviewer-briefing',
+                  )}
+                  expandedLabel={getDoneSectionToggleLabel(
+                    section.count,
+                    true,
+                    snapshot.voice === 'reviewer-briefing',
+                  )}
                   countLabel={section.countLabel}
-                  warning={isCritical && section.count > 0}
                   defaultOpen={section.defaultOpen}
                 >
                   <ul className={styles.list}>

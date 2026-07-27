@@ -13,6 +13,14 @@ import {
   type Phase2IssueKey,
 } from '../pages/data-review/phase2FlagSync'
 import type { Note } from '../pages/data-review/NotesPane'
+import {
+  normalizeVerifiedDocKey,
+  isVerifiedInSet,
+  getVerifiedDocEntry,
+  PACKET_VERIFY_DOC_KEYS,
+  PHASE1_FLAG_TO_VERIFY_DOC,
+  verifiedDocLabel,
+} from './verifiedDocKeys'
 
 export type HandoffMode =
   | 'signoff-review'
@@ -132,42 +140,9 @@ const FLAG_LABELS: Record<string, string> = {
   'ordinaryDivs-northmark': 'Ordinary dividends (Northmark)',
 }
 
-const DOC_LABELS: Record<string, string> = {
-  'w2-techCircle': 'W-2 · Tech Circle',
-  '1099-div-northmark': '1099-DIV · Northmark',
-  '1099-div-beacon': '1099-DIV · Beacon',
-  '1099-div-token': '1099-DIV · Token',
-  '1099-int-harborline': '1099-INT · Harborline',
-  '1099-int-cascade': '1099-INT · Cascade',
-  '1099-int-unwavering': '1099-INT · Unwavering',
-  '1099-r-meridian': '1099-R · Meridian',
-  '1099-nec': '1099-NEC · Summit',
-}
+const FLAG_TO_DOC = PHASE1_FLAG_TO_VERIFY_DOC
 
-const FLAG_TO_DOC: Record<string, string> = {
-  'ssn-techCircle': 'w2-techCircle',
-  'wages-techCircle': 'w2-techCircle',
-  box12: 'w2-techCircle',
-  'ein-techCircle': 'w2-techCircle',
-  divCollectibles: '1099-div-token',
-  divNonDiv: '1099-div-token',
-  fedTaxWithheld: '1099-div-token',
-  taxableInterest: '1099-int-unwavering',
-  'grossDistrib-meridian': '1099-r-meridian',
-  'ordinaryDivs-northmark': '1099-div-northmark',
-}
-
-const KNOWN_DOCS = [
-  'w2-techCircle',
-  '1099-div-northmark',
-  '1099-div-beacon',
-  '1099-div-token',
-  '1099-int-harborline',
-  '1099-int-cascade',
-  '1099-int-unwavering',
-  '1099-r-meridian',
-  '1099-nec',
-] as const
+const KNOWN_DOCS = PACKET_VERIFY_DOC_KEYS
 
 function initials(name: string): string {
   return name
@@ -187,7 +162,7 @@ function fieldLabel(key: string): string {
 }
 
 function docLabel(docId: string): string {
-  return DOC_LABELS[docId] ?? docId
+  return verifiedDocLabel(docId)
 }
 
 function editTouchesFlag(editKey: string, flagKey: string): boolean {
@@ -197,14 +172,15 @@ function editTouchesFlag(editKey: string, flagKey: string): boolean {
 }
 
 function docRelatedEdits(docId: string, editKeys: string[]): string[] {
+  const key = normalizeVerifiedDocKey(docId)
   return editKeys.filter(k => {
     const mapped = FLAG_TO_DOC[k]
-    if (mapped === docId) return true
-    if (docId.startsWith('w2') && (k.startsWith('wages') || k === 'ssn' || k === 'ein' || k.startsWith('box12'))) return true
-    if (docId.includes('div') && (k.includes('Div') || k.includes('div') || k === 'fedTaxWithheld')) return true
-    if (docId.includes('int') && (k.includes('Interest') || k.includes('interest') || k.includes('taxExempt'))) return true
-    if (docId.includes('1099-r') && (k.includes('grossDistrib') || k.includes('r-') || k.includes('ira'))) return true
-    if (docId.includes('nec') && (k.includes('nec') || k.includes('otherIncome'))) return true
+    if (mapped === key) return true
+    if (key === 'techCircle' && (k.startsWith('wages') || k === 'ssn' || k === 'ein' || k.startsWith('box12'))) return true
+    if (key.startsWith('1099-div-') && (k.includes('Div') || k.includes('div') || k === 'fedTaxWithheld')) return true
+    if (key.startsWith('1099-int-') && (k.includes('Interest') || k.includes('interest') || k.includes('taxExempt'))) return true
+    if (key === '1099-r' && (k.includes('grossDistrib') || k.includes('r-') || k.includes('ira'))) return true
+    if (key === '1099-nec' && (k.includes('nec') || k.includes('otherIncome'))) return true
     return false
   })
 }
@@ -219,6 +195,69 @@ function listPhrase(parts: string[], max = 3): string {
     return `${shown.slice(0, -1).join(', ')}, and ${shown[shown.length - 1]}`
   }
   return `${shown.join(', ')}, and ${rest} more`
+}
+
+/** Progressive disclosure trigger for open-item groups (action + count, no dot-separated hints). */
+export function getOpenGroupToggleLabel(group: HandoffItemGroup, expanded: boolean): string {
+  const n = group.count
+  if (expanded) {
+    switch (group.id) {
+      case 'unverified-docs':
+        return 'Hide unverified documents'
+      case 'notes':
+        return 'Hide open notes'
+      case 'import-flags':
+        return 'Hide import flags'
+      case 'ai-diagnostics':
+        return 'Hide AI diagnostics'
+      case 'preparer-flags':
+        return 'Hide preparer follow-ups'
+      case 'needs-confirmation':
+        return 'Hide items needing confirmation'
+      case 'docs-needs-confirmation':
+        return 'Hide documents awaiting confirmation'
+      default:
+        return `Hide ${group.title.toLowerCase()}`
+    }
+  }
+  switch (group.id) {
+    case 'unverified-docs':
+      return n === 1 ? 'View 1 unverified document' : `View ${n} unverified documents`
+    case 'notes':
+      return n === 1 ? 'View 1 open note' : `View ${n} open notes`
+    case 'import-flags':
+      return n === 1 ? 'View 1 import flag' : `View ${n} import flags`
+    case 'ai-diagnostics':
+      return n === 1 ? 'View 1 open AI diagnostic' : `View ${n} open AI diagnostics`
+    case 'preparer-flags':
+      return n === 1 ? 'View 1 preparer follow-up' : `View ${n} preparer follow-ups`
+    case 'needs-confirmation':
+      return n === 1 ? 'View 1 item needing confirmation' : `View ${n} items needing confirmation`
+    case 'docs-needs-confirmation':
+      return n === 1 ? 'View 1 document awaiting confirmation' : `View ${n} documents awaiting confirmation`
+    default:
+      return n === 1 ? `View 1 item` : `View ${n} items`
+  }
+}
+
+/** Progressive disclosure trigger for the completed-work section (distinct from section heading). */
+export function getDoneSectionToggleLabel(
+  count: number,
+  expanded: boolean,
+  isBriefing: boolean,
+): string {
+  if (expanded) {
+    return isBriefing ? 'Hide verified items' : 'Hide reviewed items'
+  }
+  if (count <= 0) {
+    return isBriefing ? 'See what was verified' : 'See what you cleared'
+  }
+  if (isBriefing) {
+    return count === 1 ? 'Show 1 verified item' : `Show ${count} verified items`
+  }
+  return count === 1
+    ? 'See what you cleared (1 item)'
+    : `See what you cleared (${count} items)`
 }
 
 export function jumpActionLabel(jump: HandoffJump): string {
@@ -284,8 +323,8 @@ export function buildHandoffSnapshot(
       : diagsOpenRaw
 
   const openNotes = input.notes.filter(n => (n.status ?? 'open') === 'open')
-  const verifiedList = [...input.verifiedDocs]
-  const unverifiedDocs = KNOWN_DOCS.filter(d => !input.verifiedDocs.has(d))
+  const verifiedList = [...input.verifiedDocs].map(normalizeVerifiedDocKey)
+  const unverifiedDocs = KNOWN_DOCS.filter(d => !isVerifiedInSet(input.verifiedDocs, d))
 
   const checks = [...input.summaryChecked.entries()]
   const reviewerConfirms = [...(input.reviewerConfirmed ?? new Map()).entries()]
@@ -419,7 +458,7 @@ export function buildHandoffSnapshot(
   }
 
   const reviewerConfirmedDocs = input.reviewerConfirmedDocs ?? new Set<string>()
-  const docsVerifiedOnly = verifiedList.filter(d => !reviewerConfirmedDocs.has(d))
+  const docsVerifiedOnly = verifiedList.filter(d => !isVerifiedInSet(reviewerConfirmedDocs, d))
   if (isBriefing && docsVerifiedOnly.length) {
     openGroups.push({
       id: 'docs-needs-confirmation',
@@ -427,7 +466,7 @@ export function buildHandoffSnapshot(
       count: docsVerifiedOnly.length,
       countLabel: `${docsVerifiedOnly.length} verified-only doc${docsVerifiedOnly.length === 1 ? '' : 's'}`,
       items: docsVerifiedOnly.map(docId => {
-        const meta = input.verifiedDocsMeta?.get(docId)
+        const meta = getVerifiedDocEntry(input.verifiedDocsMeta, docId)
         return {
           id: `doc-confirm-${docId}`,
           label: docLabel(docId),
@@ -714,10 +753,10 @@ export function buildHandoffSnapshot(
       : 'All clear',
     intro: isBriefing
       ? openBreakdown
-        ? `${openBreakdown}. Expand a category when you want the full list and jump links.`
+        ? `${openBreakdown}. Open a group below for the full list and jump links.`
         : 'Nothing is waiting in this snapshot.'
       : openBreakdown
-        ? `${openBreakdown}. Expand a category for jumpable details.`
+        ? `${openBreakdown}. Open a group below for jump links to each item.`
         : 'Nothing critical left before handoff or filing.',
     bucket: 'critical',
     defaultOpen: true,
