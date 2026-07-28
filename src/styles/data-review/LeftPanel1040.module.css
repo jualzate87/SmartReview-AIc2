@@ -533,10 +533,6 @@
   color: var(--color-ui-positive, #108000);
 }
 
-.rowChecked {
-  box-shadow: inset 3px 0 0 var(--color-ui-positive, #108000);
-}
-
 .checkedIcon {
   display: inline-flex;
   color: #0f766e;
@@ -595,9 +591,6 @@
   flex-shrink: 0;
   line-height: 1;
 }
-.rowCheckedReviewer {
-  box-shadow: inset 3px 0 0 #205ea3;
-}
 .valueBoxCheckedReviewer {
   border-color: #205ea3 !important;
   background: #f0f6fc !important;
@@ -607,9 +600,6 @@
 }
 
 /* Dual-slot: preparer verified + reviewer confirmed */
-.rowCheckedDual {
-  box-shadow: inset 3px 0 0 var(--color-action-success, #00856d), inset 6px 0 0 #205ea3;
-}
 .valueBoxCheckedDual {
   border-color: #205ea3 !important;
   background: linear-gradient(90deg, #e6f6ef 0%, #eef5fb 100%) !important;
@@ -657,9 +647,7 @@
 .summarySubRowStale {
   background: var(--color-input-background-warning);
 }
-.summarySubRowStale.summarySubRowChecked,
-.summarySubRowStale.summarySubRowCheckedDual,
-.summarySubRowStale.summarySubRowCheckedReviewer {
+.summarySubRowStale.summarySubRowChecked {
   background: var(--color-input-background-warning);
 }
 
@@ -1328,13 +1316,6 @@
   background: var(--color-container-background-primary, #ffffff);
   border-color: var(--color-border-secondary, #c3ced5);
   color: var(--color-text-secondary, #6b6c72);
-}
-.summarySubRowCheckedDual {
-  border-left: 3px solid var(--color-action-success, #00856d);
-  box-shadow: inset 3px 0 0 #205ea3;
-}
-.summarySubRowCheckedReviewer {
-  border-left-color: #205ea3;
 }
 /* User flag ON — orange active state (paired with default .summaryActionBtn when off) */
 .summaryActionBtnFlag {

@@ -123,8 +123,6 @@ function LineRow({
       ? reviewerConfirmedMeta.get(attestKey)
       : undefined
   const needsReconfirm = !!attestKey && reviewerConfirmStaleFields.has(attestKey) && !!preparerEntry
-  const hasAnyCheck = !!(preparerEntry || reviewerEntry)
-  const hasDualCheck = !!(preparerEntry && reviewerEntry)
   const showAttest =
     !!attest &&
     !!attestKey &&
@@ -139,13 +137,6 @@ function LineRow({
     styles.row,
     bold ? styles.rowBold : '',
     hasFlyout ? styles.rowClickable : '',
-    hasAnyCheck
-      ? hasDualCheck
-        ? styles.rowCheckedDual
-        : reviewerEntry && !preparerEntry
-          ? styles.rowCheckedReviewer
-          : styles.rowChecked
-      : '',
     needsReconfirm ? styles.rowNeedsReconfirm : '',
   ].filter(Boolean).join(' ')
 

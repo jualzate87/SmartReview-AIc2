@@ -703,11 +703,7 @@ export default function LeftPanel1040({
       reviewerEntry,
       needsReconfirm,
       isReviewerActor,
-      hasAnyCheck,
-      hasDualCheck,
     } = checkState
-    const isReviewerCheck  = isReviewerActor && !!reviewerEntry && !checkEntry
-    const isDualCheck      = hasDualCheck
     const isHovered        = !!field && hoveredField === field
     const isPopoverOpen    = !!field && popoverField === field
     const yoy              = field ? YOY[field] : undefined
@@ -734,13 +730,6 @@ export default function LeftPanel1040({
       isOrangeSelected ? styles.rowSelected     : '',
       isBlueSelected   ? styles.rowSelectedBlue : '',
       isReviewed       ? styles.rowReviewed     : '',
-      hasAnyCheck && !isReviewed
-        ? (isDualCheck
-          ? styles.rowCheckedDual
-          : isReviewerCheck || (isReviewerActor && !!reviewerEntry && !checkEntry)
-            ? styles.rowCheckedReviewer
-            : styles.rowChecked)
-        : '',
       showYoyTint      ? rowYoyClass(yoy!)      : '',
       clickable        ? styles.rowClickable    : '',
       commentField === field ? styles.rowCommentOpen : '',
@@ -1093,11 +1082,8 @@ export default function LeftPanel1040({
                         isReviewerActor,
                         actorHasSlot: isChecked,
                         hasAnyCheck,
-                        hasDualCheck,
                         tooltip: dualCheckTooltip,
                       } = rowCheck
-                      const isReviewerCheck =
-                        isReviewerActor && !!reviewerEntry && !checkEntry
                       const isDimmed =
                         !!focusFields &&
                         focusFields.size > 0 &&
@@ -1143,8 +1129,6 @@ export default function LeftPanel1040({
                         isBlue   ? styles.summarySubRowBlue   : '',
                         isReviewed ? styles.summarySubRowReviewed : '',
                         hasAnyCheck ? styles.summarySubRowChecked : '',
-                        hasDualCheck ? styles.summarySubRowCheckedDual : '',
-                        isReviewerCheck ? styles.summarySubRowCheckedReviewer : '',
                         clickable  ? styles.summarySubRowClickable : '',
                         needsReconfirm ? styles.summarySubRowStale : '',
                         isDimmed ? styles.rowDimmed : '',
