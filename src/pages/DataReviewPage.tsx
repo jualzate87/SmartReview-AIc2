@@ -883,7 +883,7 @@ export default function DataReviewPage() {
       if (prev.length > 0) return prev
       return [{
         id: 'note-seed-pass1',
-        text: 'Please confirm NIIT Form 8960 still applies after AGI tweak — SC',
+        text: 'Please confirm NIIT Form 8960 still applies after AGI tweak. SC',
         author: PREPARER_NAME,
         at: formatNoteAt(),
         context: 'Form 8960',
@@ -1044,6 +1044,11 @@ export default function DataReviewPage() {
     manualChecklistItems,
     outstandingOpenCount,
   })
+
+  const showChecklist =
+    reviewRole === 'reviewer' &&
+    reviewPass === 2 &&
+    (summaryOpts.voice ?? 'self') !== 'reviewer-briefing'
 
   const signOffGatingActive = !inImportPhase && reviewRole === 'reviewer'
   const signOffReady = !signOffGatingActive || canSignOff(reviewChecklist, outstandingOpenCount)
@@ -2128,6 +2133,7 @@ export default function DataReviewPage() {
                   variant="drawer"
                   snapshot={handoffSnapshot}
                   checklist={reviewChecklist}
+                  showChecklist={showChecklist}
                   onToggleChecklistItem={setManualChecklistItem}
                   signOffReady={signOffReady}
                   signOffBlockerText={signOffBlockerMessage}

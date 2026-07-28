@@ -12,7 +12,7 @@ import type { HandoffItem, HandoffJump, HandoffSnapshot } from '../../data/hando
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
 import { Checkbox } from '@ids-ts/checkbox'
 import '@ids-ts/checkbox/dist/main.css'
-import { ChevronDown } from '@design-systems/icons'
+import { ChevronDown, CircleCheckFill } from '@design-systems/icons'
 import {
   jumpActionLabel,
   getOpenGroupToggleLabel,
@@ -39,8 +39,10 @@ type Props = {
   subtitleOverride?: string
   hideFooter?: boolean
   closing?: boolean
-  /** Process-level review checklist (Phase 2 sign-off) */
+  /** Process-level review checklist (Phase 2 sign-off, reviewer only) */
   checklist?: ReviewChecklistState
+  /** When false, checklist section is hidden (preparer / Pass 1 briefing) */
+  showChecklist?: boolean
   onToggleChecklistItem?: (itemId: string, checked: boolean) => void
   signOffReady?: boolean
   signOffBlockerText?: string | null
@@ -112,11 +114,12 @@ function ItemRow({
   itemKey: string
   onJump?: (jump: HandoffJump) => void
 }) {
+  const isInfoOnly = item.status === 'info'
   return (
     <li
       key={itemKey}
       id={item.id ? `handoff-open-${item.id}` : undefined}
-      className={styles.item}
+      className={`${styles.item} ${isInfoOnly ? styles.itemInfo : ''}`}
     >
       <div className={styles.itemMain}>
         <div className={styles.itemText}>
@@ -189,29 +192,54 @@ function ChecklistRow({
   onToggle?: (itemId: string, checked: boolean) => void
 }) {
   const isAuto = item.kind === 'auto'
+  const isComplete = item.complete
   const canToggle = !isAuto && !!onToggle
+  const showAutoSuccess = isAuto && isComplete
+  const rowClass = [
+    styles.checklistItem,
+    isComplete ? styles.checklistItemComplete : styles.checklistItemPending,
+    !isComplete && item.required ? styles.checklistItemRequired : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <li className={`${styles.checklistItem} ${item.complete ? styles.checklistItemComplete : ''}`}>
+    <li className={rowClass}>
       <div className={styles.checklistItemRow}>
         <div className={styles.checklistCheck}>
-          <Checkbox
-            checked={item.complete}
-            disabled={isAuto}
-            onChange={canToggle ? (e) => onToggle!(item.id, e.target.checked) : undefined}
-            size="small"
-          >
-            {item.label}
-          </Checkbox>
+          {showAutoSuccess ? (
+            <>
+              <span className={styles.checklistSuccessIcon} aria-hidden>
+                <CircleCheckFill size="small" />
+              </span>
+              <span className={styles.checklistLabel}>{item.label}</span>
+            </>
+          ) : (
+            <Checkbox
+              checked={isComplete}
+              disabled={isAuto}
+              onChange={canToggle ? (e) => onToggle!(item.id, e.target.checked) : undefined}
+              size="small"
+              className={isComplete ? styles.checklistCheckboxSuccess : undefined}
+            >
+              <span className={isComplete ? styles.checklistLabel : styles.checklistLabelActive}>
+                {item.label}
+              </span>
+            </Checkbox>
+          )}
         </div>
-        {item.jump && onJump && !item.complete && (
+        {item.jump && onJump && !isComplete && (
           <button type="button" className={styles.checklistJumpBtn} onClick={() => onJump(item.jump!)}>
             {item.jumpLabel ?? 'View'}
           </button>
         )}
       </div>
       {item.description && (
-        <p className={styles.checklistDesc}>{item.description}</p>
+        <p
+          className={`${styles.checklistDesc} ${isComplete ? styles.checklistDescComplete : ''}`}
+        >
+          {item.description}
+        </p>
       )}
     </li>
   )
@@ -266,6 +294,7 @@ export default function HandoffSummary({
   hideFooter = false,
   closing = false,
   checklist,
+  showChecklist = false,
   onToggleChecklistItem,
   signOffReady = true,
   signOffBlockerText: _signOffBlockerText,
@@ -517,7 +546,7 @@ export default function HandoffSummary({
         })}
       </div>
 
-      {checklist && (
+      {showChecklist && checklist && (
         <ChecklistSection
           checklist={checklist}
           onJump={onJump}
