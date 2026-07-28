@@ -268,7 +268,7 @@ export default function HandoffSummary({
   checklist,
   onToggleChecklistItem,
   signOffReady = true,
-  signOffBlockerText,
+  signOffBlockerText: _signOffBlockerText,
 }: Props) {
   const title =
     titleOverride ??
@@ -295,9 +295,6 @@ export default function HandoffSummary({
 
   const footerActions = !hideFooter ? (
     <div className={styles.footerWrap}>
-      {!signOffReady && signOffBlockerText && (
-        <p className={styles.signOffBlocker} role="status">{signOffBlockerText}</p>
-      )}
       <div className={styles.footerActionsRow}>
       {snapshot.mode === 'signoff-review' && (
         <>

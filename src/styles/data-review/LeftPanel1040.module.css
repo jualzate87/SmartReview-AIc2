@@ -973,7 +973,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  width: 130px;
+  width: 138px; /* comment + flag spacer + prep + rev */
   flex-shrink: 0;
 }
 /* Align Prep/Rev headers with the last two action slots (after comment + flag) */
@@ -982,7 +982,12 @@
   flex-shrink: 0;
 }
 .summaryColCheckLabel {
-  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 0 2px;
+  box-sizing: border-box;
   text-align: center;
   font-family: var(--font-family-component);
   font-size: var(--font-size-component-x-small);
@@ -1152,8 +1157,63 @@
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  width: 130px; /* 4 × 28px + 3 × 6px gap */
+  width: 138px; /* 2 × 28px + 2 × 32px + 3 × 6px gap */
   flex-shrink: 0;
+}
+
+/* Prep / Rev attest slots — icon-only checks, not bordered action buttons */
+.summaryAttestCol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary, #6b6c72);
+  box-sizing: border-box;
+  transition: color 100ms ease, opacity 100ms ease;
+}
+.summaryAttestColEmpty {
+  /* Subtle inactive placeholder — same footprint as active icon */
+}
+.summaryAttestColEmpty::after {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 1px dashed var(--color-border-tertiary, #d4d7dc);
+  border-radius: 50%;
+  opacity: 0.55;
+}
+.summaryAttestColPrepActive {
+  color: var(--color-action-success, #00856d);
+}
+.summaryAttestColRevActive {
+  color: #205ea3;
+}
+.summaryAttestCol:hover:not(:disabled):not(.summaryAttestColReadonly).summaryAttestColEmpty::after {
+  border-color: var(--color-action-standard, #0077c5);
+  opacity: 0.85;
+}
+.summaryAttestColReadonly {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.4;
+}
+.summaryAttestCol:disabled {
+  cursor: default;
+}
+.summaryAttestSlot {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Shared secondary icon-button look for comment / flag / check */

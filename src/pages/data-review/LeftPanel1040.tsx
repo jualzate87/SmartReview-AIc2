@@ -1356,7 +1356,11 @@ export default function LeftPanel1040({
                                   <Tooltip text={preparerCheckTooltip(checkEntry)} placement="top">
                                     <button
                                       type="button"
-                                      className={`${styles.summaryActionBtn} ${checkEntry ? styles.summaryActionBtnChecked : ''} ${!checkEntry && isReviewerRole ? styles.summaryActionBtnReadonly : ''}`}
+                                      className={[
+                                        styles.summaryAttestCol,
+                                        checkEntry ? styles.summaryAttestColPrepActive : styles.summaryAttestColEmpty,
+                                        isReviewerRole ? styles.summaryAttestColReadonly : '',
+                                      ].filter(Boolean).join(' ')}
                                       aria-label={checkEntry ? `Verified by ${checkEntry.by}` : 'Preparer verify'}
                                       disabled={isReviewerRole}
                                       onClick={e => {
@@ -1370,7 +1374,11 @@ export default function LeftPanel1040({
                                   <Tooltip text={reviewerCheckTooltip(reviewerEntry)} placement="top">
                                     <button
                                       type="button"
-                                      className={`${styles.summaryActionBtn} ${reviewerEntry ? styles.summaryActionBtnReviewer : ''} ${!reviewerEntry && !isReviewerRole ? styles.summaryActionBtnReadonly : ''}`}
+                                      className={[
+                                        styles.summaryAttestCol,
+                                        reviewerEntry ? styles.summaryAttestColRevActive : styles.summaryAttestColEmpty,
+                                        !isReviewerRole ? styles.summaryAttestColReadonly : '',
+                                      ].filter(Boolean).join(' ')}
                                       aria-label={reviewerEntry ? `Confirmed by ${reviewerEntry.by}` : 'Reviewer confirm'}
                                       disabled={!isReviewerRole}
                                       onClick={e => {
@@ -1384,8 +1392,8 @@ export default function LeftPanel1040({
                                 </>
                               ) : (
                                 <>
-                                  <span className={styles.summaryActionBtnSlot} aria-hidden="true" />
-                                  <span className={styles.summaryActionBtnSlot} aria-hidden="true" />
+                                  <span className={styles.summaryAttestSlot} aria-hidden="true" />
+                                  <span className={styles.summaryAttestSlot} aria-hidden="true" />
                                 </>
                               )}
                             </div>
