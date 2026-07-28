@@ -25,7 +25,8 @@ export const DIV_PAYER_TABS: { key: DivPayer; label: string }[] = [
 ]
 
 /** Verified-docs key — canonical definition in verifiedDocKeys.ts */
-export { divVerifiedDocKey } from '../../data/verifiedDocKeys'
+import { divVerifiedDocKey } from '../../data/verifiedDocKeys'
+export { divVerifiedDocKey }
 
 // 1099-DIV payers — Jessica Drake TY 2025
 const PAYER_DATA: Record<DivPayer, { ein: string; name: string; street: string; city: string; state: string; zip: string; payerPhone: string }> = {

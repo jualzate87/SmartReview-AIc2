@@ -25,7 +25,8 @@ export const INT_PAYER_TABS: { key: IntPayer; label: string }[] = [
 ]
 
 /** Verified-docs key — canonical definition in verifiedDocKeys.ts */
-export { intVerifiedDocKey } from '../../data/verifiedDocKeys'
+import { intVerifiedDocKey } from '../../data/verifiedDocKeys'
+export { intVerifiedDocKey }
 
 // 1099-INT payers — Jessica Drake TY 2025
 const PAYER_DATA: Record<IntPayer, { ein: string; name: string; street: string; city: string; state: string; zip: string; payerPhone: string }> = {
