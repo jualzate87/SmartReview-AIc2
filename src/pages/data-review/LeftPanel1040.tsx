@@ -20,7 +20,6 @@ import { summaryFieldHasUnresolvedFlags } from './phase1FieldSync'
 import {
   formatActivityMeta,
   formatDualCheckTooltip,
-  formatDualCheckTrail,
   getReviewActor,
   REVIEWER_NAME,
   type ActivityEntry,
@@ -84,9 +83,67 @@ function fieldCheckState(
     actorHasSlot,
     hasAnyCheck,
     hasDualCheck,
-    trail: formatDualCheckTrail(preparerEntry, reviewerEntry),
     tooltip: formatDualCheckTooltip(preparerEntry, reviewerEntry),
   }
+}
+
+/** Prep / Rev attest slots — same pattern as Return Summary rows */
+function AttestColumns({
+  field,
+  preparerEntry,
+  reviewerEntry,
+  isReviewerRole,
+  onTogglePreparer,
+  onToggleReviewer,
+}: {
+  field: string
+  preparerEntry?: ActivityEntry
+  reviewerEntry?: ActivityEntry
+  isReviewerRole: boolean
+  onTogglePreparer?: (fieldName: string) => void
+  onToggleReviewer?: (fieldName: string) => void
+}) {
+  if (!onTogglePreparer && !onToggleReviewer) return null
+  return (
+    <div className={styles.formAttestGroup}>
+      <Tooltip text={preparerCheckTooltip(preparerEntry)} placement="top">
+        <button
+          type="button"
+          className={[
+            styles.summaryAttestCol,
+            preparerEntry ? styles.summaryAttestColPrepActive : styles.summaryAttestColEmpty,
+            isReviewerRole ? styles.summaryAttestColReadonly : '',
+          ].filter(Boolean).join(' ')}
+          aria-label={preparerEntry ? `Verified by ${preparerEntry.by}` : 'Preparer verify'}
+          disabled={isReviewerRole}
+          onClick={e => {
+            e.stopPropagation()
+            if (!isReviewerRole) onTogglePreparer?.(field)
+          }}
+        >
+          {preparerEntry ? <CircleCheck size="small" /> : null}
+        </button>
+      </Tooltip>
+      <Tooltip text={reviewerCheckTooltip(reviewerEntry)} placement="top">
+        <button
+          type="button"
+          className={[
+            styles.summaryAttestCol,
+            reviewerEntry ? styles.summaryAttestColRevActive : styles.summaryAttestColEmpty,
+            !isReviewerRole ? styles.summaryAttestColReadonly : '',
+          ].filter(Boolean).join(' ')}
+          aria-label={reviewerEntry ? `Confirmed by ${reviewerEntry.by}` : 'Reviewer confirm'}
+          disabled={!isReviewerRole}
+          onClick={e => {
+            e.stopPropagation()
+            if (isReviewerRole) onToggleReviewer?.(field)
+          }}
+        >
+          {reviewerEntry ? <CircleCheck size="small" /> : null}
+        </button>
+      </Tooltip>
+    </div>
+  )
 }
 
 interface LeftPanel1040Props {
@@ -712,11 +769,8 @@ export default function LeftPanel1040({
       reviewerEntry,
       needsReconfirm,
       isReviewerActor,
-      actorHasSlot: isChecked,
       hasAnyCheck,
       hasDualCheck,
-      trail: checkTrail,
-      tooltip: dualCheckTooltip,
     } = checkState
     const isReviewerCheck  = isReviewerActor && !!reviewerEntry && !checkEntry
     const isDualCheck      = hasDualCheck
@@ -724,8 +778,7 @@ export default function LeftPanel1040({
     const isPopoverOpen    = !!field && popoverField === field
     const yoy              = field ? YOY[field] : undefined
     const clickable        = !!field
-    // Show check button on hover for any field with a value (kind set means it has data)
-    const showCheckBtn     = !!field && !!kind && !!value && isHovered
+    const showAttest       = !!field && !!kind && (togglePreparer || toggleReviewer)
     const isDimmed =
       !!focusFields && focusFields.size > 0 && !!field && !focusFields.has(field)
 
@@ -769,14 +822,6 @@ export default function LeftPanel1040({
       value === undefined ? styles.valueBoxEmpty    : '',
       isOrangeSelected    ? styles.valueBoxSelected : '',
       isBlueSelected      ? styles.valueBoxSelectedBlue : '',
-      isReviewed && !isSelected ? styles.valueBoxReviewed : '',
-      hasAnyCheck && !isReviewed && !isSelected
-        ? (isDualCheck
-          ? styles.valueBoxCheckedDual
-          : isReviewerCheck || (isReviewerActor && !!reviewerEntry && !checkEntry)
-            ? styles.valueBoxCheckedReviewer
-            : styles.valueBoxChecked)
-        : '',
       isCommentOpen && !isSelected ? styles.valueBoxCommentOpen : '',
     ].filter(Boolean).join(' ')
 
@@ -786,14 +831,6 @@ export default function LeftPanel1040({
       kind === 'source' ? styles.valueNumSource : '',
       isOrangeSelected  ? styles.valueNumSelected   : '',
       isBlueSelected    ? styles.valueNumSelectedBlue : '',
-      isReviewed && !isSelected ? styles.valueNumReviewed : '',
-      hasAnyCheck && !isReviewed && !isSelected
-        ? (isDualCheck
-          ? styles.valueNumCheckedDual
-          : isReviewerCheck || (isReviewerActor && !!reviewerEntry && !checkEntry)
-            ? styles.valueNumCheckedReviewer
-            : styles.valueNumChecked)
-        : '',
     ].filter(Boolean).join(' ')
 
     return (
@@ -823,38 +860,23 @@ export default function LeftPanel1040({
         <td className={styles.cellValue}>
           <div className={styles.cellValueInner}>
             <div className={valueCellCls}>
-              {/* AI-reviewed check — left side of value box */}
-              {isReviewed && (
-                <span className={styles.reviewedIcon}><CircleCheck size="small" /></span>
-              )}
-              {/* User check — inside value box; dual trail when both actors checked */}
-              {hasAnyCheck && !isReviewed && (
-                <span
-                  className={
-                    isDualCheck
-                      ? styles.checkedIconDual
-                      : isReviewerCheck || (isReviewerActor && !!reviewerEntry)
-                        ? styles.checkedIconReviewer
-                        : styles.checkedIcon
-                  }
-                  title={dualCheckTooltip || undefined}
-                >
-                  {isDualCheck ? (
-                    <span className={styles.checkTrail}>{checkTrail}</span>
-                  ) : (
-                    <CircleCheck size="small" />
-                  )}
-                </span>
-              )}
-
-              {/* The value number */}
               {value !== undefined && (
                 <span className={valueNumCls}>
                   {typeof value === 'number' ? fmt(value) : value}
                 </span>
               )}
-
             </div>
+
+            {showAttest && (
+              <AttestColumns
+                field={field!}
+                preparerEntry={checkEntry}
+                reviewerEntry={reviewerEntry}
+                isReviewerRole={isReviewerRole}
+                onTogglePreparer={togglePreparer}
+                onToggleReviewer={toggleReviewer}
+              />
+            )}
 
             {/* Info — opens FieldPopover only from this button */}
             {!!field && fieldHasPopover(field) && value !== undefined && (
@@ -875,22 +897,6 @@ export default function LeftPanel1040({
                   <CircleInfo size="small" />
                 </button>
               </Tooltip>
-            )}
-
-            {/* Check toggle — hover affordance; checked state shows inside the value box */}
-            {showCheckBtn && !isReviewed && (
-              <Tooltip
-                text={checkActionTooltip(isReviewerActor, isChecked, dualCheckTooltip)}
-                placement="top"
-              ><button
-                className={`${styles.checkBtn} ${isChecked ? styles.checkBtnActive : ''} ${isReviewerActor ? styles.checkBtnReviewer : ''} ${hasDualCheck && !isChecked ? styles.checkBtnDualPending : ''}`}
-                aria-label={isChecked
-                  ? (isReviewerActor ? `Remove confirmation for ${field}` : `Remove verification for ${field}`)
-                  : (isReviewerActor ? `Confirm ${field} for sign-off` : `Verify ${field} against source`)}
-                onClick={(e) => { e.stopPropagation(); onToggleChecked?.(field!) }}
-              >
-                <CircleCheck size="small" />
-              </button></Tooltip>
             )}
 
             {/* Comment button — outside value box, shown on hover */}
@@ -1596,7 +1602,7 @@ export default function LeftPanel1040({
               <col style={{ width: '22px' }} />
               <col style={{ width: 'auto' }} />
               <col style={{ width: '22px' }} />
-              <col style={{ width: '180px' }} />
+              <col style={{ width: '220px' }} />
             </colgroup>
             <tbody>
               <Section title="Income" />

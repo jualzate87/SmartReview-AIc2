@@ -179,7 +179,7 @@
 /* ── Column headers ── */
 .colHeaders {
   display: grid;
-  grid-template-columns: 22px 1fr 22px 180px;
+  grid-template-columns: 22px 1fr 22px minmax(180px, 220px);
   padding: 3px 0;
   background: #f7f9fb;
   border-bottom: 1px solid #d4d7dc;
@@ -344,7 +344,7 @@
 }
 
 .cellValue {
-  width: 140px;
+  width: 220px;
   padding: 4px 6px 4px 0;
   vertical-align: middle;
 }
@@ -353,12 +353,13 @@
 .valueBox {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 4px;
   padding: 2px 7px;
   border-radius: 3px;
   min-height: 22px;
   min-width: 80px;
+  flex: 1;
   border: 1px solid #e0e4e8;   /* default: plain outline for any non-empty field */
   background: #ffffff;
   transition: border-color 100ms ease, background 100ms ease;
@@ -625,7 +626,24 @@
 .cellValueInner {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+/* Prep / Rev columns on Form 1040 output rows — mirrors Return Summary */
+.formAttestGroup {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+.formAttestGroup .summaryAttestCol {
+  width: 28px;
+  height: 28px;
+}
+.formAttestGroup .summaryAttestColEmpty::after {
+  width: 18px;
+  height: 18px;
 }
 
 .commentBtn1040 {
