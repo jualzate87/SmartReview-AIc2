@@ -57,6 +57,8 @@ interface AgentReportPaneProps {
   amounts?: LiveAmounts
   /** Open an output form / schedule in the left panel (Sch C, 8960, …) */
   onOpenForm?: (formLabel: string) => void
+  /** Primary CTA when all diagnostics reviewed — opens sign-off summary */
+  onSignOff?: () => void
 }
 
 const REPORT_CARDS = [
@@ -387,6 +389,7 @@ export default function AgentReportPane({
   liveTotals,
   amounts = SEED_AMOUNTS,
   onOpenForm,
+  onSignOff,
 }: AgentReportPaneProps) {
   const live = liveTotals ?? computeLiveReturn(amounts)
   const ALL_ISSUES = buildAllIssues(live, amounts)
@@ -564,12 +567,14 @@ export default function AgentReportPane({
                 </p>
               ))}
               <div className={styles.completionActions}>
-                <p className={styles.completionBody}>
-                  Use Sign-off in the header when you are ready to finish or pass this return on.
-                </p>
-                <button className={styles.completionSecondaryBtn} onClick={() => setShowCompletion(false)}>
+                {onSignOff && (
+                  <Button priority="primary" size="medium" onClick={onSignOff}>
+                    Open sign-off summary
+                  </Button>
+                )}
+                <Button priority="secondary" size="medium" onClick={() => setShowCompletion(false)}>
                   Review again
-                </button>
+                </Button>
               </div>
             </div>
           )}

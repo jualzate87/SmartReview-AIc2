@@ -108,6 +108,8 @@ const SOURCE_PANEL_EXIT_MS = 500
 const SUMMARY_TOGGLE_MS = 500
 /** Collapsed "Show Summary" edge tab width */
 const SHOW_SUMMARY_HANDLE_WIDTH = 44
+/** Fixed width for HandoffSummary right-rail panel */
+const SUMMARY_PANEL_WIDTH = 755
 /** Hard floor for Summary so Return Breakdown labels aren’t truncated.
  *  Below this width the first column gets ellipsized (“eaten”). */
 const LEFT_PANEL_MIN_WIDTH = 795.7
@@ -149,6 +151,8 @@ export default function DataReviewPage() {
     reviewerConfirmedDocsMeta,
     reviewerConfirmStaleFields,
     toggleSummaryChecked,
+    toggleSummaryPreparerCheck,
+    toggleSummaryReviewerConfirm,
     summaryFlaggedFields,
     summaryFlaggedMeta,
     toggleSummaryFlagged,
@@ -768,6 +772,7 @@ export default function DataReviewPage() {
     setSummaryOpts(opts)
     setAgentView('idle')
     setYoyExpanded(false)
+    setRightPanelWidth(SUMMARY_PANEL_WIDTH)
     openRightPanel('summary')
   }
 
@@ -1005,7 +1010,7 @@ export default function DataReviewPage() {
 
   // Clamp Sources width when the viewport shrinks so Summary stays ≥ LEFT_PANEL_MIN_WIDTH.
   useEffect(() => {
-    if (bodyWidth <= 0 || rightPanelMode === 'closed' || rightPanelMode === 'ai') return
+    if (bodyWidth <= 0 || rightPanelMode === 'closed' || rightPanelMode === 'ai' || rightPanelMode === 'summary') return
     const maxRight = Math.max(0, bodyWidth - LEFT_PANEL_MIN_WIDTH - PANEL_DRAG_HANDLE_WIDTH)
     setRightPanelWidth((w) => Math.min(w, maxRight))
   }, [bodyWidth, rightPanelMode])
@@ -1490,6 +1495,11 @@ export default function DataReviewPage() {
             reviewerConfirmedMeta={reviewerConfirmedMeta}
             reviewerConfirmStaleFields={reviewerConfirmStaleFields}
             onToggleChecked={toggleSummaryChecked}
+            onTogglePreparerCheck={toggleSummaryPreparerCheck}
+            onToggleReviewerConfirm={toggleSummaryReviewerConfirm}
+            reviewRole={reviewRole}
+            outputFormsSignedOff={!!manualChecklistItems['output-forms-signoff']}
+            onConfirmOutputForms={() => setManualChecklistItem('output-forms-signoff', true)}
             flaggedFields={summaryFlaggedFields}
             flaggedMeta={summaryFlaggedMeta}
             onToggleFlagged={toggleSummaryFlagged}
@@ -1993,6 +2003,7 @@ export default function DataReviewPage() {
                       embedded
                       closing={agentView === 'closing'}
                       onClose={handleAgentClose}
+                      onSignOff={handleWrapUpPass}
                       onYoyToggle={setYoyExpanded}
                       onMarkReviewed={handleMarkReviewed}
                       reviewedFields={reviewedFields}

@@ -52,6 +52,14 @@ function checkActionTooltip(
     : (actorHasSlot ? 'Remove your verification' : 'Verify against source')
 }
 
+function preparerCheckTooltip(entry?: ActivityEntry | null): string {
+  return entry ? `Verified by ${entry.by} · ${entry.at}` : 'Verify against source'
+}
+
+function reviewerCheckTooltip(entry?: ActivityEntry | null): string {
+  return entry ? `Confirmed by ${entry.by} · ${entry.at}` : 'Confirm for sign-off'
+}
+
 function fieldCheckState(
   field: string | undefined,
   checkedFields: Set<string>,
@@ -103,6 +111,15 @@ interface LeftPanel1040Props {
   reviewerConfirmStaleFields?: Set<string>
   /** Toggle check/confirm for the current actor's slot */
   onToggleChecked?: (fieldName: string) => void
+  /** Toggle preparer verify slot (preparer only) */
+  onTogglePreparerCheck?: (fieldName: string) => void
+  /** Toggle reviewer confirm slot (reviewer only) */
+  onToggleReviewerConfirm?: (fieldName: string) => void
+  /** C2 review role — drives output-forms sign-off affordance */
+  reviewRole?: 'preparer' | 'reviewer'
+  /** Reviewer attestation that output forms were reviewed */
+  outputFormsSignedOff?: boolean
+  onConfirmOutputForms?: () => void
   /** Summary-row user flags — mutually exclusive with checks */
   flaggedFields?: Set<string>
   /** Who/when for currently active flags */
@@ -197,6 +214,11 @@ export default function LeftPanel1040({
   reviewerConfirmedMeta = new Map(),
   reviewerConfirmStaleFields = new Set(),
   onToggleChecked,
+  onTogglePreparerCheck,
+  onToggleReviewerConfirm,
+  reviewRole = 'preparer',
+  outputFormsSignedOff = false,
+  onConfirmOutputForms,
   flaggedFields = new Set(),
   flaggedMeta = new Map(),
   onToggleFlagged,
@@ -246,7 +268,11 @@ export default function LeftPanel1040({
   const [flagNoteAnchor, setFlagNoteAnchor] = useState<{ top: number; left: number } | null>(null)
   const flagNoteRef = useRef<HTMLDivElement>(null)
 
+  const isReviewerRole = reviewRole === 'reviewer'
+  const togglePreparer = onTogglePreparerCheck ?? onToggleChecked
+  const toggleReviewer = onToggleReviewerConfirm ?? onToggleChecked
   const outputFormId = controlledOutputFormId ?? internalOutputFormId
+
   const setOutputFormId = (id: OutputFormId) => {
     onOutputFormChange?.(id)
     if (controlledOutputFormId === undefined) setInternalOutputFormId(id)
@@ -990,6 +1016,23 @@ export default function LeftPanel1040({
             ))}
           </select>
         </CoachTip>
+        {isReviewerRole && outputFormId !== 'summary' && onConfirmOutputForms && (
+          <button
+            type="button"
+            className={`${styles.outputFormsSignoffBtn} ${outputFormsSignedOff ? styles.outputFormsSignoffBtnDone : ''}`}
+            onClick={onConfirmOutputForms}
+            disabled={outputFormsSignedOff}
+          >
+            {outputFormsSignedOff ? (
+              <>
+                <CircleCheck size="small" aria-hidden />
+                Output forms confirmed
+              </>
+            ) : (
+              'Confirm output forms'
+            )}
+          </button>
+        )}
       </div>
 
       {/* ── SUMMARY TABLE VIEW — Figma ProConnect style ── */}
@@ -1009,7 +1052,11 @@ export default function LeftPanel1040({
                 <div className={`${styles.summaryColLabel} ${styles.summaryColPrior}`}>Prior year</div>
                 <div className={`${styles.summaryColLabel} ${styles.summaryColDiff}`}>Change $</div>
                 <div className={`${styles.summaryColLabel} ${styles.summaryColPct}`}>Change %</div>
-                <div className={`${styles.summaryColLabel} ${styles.summaryColActions}`} aria-hidden="true" />
+                <div className={styles.summaryColCheckGroup} aria-hidden="true">
+                  <span className={styles.summaryColCheckSpacer} />
+                  <span className={styles.summaryColCheckLabel}>Prep</span>
+                  <span className={styles.summaryColCheckLabel}>Rev</span>
+                </div>
               </div>
             </div>
 
@@ -1304,21 +1351,42 @@ export default function LeftPanel1040({
                               ) : (
                                 <span className={styles.summaryActionBtnSlot} aria-hidden="true" />
                               )}
-                              {!!row.field && !!onToggleChecked ? (
-                                <Tooltip text={checkTooltip} placement="top">
-                                  <button
-                                    type="button"
-                                    className={`${styles.summaryActionBtn} ${isChecked ? styles.summaryActionBtnChecked : ''} ${isReviewerActor ? styles.summaryActionBtnReviewer : ''} ${hasDualCheck && !isChecked ? styles.summaryActionBtnDualPending : ''}`}
-                                    aria-label={isChecked
-                                      ? (isReviewerActor ? 'Remove confirmation' : 'Remove verification')
-                                      : (isReviewerActor ? 'Confirm for sign-off' : 'Verify against source')}
-                                    onClick={e => { e.stopPropagation(); onToggleChecked(row.field!) }}
-                                  >
-                                    <CircleCheck size="small" />
-                                  </button>
-                                </Tooltip>
+                              {!!row.field && (togglePreparer || toggleReviewer) ? (
+                                <>
+                                  <Tooltip text={preparerCheckTooltip(checkEntry)} placement="top">
+                                    <button
+                                      type="button"
+                                      className={`${styles.summaryActionBtn} ${checkEntry ? styles.summaryActionBtnChecked : ''} ${!checkEntry && isReviewerRole ? styles.summaryActionBtnReadonly : ''}`}
+                                      aria-label={checkEntry ? `Verified by ${checkEntry.by}` : 'Preparer verify'}
+                                      disabled={isReviewerRole}
+                                      onClick={e => {
+                                        e.stopPropagation()
+                                        if (!isReviewerRole && row.field) togglePreparer?.(row.field)
+                                      }}
+                                    >
+                                      {checkEntry ? <CircleCheck size="small" /> : null}
+                                    </button>
+                                  </Tooltip>
+                                  <Tooltip text={reviewerCheckTooltip(reviewerEntry)} placement="top">
+                                    <button
+                                      type="button"
+                                      className={`${styles.summaryActionBtn} ${reviewerEntry ? styles.summaryActionBtnReviewer : ''} ${!reviewerEntry && !isReviewerRole ? styles.summaryActionBtnReadonly : ''}`}
+                                      aria-label={reviewerEntry ? `Confirmed by ${reviewerEntry.by}` : 'Reviewer confirm'}
+                                      disabled={!isReviewerRole}
+                                      onClick={e => {
+                                        e.stopPropagation()
+                                        if (isReviewerRole && row.field) toggleReviewer?.(row.field)
+                                      }}
+                                    >
+                                      {reviewerEntry ? <CircleCheck size="small" /> : null}
+                                    </button>
+                                  </Tooltip>
+                                </>
                               ) : (
-                                <span className={styles.summaryActionBtnSlot} aria-hidden="true" />
+                                <>
+                                  <span className={styles.summaryActionBtnSlot} aria-hidden="true" />
+                                  <span className={styles.summaryActionBtnSlot} aria-hidden="true" />
+                                </>
                               )}
                             </div>
                           </div>

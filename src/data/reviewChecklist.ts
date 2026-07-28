@@ -13,22 +13,27 @@ import { getPhase2Progress } from '../pages/data-review/phase2FlagSync'
 import type { Note } from '../pages/data-review/NotesPane'
 import type { HandoffJump } from './handoffSnapshot'
 import {
-  isDocShownVerified,
   isVerifiedInSet,
-  normalizeVerifiedDocKey,
   PACKET_VERIFY_DOC_KEYS,
 } from './verifiedDocKeys'
 
 /** Source documents expected on a typical Jessica Drake 1040 return (verify-doc keys). */
 export const EXPECTED_SOURCE_DOCS = PACKET_VERIFY_DOC_KEYS
 
-export type ManualChecklistId = 'final-walkthrough' | 'yoy-variances'
+export type ManualChecklistId =
+  | 'final-walkthrough'
+  | 'yoy-variances'
+  | 'output-forms-signoff'
+  | 'law-compliance'
+  | 'deductions-optimization'
 
 export type ReviewChecklistItemId =
   | 'source-docs'
-  | 'preparer-notes'
-  | 'import-accuracy'
-  | 'ai-diagnostics'
+  | 'reviewed-inputs'
+  | 'reviewed-outputs'
+  | 'reviewed-notes'
+  | 'law-compliance'
+  | 'deductions-optimization'
   | 'summary-lines'
   | ManualChecklistId
 
@@ -89,6 +94,7 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
     openImportFlags.length > 0
       ? diagsOpenRaw.filter(k => k !== 'importMismatches')
       : diagsOpenRaw
+  const hasActiveDiags = p2.activeKeys.length > 0
 
   const docsMissingVerify = EXPECTED_SOURCE_DOCS.filter(
     d => !isVerifiedInSet(input.verifiedDocs, d),
@@ -123,6 +129,11 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
 
   const manual = input.manualChecklistItems
 
+  const lawComplianceManual = !hasActiveDiags
+  const lawComplianceComplete = lawComplianceManual
+    ? !!manual['law-compliance']
+    : aiComplete
+
   const items: ReviewChecklistItem[] = [
     {
       id: 'source-docs',
@@ -139,8 +150,30 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
       jumpLabel: 'View document',
     },
     {
-      id: 'preparer-notes',
-      label: 'Preparer notes reviewed',
+      id: 'reviewed-inputs',
+      label: 'Reviewed inputs',
+      description: importComplete
+        ? 'Import accuracy cleared — source docs and Phase 1 flags resolved.'
+        : `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open.`,
+      kind: 'auto',
+      required: true,
+      complete: importComplete,
+      jump: firstImportFlag ? { type: 'field', field: firstImportFlag } : undefined,
+      jumpLabel: 'View field',
+    },
+    {
+      id: 'reviewed-outputs',
+      label: 'Reviewed outputs',
+      description: 'I reviewed output forms and return summary.',
+      kind: 'manual',
+      required: true,
+      complete: !!manual['output-forms-signoff'],
+      jump: { type: 'field', field: 'wages' },
+      jumpLabel: 'View summary',
+    },
+    {
+      id: 'reviewed-notes',
+      label: 'Reviewed notes',
       description: preparerNotesComplete
         ? 'No open notes from the preparer.'
         : `${prepNotes.length} preparer note${prepNotes.length === 1 ? '' : 's'} still open.`,
@@ -155,27 +188,27 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
       jumpLabel: firstPrepNote ? 'Read note' : 'Open notes',
     },
     {
-      id: 'import-accuracy',
-      label: 'Import accuracy cleared',
-      description: importComplete
-        ? 'All Phase 1 import flags are resolved.'
-        : `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open.`,
-      kind: 'auto',
+      id: 'law-compliance',
+      label: 'Checked law compliance application',
+      description: lawComplianceManual
+        ? 'No AI diagnostics on this return — attest compliance review manually.'
+        : aiComplete
+          ? 'All active AI diagnostics have been reviewed.'
+          : `${diagsOpen.length} diagnostic${diagsOpen.length === 1 ? '' : 's'} still open.`,
+      kind: lawComplianceManual ? 'manual' : 'auto',
       required: true,
-      complete: importComplete,
-      jump: firstImportFlag ? { type: 'field', field: firstImportFlag } : undefined,
-      jumpLabel: 'View field',
+      complete: lawComplianceComplete,
+      jump: firstDiag ? { type: 'diagnostic', issueKey: firstDiag } : undefined,
+      jumpLabel: 'Open AI review',
     },
     {
-      id: 'ai-diagnostics',
-      label: 'AI diagnostics reviewed',
-      description: aiComplete
-        ? 'All active AI diagnostics have been reviewed.'
-        : `${diagsOpen.length} diagnostic${diagsOpen.length === 1 ? '' : 's'} still open.`,
-      kind: 'auto',
+      id: 'deductions-optimization',
+      label: 'Checked applied deductions and optimization',
+      description: 'Deductions, credits, and planning opportunities make sense for this client.',
+      kind: 'manual',
       required: true,
-      complete: aiComplete,
-      jump: firstDiag ? { type: 'diagnostic', issueKey: firstDiag } : undefined,
+      complete: !!manual['deductions-optimization'],
+      jump: { type: 'diagnostic', issueKey: 'optItemize' },
       jumpLabel: 'Open AI review',
     },
     {
@@ -203,7 +236,7 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
     {
       id: 'yoy-variances',
       label: 'Year-over-year variances reviewed',
-      description: 'Material YoY changes make sense for this client.',
+      description: 'Material YoY changes make sense for this client (optional).',
       kind: 'manual',
       required: false,
       complete: !!manual['yoy-variances'],

@@ -521,18 +521,14 @@ export function useSyncedReviewState() {
   /** Toggle Summary check/confirm — preparer vs reviewer slot based on current actor */
   const toggleSummaryChecked = (fieldName: string) => {
     if (isReviewerActor()) {
-      const nextConfirmed = new Map(stateRef.current.reviewerConfirmedFieldsList)
-      if (nextConfirmed.has(fieldName)) nextConfirmed.delete(fieldName)
-      else nextConfirmed.set(fieldName, nowEntry())
-      const nextStale = nextConfirmed.has(fieldName)
-        ? clearStaleMarker(stateRef.current.reviewerConfirmStaleFieldsList, fieldName)
-        : stateRef.current.reviewerConfirmStaleFieldsList
-      update({
-        reviewerConfirmedFieldsList: Array.from(nextConfirmed.entries()),
-        reviewerConfirmStaleFieldsList: nextStale,
-      })
-      return
+      toggleSummaryReviewerConfirm(fieldName)
+    } else {
+      toggleSummaryPreparerCheck(fieldName)
     }
+  }
+
+  const toggleSummaryPreparerCheck = (fieldName: string) => {
+    if (isReviewerActor()) return
 
     const nextChecked = new Map(stateRef.current.summaryCheckedFieldsList)
     const nextFlagged = new Map(stateRef.current.summaryFlaggedFieldsList)
@@ -540,11 +536,26 @@ export function useSyncedReviewState() {
       nextChecked.delete(fieldName)
     } else {
       nextChecked.set(fieldName, nowEntry())
-      nextFlagged.delete(fieldName) // mutual exclusion: preparer check supersedes flag
+      nextFlagged.delete(fieldName)
     }
     update({
       summaryCheckedFieldsList: Array.from(nextChecked.entries()),
       summaryFlaggedFieldsList: Array.from(nextFlagged.entries()),
+    })
+  }
+
+  const toggleSummaryReviewerConfirm = (fieldName: string) => {
+    if (!isReviewerActor()) return
+
+    const nextConfirmed = new Map(stateRef.current.reviewerConfirmedFieldsList)
+    if (nextConfirmed.has(fieldName)) nextConfirmed.delete(fieldName)
+    else nextConfirmed.set(fieldName, nowEntry())
+    const nextStale = nextConfirmed.has(fieldName)
+      ? clearStaleMarker(stateRef.current.reviewerConfirmStaleFieldsList, fieldName)
+      : stateRef.current.reviewerConfirmStaleFieldsList
+    update({
+      reviewerConfirmedFieldsList: Array.from(nextConfirmed.entries()),
+      reviewerConfirmStaleFieldsList: nextStale,
     })
   }
 
@@ -707,6 +718,8 @@ export function useSyncedReviewState() {
     reviewerConfirmedMeta: reviewerConfirmedFields,
     reviewerConfirmStaleFields: reviewerConfirmStaleKeys,
     toggleSummaryChecked,
+    toggleSummaryPreparerCheck,
+    toggleSummaryReviewerConfirm,
     /** Set of flagged summary field keys (presence) */
     summaryFlaggedFields: summaryFlaggedKeys,
     summaryFlaggedMeta: summaryFlaggedFields,

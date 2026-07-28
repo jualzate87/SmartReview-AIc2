@@ -968,7 +968,56 @@
 .summaryColPrior { width: 80px; }
 .summaryColDiff { width: 72px; }
 .summaryColPct { width: 52px; }
-.summaryColActions { width: 96px; }
+.summaryColCheckGroup {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 130px;
+  flex-shrink: 0;
+}
+/* Align Prep/Rev headers with the last two action slots (after comment + flag) */
+.summaryColCheckSpacer {
+  width: 62px; /* 28px + 6px gap + 28px */
+  flex-shrink: 0;
+}
+.summaryColCheckLabel {
+  width: 28px;
+  text-align: center;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.outputFormsSignoffBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  border: 1px solid var(--color-divider-tertiary);
+  border-radius: 6px;
+  padding: 6px 12px;
+  background: var(--color-container-background-primary);
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-action-standard);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.outputFormsSignoffBtn:hover:not(:disabled) {
+  border-color: var(--color-action-standard);
+  background: #eef5fb;
+}
+.outputFormsSignoffBtnDone {
+  border-color: #205ea3;
+  color: #205ea3;
+  background: #eef5fb;
+  cursor: default;
+}
 
 .summaryBody {
   border-top: 1px solid #f1f3f7;
@@ -1097,13 +1146,13 @@
   flex-shrink: 0;
 }
 
-/* End-of-row actions: comment + flag + check — equal-size icon buttons */
+/* End-of-row actions: comment + flag + prep check + rev check */
 .summaryRowEndActions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  width: 96px; /* 3 × 28px + 2 × 6px gap — always reserved */
+  width: 130px; /* 4 × 28px + 3 × 6px gap */
   flex-shrink: 0;
 }
 
@@ -1145,6 +1194,15 @@
 }
 .summaryActionBtnDualPending {
   border-style: dashed;
+}
+.summaryActionBtnReadonly {
+  opacity: 0.45;
+  cursor: default;
+}
+.summaryActionBtnReadonly:hover {
+  background: var(--color-container-background-primary, #ffffff);
+  border-color: var(--color-border-secondary, #c3ced5);
+  color: var(--color-text-secondary, #6b6c72);
 }
 .summarySubRowCheckedDual {
   border-left: 3px solid var(--color-action-success, #00856d);

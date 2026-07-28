@@ -51,6 +51,23 @@
   color: #1a6b35;
 }
 
+.confirmedBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-family-component) !important;
+  font-size: 13px;
+  font-weight: 500;
+  color: #205ea3;
+}
+
+.verifyStatusGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .addNoteBtn {
   background: none;
   border: none;

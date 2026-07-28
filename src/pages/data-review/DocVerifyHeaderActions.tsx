@@ -40,15 +40,12 @@ export default function DocVerifyHeaderActions({
   const isReviewerActor = getReviewActor() === REVIEWER_NAME
   const preparerMeta = getVerifiedDocEntry(verifiedDocsMeta, docKey)
   const reviewerMeta = getVerifiedDocEntry(reviewerConfirmedDocsMeta, docKey)
-  const dualDocTooltip = formatDualCheckTooltip(preparerMeta, reviewerMeta)
-  const verifiedTooltip = dualDocTooltip
-    || (preparerMeta ? `Verified · ${preparerMeta.by} · ${preparerMeta.at}` : 'Click to unmark verified')
-  const showVerifiedBadge = isPreparerVerified || isReviewerConfirmed
-  const badgeLabel = isPreparerVerified && isReviewerConfirmed
-    ? 'Verified · Confirmed'
-    : isReviewerConfirmed
-      ? 'Confirmed'
-      : 'Verified'
+  const preparerTooltip = preparerMeta
+    ? `Verified by ${preparerMeta.by} · ${preparerMeta.at}`
+    : 'Click to unmark verified'
+  const reviewerTooltip = reviewerMeta
+    ? `Confirmed by ${reviewerMeta.by} · ${reviewerMeta.at}`
+    : 'Click to remove confirmation'
 
   const handleMarkClick = () => {
     onVerifyDoc?.(docKey)
@@ -56,28 +53,40 @@ export default function DocVerifyHeaderActions({
   }
 
   return (
-    <>
-      {showVerifiedBadge ? (
-        <Tooltip text={verifiedTooltip} placement="top">
+    <div className={styles.verifyStatusGroup}>
+      {isPreparerVerified ? (
+        <Tooltip text={preparerTooltip} placement="top">
           <button
             type="button"
             className={styles.verifiedBadge}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 4, display: 'flex', alignItems: 'center' }}
-            onClick={() => onVerifyDoc?.(docKey)}
+            onClick={() => !isReviewerActor && onVerifyDoc?.(docKey)}
           >
-            <CheckIcon size={14} /> {badgeLabel}
+            <CheckIcon size={14} /> Verified by {preparerMeta?.by ?? 'preparer'}
           </button>
         </Tooltip>
-      ) : (
+      ) : !isReviewerActor ? (
         <button type="button" className={styles.markVerifiedBtn} onClick={handleMarkClick}>
-          {isReviewerActor ? 'Confirm document' : 'Mark as verified'}
+          Mark as verified
         </button>
-      )}
-      {isReviewerActor && isPreparerVerified && !isReviewerConfirmed && (
+      ) : null}
+
+      {isReviewerConfirmed ? (
+        <Tooltip text={reviewerTooltip} placement="top">
+          <button
+            type="button"
+            className={styles.confirmedBadge}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 4, display: 'flex', alignItems: 'center' }}
+            onClick={() => isReviewerActor && onVerifyDoc?.(docKey)}
+          >
+            <CheckIcon size={14} /> Confirmed by {reviewerMeta?.by ?? 'reviewer'}
+          </button>
+        </Tooltip>
+      ) : isReviewerActor && isPreparerVerified ? (
         <button type="button" className={styles.markVerifiedBtn} onClick={() => onVerifyDoc?.(docKey)}>
           Confirm for sign-off
         </button>
-      )}
-    </>
+      ) : null}
+    </div>
   )
 }

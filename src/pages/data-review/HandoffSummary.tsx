@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode, Fragment } from 'react'
+import { PREPARER_NAME, REVIEWER_NAME } from '../../hooks/useSyncedReviewState'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
 import { Badge, NumericBadge } from '@ids-ts/badge'
@@ -77,6 +78,31 @@ function CountBadge({
   )
 }
 
+/** Bold names, counts, Pass N, and key phrases in narrative paragraphs */
+function isStoryEmphasis(part: string, actorLabel: string): boolean {
+  if (/^\d+$/.test(part)) return true
+  if (/^Pass [12]$/.test(part)) return true
+  return part === PREPARER_NAME || part === REVIEWER_NAME || part === actorLabel
+}
+
+function renderStoryParagraph(text: string, actorLabel: string): ReactNode {
+  const names = [PREPARER_NAME, REVIEWER_NAME, actorLabel]
+    .filter((n, i, a) => a.indexOf(n) === i)
+    .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const pattern = new RegExp(
+    `(\\b(?:${names.join('|')})\\b|\\bPass [12]\\b|\\d+)`,
+    'g',
+  )
+  const parts = text.split(pattern)
+  return parts.map((part, i) => {
+    if (!part) return null
+    if (isStoryEmphasis(part, actorLabel)) {
+      return <strong key={i}>{part}</strong>
+    }
+    return <Fragment key={i}>{part}</Fragment>
+  })
+}
+
 function ItemRow({
   item,
   itemKey,
@@ -92,19 +118,21 @@ function ItemRow({
       id={item.id ? `handoff-open-${item.id}` : undefined}
       className={styles.item}
     >
-      <div className={styles.itemText}>
-        <span className={styles.itemLabel}>{item.label}</span>
-        {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}
+      <div className={styles.itemMain}>
+        <div className={styles.itemText}>
+          <span className={styles.itemLabel}>{item.label}</span>
+          {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}
+        </div>
+        {item.jump && onJump && (
+          <button
+            type="button"
+            className={styles.checklistJumpBtn}
+            onClick={() => onJump(item.jump!)}
+          >
+            {item.jumpLabel ?? jumpActionLabel(item.jump)}
+          </button>
+        )}
       </div>
-      {item.jump && onJump && (
-        <button
-          type="button"
-          className={styles.jumpBtn}
-          onClick={() => onJump(item.jump!)}
-        >
-          {item.jumpLabel ?? jumpActionLabel(item.jump)}
-        </button>
-      )}
     </li>
   )
 }
@@ -165,23 +193,25 @@ function ChecklistRow({
 
   return (
     <li className={`${styles.checklistItem} ${item.complete ? styles.checklistItemComplete : ''}`}>
-      <div className={styles.checklistCheck}>
-        <Checkbox
-          checked={item.complete}
-          disabled={isAuto}
-          onChange={canToggle ? (e) => onToggle!(item.id, e.target.checked) : undefined}
-          size="small"
-        >
-          {item.label}
-        </Checkbox>
+      <div className={styles.checklistItemRow}>
+        <div className={styles.checklistCheck}>
+          <Checkbox
+            checked={item.complete}
+            disabled={isAuto}
+            onChange={canToggle ? (e) => onToggle!(item.id, e.target.checked) : undefined}
+            size="small"
+          >
+            {item.label}
+          </Checkbox>
+        </div>
+        {item.jump && onJump && !item.complete && (
+          <button type="button" className={styles.checklistJumpBtn} onClick={() => onJump(item.jump!)}>
+            {item.jumpLabel ?? 'View'}
+          </button>
+        )}
       </div>
       {item.description && (
         <p className={styles.checklistDesc}>{item.description}</p>
-      )}
-      {item.jump && onJump && !item.complete && (
-        <button type="button" className={styles.jumpBtn} onClick={() => onJump(item.jump!)}>
-          {item.jumpLabel ?? 'View'}
-        </button>
       )}
     </li>
   )
@@ -343,7 +373,7 @@ export default function HandoffSummary({
       {snapshot.story.length > 0 && (
         <div className={styles.story}>
           {snapshot.story.map((para, i) => (
-            <p key={i} className={styles.storyPara}>{para}</p>
+            <p key={i} className={styles.storyPara}>{renderStoryParagraph(para, snapshot.actorLabel)}</p>
           ))}
         </div>
       )}
