@@ -179,7 +179,7 @@
 /* ── Column headers ── */
 .colHeaders {
   display: grid;
-  grid-template-columns: 22px 1fr 22px minmax(180px, 220px);
+  grid-template-columns: 22px 1fr 22px minmax(220px, 280px);
   padding: 3px 0;
   background: #f7f9fb;
   border-bottom: 1px solid #d4d7dc;
@@ -209,6 +209,53 @@
   letter-spacing: 0.5px;
   padding: 2px 8px;
   text-align: right;
+}
+
+/* Amount + Prep/Rev column header (schedule / form output tables) */
+.colValWithAttest {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 2px 8px;
+  min-width: 0;
+}
+
+.colValAmount {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: right;
+}
+
+.colValAttestGroup {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.colValAttestLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.lineNote {
+  display: block;
+  font-size: 11px;
+  color: #6b6c72;
+  font-weight: 400;
 }
 
 /* ── Main table ── */
@@ -638,12 +685,12 @@
   flex-shrink: 0;
 }
 .formAttestGroup .summaryAttestCol {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
 }
 .formAttestGroup .summaryAttestColEmpty::after {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .commentBtn1040 {

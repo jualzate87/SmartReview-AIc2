@@ -25,6 +25,7 @@ import {
   type ActivityEntry,
 } from '../../hooks/useSyncedReviewState'
 import { PRIOR_YEAR_1040_VALUES, buildYoyMap, yoyPercent } from './priorYear1040Data'
+import AttestColumns, { preparerCheckTooltip, reviewerCheckTooltip } from './AttestColumns'
 import OutputFormViews from './OutputFormViews'
 import { OUTPUT_FORM_OPTIONS, type OutputFormId } from './outputForms'
 import styles from '../../styles/data-review/LeftPanel1040.module.css'
@@ -49,14 +50,6 @@ function checkActionTooltip(
   return actorIsReviewer
     ? (actorHasSlot ? 'Remove your confirmation' : 'Confirm for sign-off')
     : (actorHasSlot ? 'Remove your verification' : 'Verify against source')
-}
-
-function preparerCheckTooltip(entry?: ActivityEntry | null): string {
-  return entry ? `Verified by ${entry.by} · ${entry.at}` : 'Verify against source'
-}
-
-function reviewerCheckTooltip(entry?: ActivityEntry | null): string {
-  return entry ? `Confirmed by ${entry.by} · ${entry.at}` : 'Confirm for sign-off'
 }
 
 function fieldCheckState(
@@ -85,65 +78,6 @@ function fieldCheckState(
     hasDualCheck,
     tooltip: formatDualCheckTooltip(preparerEntry, reviewerEntry),
   }
-}
-
-/** Prep / Rev attest slots — same pattern as Return Summary rows */
-function AttestColumns({
-  field,
-  preparerEntry,
-  reviewerEntry,
-  isReviewerRole,
-  onTogglePreparer,
-  onToggleReviewer,
-}: {
-  field: string
-  preparerEntry?: ActivityEntry
-  reviewerEntry?: ActivityEntry
-  isReviewerRole: boolean
-  onTogglePreparer?: (fieldName: string) => void
-  onToggleReviewer?: (fieldName: string) => void
-}) {
-  if (!onTogglePreparer && !onToggleReviewer) return null
-  return (
-    <div className={styles.formAttestGroup}>
-      <Tooltip text={preparerCheckTooltip(preparerEntry)} placement="top">
-        <button
-          type="button"
-          className={[
-            styles.summaryAttestCol,
-            preparerEntry ? styles.summaryAttestColPrepActive : styles.summaryAttestColEmpty,
-            isReviewerRole ? styles.summaryAttestColReadonly : '',
-          ].filter(Boolean).join(' ')}
-          aria-label={preparerEntry ? `Verified by ${preparerEntry.by}` : 'Preparer verify'}
-          disabled={isReviewerRole}
-          onClick={e => {
-            e.stopPropagation()
-            if (!isReviewerRole) onTogglePreparer?.(field)
-          }}
-        >
-          {preparerEntry ? <CircleCheck size="small" /> : null}
-        </button>
-      </Tooltip>
-      <Tooltip text={reviewerCheckTooltip(reviewerEntry)} placement="top">
-        <button
-          type="button"
-          className={[
-            styles.summaryAttestCol,
-            reviewerEntry ? styles.summaryAttestColRevActive : styles.summaryAttestColEmpty,
-            !isReviewerRole ? styles.summaryAttestColReadonly : '',
-          ].filter(Boolean).join(' ')}
-          aria-label={reviewerEntry ? `Confirmed by ${reviewerEntry.by}` : 'Reviewer confirm'}
-          disabled={!isReviewerRole}
-          onClick={e => {
-            e.stopPropagation()
-            if (isReviewerRole) onToggleReviewer?.(field)
-          }}
-        >
-          {reviewerEntry ? <CircleCheck size="small" /> : null}
-        </button>
-      </Tooltip>
-    </div>
-  )
 }
 
 interface LeftPanel1040Props {
@@ -1518,6 +1452,14 @@ export default function LeftPanel1040({
             formId={outputFormId}
             live={originTotals}
             amounts={liveAmounts}
+            checkedFields={checkedFields}
+            checkedMeta={checkedMeta}
+            reviewerConfirmedFields={reviewerConfirmedFields}
+            reviewerConfirmedMeta={reviewerConfirmedMeta}
+            reviewerConfirmStaleFields={reviewerConfirmStaleFields}
+            reviewRole={reviewRole}
+            onTogglePreparerCheck={togglePreparer}
+            onToggleReviewerConfirm={toggleReviewer}
             onNavigateSource={onNavigateSource}
             onNavigateToSourceDoc={onNavigateToSourceDoc}
           />
@@ -1581,7 +1523,13 @@ export default function LeftPanel1040({
             <div className={styles.colLine} />
             <div className={styles.colDesc}>Description</div>
             <div className={styles.colLineR} />
-            <div className={styles.colVal}>Amount</div>
+            <div className={styles.colValWithAttest}>
+              <span className={styles.colValAmount}>Amount</span>
+              <span className={styles.colValAttestGroup} aria-hidden="true">
+                <span className={styles.colValAttestLabel}>Prep</span>
+                <span className={styles.colValAttestLabel}>Rev</span>
+              </span>
+            </div>
           </div>
 
           {/* ── Field legend ── */}

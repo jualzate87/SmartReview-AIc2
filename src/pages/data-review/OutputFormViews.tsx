@@ -5,7 +5,9 @@ import type { LiveAmounts, LiveReturnTotals } from '../../data/liveReturn'
 import { NIIT_AGI_THRESHOLD, SAFE_HARBOR_2210 } from '../../data/liveReturn'
 import { CLIENT_ADDRESS, formatClientCityStateZip } from '../../data/clientAddress'
 import { getScheduleLineFlyout } from '../../data/scheduleFieldOrigins'
-import type { OutputFormId } from './outputForms'
+import type { ActivityEntry } from '../../hooks/useSyncedReviewState'
+import AttestColumns from './AttestColumns'
+import { getOutputLineAttest, type OutputFormId } from './outputForms'
 import TaxControlDocPopover from './TaxControlDocPopover'
 import Tooltip from './Tooltip'
 import styles from '../../styles/data-review/LeftPanel1040.module.css'
@@ -60,7 +62,18 @@ function TaxpayerStrip({ ssn }: { ssn: string }) {
   )
 }
 
-type LineRowProps = {
+type AttestContext = {
+  checkedFields: Set<string>
+  checkedMeta: Map<string, ActivityEntry>
+  reviewerConfirmedFields: Set<string>
+  reviewerConfirmedMeta: Map<string, ActivityEntry>
+  reviewerConfirmStaleFields: Set<string>
+  isReviewerRole: boolean
+  onTogglePreparer?: (fieldName: string) => void
+  onToggleReviewer?: (fieldName: string) => void
+}
+
+type LineRowProps = AttestContext & {
   line: string
   label: string
   value: string | number
@@ -89,21 +102,57 @@ function LineRow({
   amounts,
   openFieldId,
   onOpenFlyout,
+  checkedFields,
+  checkedMeta,
+  reviewerConfirmedFields,
+  reviewerConfirmedMeta,
+  reviewerConfirmStaleFields,
+  isReviewerRole,
+  onTogglePreparer,
+  onToggleReviewer,
 }: LineRowProps) {
   const display = typeof value === 'number' ? fmt(value) : value
   const flyout = getScheduleLineFlyout(formId, fieldId, live, amounts)
   const hasFlyout = !!flyout
   const isOpen = openFieldId === fieldId
+  const attest = getOutputLineAttest(fieldId, kind)
+  const attestKey = attest?.fieldKey
+  const preparerEntry = attestKey && checkedFields.has(attestKey) ? checkedMeta.get(attestKey) : undefined
+  const reviewerEntry =
+    attestKey && reviewerConfirmedFields.has(attestKey)
+      ? reviewerConfirmedMeta.get(attestKey)
+      : undefined
+  const needsReconfirm = !!attestKey && reviewerConfirmStaleFields.has(attestKey) && !!preparerEntry
+  const hasAnyCheck = !!(preparerEntry || reviewerEntry)
+  const hasDualCheck = !!(preparerEntry && reviewerEntry)
+  const showAttest =
+    !!attest &&
+    !!attestKey &&
+    (onTogglePreparer || onToggleReviewer)
 
   const openFromRow = (rowEl: HTMLElement) => {
     if (!hasFlyout) return
     onOpenFlyout(fieldId, rowEl)
   }
 
+  const rowCls = [
+    styles.row,
+    bold ? styles.rowBold : '',
+    hasFlyout ? styles.rowClickable : '',
+    hasAnyCheck
+      ? hasDualCheck
+        ? styles.rowCheckedDual
+        : reviewerEntry && !preparerEntry
+          ? styles.rowCheckedReviewer
+          : styles.rowChecked
+      : '',
+    needsReconfirm ? styles.rowNeedsReconfirm : '',
+  ].filter(Boolean).join(' ')
+
   return (
     <tr
-      className={`${styles.row} ${bold ? styles.rowBold : ''} ${hasFlyout ? styles.rowClickable : ''}`}
-      data-field-row={hasFlyout ? fieldId : undefined}
+      className={rowCls}
+      data-field-row={attestKey ?? (hasFlyout ? fieldId : undefined)}
       onMouseDown={hasFlyout ? e => e.stopPropagation() : undefined}
       onClick={hasFlyout ? e => openFromRow(e.currentTarget) : undefined}
       style={hasFlyout ? { cursor: 'pointer' } : undefined}
@@ -113,8 +162,13 @@ function LineRow({
         <div className={styles.cellLabelInner}>
           {label}
           {note ? (
-            <span style={{ display: 'block', fontSize: 11, color: '#6b6c72', fontWeight: 400 }}>{note}</span>
+            <span className={styles.lineNote}>{note}</span>
           ) : null}
+          {needsReconfirm && (
+            <span className={styles.reconfirmBadge} title="Preparer verified, then value was edited — confirm again for sign-off">
+              Edited since verify — confirm again
+            </span>
+          )}
         </div>
       </td>
       <td className={styles.cellLineRight}>{line}</td>
@@ -127,6 +181,19 @@ function LineRow({
               {display}
             </span>
           </div>
+
+          {showAttest && (
+            <AttestColumns
+              field={attestKey}
+              preparerEntry={preparerEntry}
+              reviewerEntry={reviewerEntry}
+              isReviewerRole={isReviewerRole}
+              onTogglePreparer={onTogglePreparer}
+              onToggleReviewer={onToggleReviewer}
+              interactive={attest.toggleable}
+            />
+          )}
+
           {hasFlyout && (
             <Tooltip
               text={kind === 'calc' ? 'Click row or icon to view subtotals' : 'Click row or icon to view sources'}
@@ -159,7 +226,13 @@ function FormTable({ children }: { children: React.ReactNode }) {
         <div className={styles.colLine} />
         <div className={styles.colDesc}>Description</div>
         <div className={styles.colLineR} />
-        <div className={styles.colVal}>Amount</div>
+        <div className={styles.colValWithAttest}>
+          <span className={styles.colValAmount}>Amount</span>
+          <span className={styles.colValAttestGroup} aria-hidden="true">
+            <span className={styles.colValAttestLabel}>Prep</span>
+            <span className={styles.colValAttestLabel}>Rev</span>
+          </span>
+        </div>
       </div>
       <div className={styles.legend}>
         <span className={styles.legendItem}>
@@ -701,10 +774,18 @@ function Form2210View({ live, ssn, ...row }: { live: LiveReturnTotals; ssn: stri
   )
 }
 
-interface OutputFormViewsProps {
+export interface OutputFormViewsProps {
   formId: OutputFormId
   live: LiveReturnTotals
   amounts: LiveAmounts
+  checkedFields?: Set<string>
+  checkedMeta?: Map<string, ActivityEntry>
+  reviewerConfirmedFields?: Set<string>
+  reviewerConfirmedMeta?: Map<string, ActivityEntry>
+  reviewerConfirmStaleFields?: Set<string>
+  reviewRole?: 'preparer' | 'reviewer'
+  onTogglePreparerCheck?: (fieldName: string) => void
+  onToggleReviewerConfirm?: (fieldName: string) => void
   onNavigateSource?: (source: FieldOriginSource) => void
   onNavigateToSourceDoc?: (docId: string) => void
 }
@@ -714,12 +795,21 @@ export default function OutputFormViews({
   formId,
   live,
   amounts,
+  checkedFields = new Set(),
+  checkedMeta = new Map(),
+  reviewerConfirmedFields = new Set(),
+  reviewerConfirmedMeta = new Map(),
+  reviewerConfirmStaleFields = new Set(),
+  reviewRole = 'preparer',
+  onTogglePreparerCheck,
+  onToggleReviewerConfirm,
   onNavigateSource,
   onNavigateToSourceDoc,
 }: OutputFormViewsProps) {
   const ssn = live.employeeSsn || '—'
   const [flyoutField, setFlyoutField] = useState<string | null>(null)
   const [flyoutRect, setFlyoutRect] = useState<DOMRect | null>(null)
+  const isReviewerRole = reviewRole === 'reviewer'
 
   const openFlyout = (fieldId: string, el: HTMLElement) => {
     if (flyoutField === fieldId) {
@@ -727,7 +817,6 @@ export default function OutputFormViews({
       setFlyoutRect(null)
       return
     }
-    // Prefer amount cell when opening from the full row
     const rowEl = el.closest('tr') ?? el
     const cells = rowEl instanceof HTMLTableRowElement ? rowEl.querySelectorAll('td') : null
     const valueCell = cells?.[cells.length - 1] as HTMLElement | undefined
@@ -750,6 +839,14 @@ export default function OutputFormViews({
     amounts,
     openFieldId: flyoutField,
     onOpenFlyout: openFlyout,
+    checkedFields,
+    checkedMeta,
+    reviewerConfirmedFields,
+    reviewerConfirmedMeta,
+    reviewerConfirmStaleFields,
+    isReviewerRole,
+    onTogglePreparer: onTogglePreparerCheck,
+    onToggleReviewer: onToggleReviewerConfirm,
   }
 
   let body: React.ReactNode = null
