@@ -86,7 +86,7 @@ export function buildTabConfirmStatus(args: {
     )
     if (statuses.every(s => s === 'confirmed')) {
       out[tabKey] = 'confirmed'
-    } else {
+    } else if (statuses.some(s => s === 'needs-confirm')) {
       out[tabKey] = 'needs-confirm'
     }
   }

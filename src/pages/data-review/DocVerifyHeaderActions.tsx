@@ -5,6 +5,8 @@ import {
   type ActivityEntry,
 } from '../../hooks/useSyncedReviewState'
 import Tooltip from './Tooltip'
+import { Badge } from '@ids-ts/badge'
+import '@ids-ts/badge/dist/main.css'
 import { getVerifiedDocEntry, isVerifiedInSet } from '../../data/verifiedDocKeys'
 import styles from '../../styles/data-review/DetailFields.module.css'
 
@@ -83,8 +85,10 @@ export default function DocVerifyHeaderActions({
           </button>
         </Tooltip>
       ) : isReviewerActor && isPreparerVerified ? (
-        <button type="button" className={styles.needsConfirmBadge} onClick={() => onVerifyDoc?.(docKey)}>
-          Needs confirmation
+        <button type="button" className={styles.needsConfirmBtn} onClick={() => onVerifyDoc?.(docKey)}>
+          <Badge status="warning" priority="secondary" capitalization="sentence">
+            Needs confirmation
+          </Badge>
         </button>
       ) : null}
     </div>

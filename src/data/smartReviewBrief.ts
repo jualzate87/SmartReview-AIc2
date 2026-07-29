@@ -394,6 +394,21 @@ function countActivityEntries(snapshot: HandoffSnapshot): {
   }
 }
 
+function getPass2OpenStats(snapshot: HandoffSnapshot): {
+  openImportFlags: number
+  unverifiedDocs: number
+  openDiags: number
+  openNotes: number
+} {
+  const openGroups = getOpenGroups(snapshot)
+  return {
+    openImportFlags: openGroups.find(g => g.id === 'import-flags')?.count ?? 0,
+    unverifiedDocs: openGroups.find(g => g.id === 'unverified-docs')?.count ?? 0,
+    openDiags: openGroups.find(g => g.id === 'ai-diagnostics')?.count ?? 0,
+    openNotes: openGroups.find(g => g.id === 'notes')?.count ?? 0,
+  }
+}
+
 function buildExecutiveBrief(
   snapshot: HandoffSnapshot,
   preparerFirst: string,
@@ -404,6 +419,96 @@ function buildExecutiveBrief(
   milestoneState?: MilestoneState,
 ): SmartReviewBrief['executiveBrief'] {
   const reviewerFirst = firstName(REVIEWER_NAME)
+
+  if (reviewPass === 2) {
+    const stats = getPass2OpenStats(snapshot)
+    const completedItems: ConversationalBriefItem[] = []
+
+    if (stats.openImportFlags === 0) {
+      completedItems.push(briefItem('flags', [{ text: 'She cleared all import flags.' }]))
+    } else {
+      completedItems.push(
+        briefItem('flags', [
+          { text: 'She left ' },
+          { text: String(stats.openImportFlags), bold: true },
+          { text: ` import flag${stats.openImportFlags === 1 ? '' : 's'} still open.` },
+        ]),
+      )
+    }
+
+    if (stats.unverifiedDocs === 0) {
+      completedItems.push(
+        briefItem('docs', [{ text: 'She marked all source documents as reviewed.' }]),
+      )
+    } else {
+      completedItems.push(
+        briefItem('docs', [
+          { text: 'She left ' },
+          { text: String(stats.unverifiedDocs), bold: true },
+          { text: ` document${stats.unverifiedDocs === 1 ? '' : 's'} unverified.` },
+        ]),
+      )
+    }
+
+    if (stats.openDiags === 0) {
+      completedItems.push(
+        briefItem('diags', [{ text: 'She cleared all first-pass diagnostics.' }]),
+      )
+    } else {
+      completedItems.push(
+        briefItem('diags', [
+          { text: 'She left ' },
+          { text: String(stats.openDiags), bold: true },
+          { text: ` diagnostic${stats.openDiags === 1 ? '' : 's'} for your review.` },
+        ]),
+      )
+    }
+
+    if (stats.openNotes > 0) {
+      completedItems.push(briefItem('notes', [{ text: 'She left notes for your review.' }]))
+    }
+
+    const remainingMilestones = milestoneState
+      ? Math.max(0, milestoneState.requiredTotal - milestoneState.requiredCompleteCount)
+      : countStrategicProgress(phases).open
+
+    let attention: ConversationalBriefSection | null = null
+    if (remainingMilestones > 0) {
+      attention = {
+        label: 'Needs your attention',
+        items: [
+          briefItem('milestones-attest', [
+            { text: String(remainingMilestones), bold: true },
+            {
+              text: ` milestone${remainingMilestones === 1 ? '' : 's'} still need${remainingMilestones === 1 ? 's' : ''} your attestation before sign-off.`,
+            },
+          ]),
+        ],
+      }
+    } else if (!allPhasesComplete && outstandingOpenCount > 0) {
+      attention = {
+        label: 'Needs your attention',
+        items: [
+          briefItem('spot-check', [
+            { text: 'Spot-check NIIT, capital gains rate, and executive totals before sign-off.' },
+          ]),
+        ],
+      }
+    }
+
+    return {
+      reviewerFirstName: reviewerFirst,
+      heading: `${reviewerFirst}, Pass 2 review`,
+      intro: `${preparerFirst} completed the first pass.`,
+      completed: {
+        label: '',
+        items: completedItems,
+      },
+      attention,
+      syncedAt: 'Synced just now',
+    }
+  }
+
   const { checks, docCount } = countPass1Baseline(snapshot)
   const { attested, required, open } = countStrategicProgress(phases)
   const attentionCount = Math.max(open, outstandingOpenCount)
@@ -416,9 +521,7 @@ function buildExecutiveBrief(
   const heading = `${reviewerFirst}, here's where ${passLabel.toLowerCase()} stands`
 
   const intro =
-    reviewPass === 2
-      ? `You're on ${passLabel} sign-off review. Below is what's already cleared and what still needs your attestation before you approve this return.`
-      : `${preparerFirst} finished ${passLabel} and handed this return to you. Here's what's already done and what still needs your review.`
+    `${preparerFirst} finished ${passLabel} and handed this return to you. Here's what's already done and what still needs your review.`
 
   const completedItems: ConversationalBriefItem[] = []
 
@@ -543,39 +646,17 @@ function buildExecutiveBrief(
     : required - attested
 
   if (attentionCount > 0 || remainingMilestones > 0) {
-    const attentionItems: ConversationalBriefItem[] = []
-
-    if (remainingMilestones > 0) {
-      attentionItems.push(
-        briefItem('open-milestones', [
-          { text: String(remainingMilestones), bold: true },
-          {
-            text: ` milestone${remainingMilestones === 1 ? '' : 's'} still need${remainingMilestones === 1 ? 's' : ''} completion`,
-          },
-        ]),
-      )
-    }
-
-    if (attentionCount > 0 && attentionCount !== remainingMilestones) {
-      attentionItems.push(
-        briefItem('open-checklist', [
-          { text: String(attentionCount), bold: true },
-          {
-            text: ` item${attentionCount === 1 ? '' : 's'} still need${attentionCount === 1 ? 's' : ''} your review`,
-          },
-        ]),
-      )
-    }
-
-    attentionItems.push(
-      briefItem('work-phases', [
-        { text: 'Work through the milestone checklist below — start with Phase 1 client setup' },
-      ]),
-    )
-
+    const n = Math.max(remainingMilestones, attentionCount)
     attention = {
       label: 'Needs your attention',
-      items: attentionItems,
+      items: [
+        briefItem('open-items', [
+          { text: String(n), bold: true },
+          {
+            text: ` item${n === 1 ? '' : 's'} still need${n === 1 ? 's' : ''} your review — work through the checklist below.`,
+          },
+        ]),
+      ],
     }
   } else if (!allPhasesComplete) {
     attention = {

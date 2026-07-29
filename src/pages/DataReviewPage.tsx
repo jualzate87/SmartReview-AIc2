@@ -1597,6 +1597,7 @@ export default function DataReviewPage() {
             alignment="middle"
           >
             <button
+              type="button"
               className={styles.form1040Handle}
               onClick={() => {
                 if (coachTip === 'showOutputs') dismissCoachTip('showOutputs')
@@ -2157,13 +2158,19 @@ export default function DataReviewPage() {
                   reviewedFields={reviewedFields}
                   onAddFieldNote={(text, context) => handleAddNote(text, context)}
                   verifiedDocs={verifiedDocs}
+                  verifiedDocsMeta={verifiedDocsMeta}
                   onVerifyDoc={toggleVerifiedDoc}
+                  reviewerConfirmedDocs={reviewerConfirmedDocs}
+                  reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
                 />
               )}
               {activeTopTab === 'questionnaire' && (
                 <QuestionnaireResponsesPanel
                   verifiedDocs={verifiedDocs}
+                  verifiedDocsMeta={verifiedDocsMeta}
                   onVerifyDoc={toggleVerifiedDoc}
+                  reviewerConfirmedDocs={reviewerConfirmedDocs}
+                  reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
                   highlightResponseId={questionnaireHighlightId}
                 />
               )}

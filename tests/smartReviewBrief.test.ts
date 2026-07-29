@@ -77,10 +77,11 @@ describe('buildSmartReviewBrief reviewer checklist', () => {
     })
 
     expect(brief.viewMode).toBe('reviewer-strategic')
-    expect(brief.executiveBrief?.intro).toContain('Pass 2')
+    expect(brief.executiveBrief?.intro).toContain('completed the first pass')
     expect(brief.executiveBrief?.attention?.items.some(i =>
       i.parts.some(p => p.text.includes('milestone')),
     )).toBe(true)
+    expect(brief.executiveBrief?.attention?.items).toHaveLength(1)
     expect(brief.phases).toHaveLength(5)
     expect(brief.phases[0].title).toContain('Client information')
     const phase2Items = brief.phases.find(p => p.id === 'phase-2')?.items ?? []

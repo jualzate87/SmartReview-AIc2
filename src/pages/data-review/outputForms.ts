@@ -116,11 +116,11 @@ const OUTPUT_LINE_ATTEST: Record<string, OutputLineAttest | null> = {
 
   // Schedule C
   'schC-1': { fieldKey: 'otherIncome', toggleable: true },
-  'schC-2': null,
+  'schC-2': { fieldKey: 'schC-2', toggleable: true },
   'schC-3': { fieldKey: 'schC-3', toggleable: false },
-  'schC-4': null,
+  'schC-4': { fieldKey: 'schC-4', toggleable: true },
   'schC-5': { fieldKey: 'schC-5', toggleable: false },
-  'schC-8': null,
+  'schC-8': { fieldKey: 'schC-8', toggleable: true },
   'schC-18': { fieldKey: 'schC-18', toggleable: true },
   'schC-22': { fieldKey: 'schC-22', toggleable: true },
   'schC-24a': { fieldKey: 'schC-24a', toggleable: true },

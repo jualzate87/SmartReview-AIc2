@@ -50,6 +50,7 @@ export default function AttestColumns({
           aria-label={preparerEntry ? `Verified by ${preparerEntry.by}` : 'Preparer verify'}
           disabled={prepDisabled}
           onClick={e => {
+            e.preventDefault()
             e.stopPropagation()
             if (!prepDisabled) onTogglePreparer?.(field)
           }}
@@ -70,6 +71,7 @@ export default function AttestColumns({
           aria-label={reviewerEntry ? `Confirmed by ${reviewerEntry.by}` : 'Reviewer confirm'}
           disabled={revDisabled}
           onClick={e => {
+            e.preventDefault()
             e.stopPropagation()
             if (!revDisabled) onToggleReviewer?.(field)
           }}

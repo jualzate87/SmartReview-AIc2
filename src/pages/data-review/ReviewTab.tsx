@@ -1,4 +1,6 @@
 import { CircleCheck } from '@design-systems/icons'
+import { Badge } from '@ids-ts/badge'
+import '@ids-ts/badge/dist/main.css'
 import sparklesIcon from '../../assets/icons/sparkles.svg'
 import type { DocConfirmStatus } from './docReviewStatus'
 import styles from '../../styles/data-review/ReviewTab.module.css'
@@ -68,9 +70,15 @@ export default function ReviewTab({
     const confirmStatus = tabConfirmStatus?.[tabKey]
     if (confirmStatus === 'needs-confirm') {
       return (
-        <span className={styles.tabNeedsConfirmBadge} aria-label="Documents need reviewer confirmation">
+        <Badge
+          status="warning"
+          priority="secondary"
+          capitalization="sentence"
+          className={styles.tabNeedsConfirmBadge}
+          aria-label="Documents need reviewer confirmation"
+        >
           Needs confirm
-        </span>
+        </Badge>
       )
     }
     if (confirmStatus === 'confirmed') {
@@ -114,6 +122,7 @@ export default function ReviewTab({
         {TABS.map((tab) => (
           <button
             key={tab.key}
+            type="button"
             className={[
               styles.tab,
               tabConfirmStatus?.[tab.key] === 'needs-confirm' ? styles.tabNeedsConfirm : '',

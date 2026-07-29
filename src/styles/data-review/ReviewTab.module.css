@@ -190,18 +190,10 @@
 .tabNeedsConfirmBadge {
   display: inline-flex;
   align-items: center;
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 18px;
-  background: #fef3e8;
-  color: #c9500f;
-  border: 1px solid #e8a05c;
-  white-space: nowrap;
+  margin-left: var(--space-component-gap-small, 6px);
+  flex-shrink: 0;
 }
 
 .tabNeedsConfirm .tabLabelInactive {
-  color: #9a4b0a;
+  color: var(--color-text-attention, #8a6116);
 }

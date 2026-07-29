@@ -14,6 +14,7 @@ import type { LiveAmounts, LiveReturnTotals } from '../../data/liveReturn'
 import {
   SAFE_HARBOR_2210,
   SEED_AMOUNTS,
+  buildEffectiveTaxRateExplanation,
   computeEffectiveTaxRate,
   formatEffectiveTaxRate,
 } from '../../data/liveReturn'
@@ -1393,10 +1394,33 @@ export default function LeftPanel1040({
                     : null
                 const diffPos = rateDiff !== null && rateDiff > 0
                 const diffNeg = rateDiff !== null && rateDiff < 0
+                const rateExplanation = buildEffectiveTaxRateExplanation({
+                  totalTax,
+                  taxableIncome,
+                  priorTotalTax: PRIOR_YEAR.totalTax,
+                  priorTaxableIncome: PRIOR_YEAR.taxableIncome,
+                  niitTax,
+                  stdDeduction,
+                  priorStdDeduction: PRIOR_YEAR.stdDeduction,
+                  incomeTax,
+                  priorIncomeTax: PRIOR_YEAR.incomeTax,
+                })
                 return (
                   <div className={`${styles.summarySubRow} ${styles.summaryRateRow}`}>
                     <div className={styles.summaryRowLeft}>
-                      <span className={styles.summaryRateLabel}>Effective tax rate</span>
+                      <span className={styles.summaryRateLabelRow}>
+                        <span className={styles.summaryRateLabel}>Effective tax rate</span>
+                        <Tooltip text={rateExplanation} placement="top">
+                          <button
+                            type="button"
+                            className={styles.summaryInfoBtn}
+                            aria-label="Why did the effective tax rate change?"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <CircleInfo size="small" aria-hidden />
+                          </button>
+                        </Tooltip>
+                      </span>
                       <span className={styles.summaryRateSub}>Line 24 ÷ Line 15</span>
                     </div>
                     <div className={styles.summaryRowRight}>

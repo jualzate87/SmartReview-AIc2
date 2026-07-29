@@ -11,6 +11,8 @@ import WorkspacePage from './pages/WorkspacePage'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
 
+const ROUTER_BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
+
 function AppLayout() {
   return (
     <FusionShell businessName={FUSION_CONFIG.businessName}>
@@ -25,7 +27,7 @@ const APP_PAGES: { path: string; component: React.ComponentType }[] = []
 export default function App() {
   return (
     <ErrorBoundary>
-      <HashRouter>
+      <HashRouter basename={ROUTER_BASENAME}>
         <FusionProvider pathPrefix={FUSION_CONFIG.pathPrefix || ''}>
           <Routes>
             {/* SmartReview prototype — outside the QBO Fusion shell */}

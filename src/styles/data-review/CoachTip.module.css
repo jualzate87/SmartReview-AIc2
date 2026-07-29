@@ -7,6 +7,7 @@
 
 .wrapOpen {
   z-index: 6;
+  animation: coachNudge var(--duration-appear-emphasize-moderate, 700ms) var(--ease-transform-emphasize, cubic-bezier(0.35, 1.4, 0.25, 1)) 4;
 }
 
 /* Pink attention pulse — default: top-right of the control */
@@ -34,7 +35,7 @@
   inset: 0;
   border-radius: 50%;
   background: color-mix(in srgb, var(--color-pink-300, #e31c9e) 45%, transparent);
-  animation: coachPulse 1.6s ease-out infinite;
+  animation: coachPulse var(--duration-progress-moderate, 1000ms) var(--ease-appear-emphasize, cubic-bezier(0.15, 1.4, 0.25, 1)) infinite;
 }
 
 /* Position variants — dot sits outside the control on the named side */
@@ -203,5 +204,14 @@
   100% {
     transform: scale(2.1);
     opacity: 0;
+  }
+}
+
+@keyframes coachNudge {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(3px);
   }
 }

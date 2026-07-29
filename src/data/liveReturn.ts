@@ -280,6 +280,76 @@ export function formatEffectiveTaxRate(rate: number | null): string {
   return `${rate.toFixed(1)}%`
 }
 
+export type EffectiveTaxRateContext = {
+  totalTax: number
+  taxableIncome: number
+  priorTotalTax: number
+  priorTaxableIncome: number
+  niitTax?: number
+  priorNiitTax?: number
+  stdDeduction?: number
+  priorStdDeduction?: number
+  incomeTax?: number
+  priorIncomeTax?: number
+}
+
+/** Narrative explaining YoY effective-rate change for summary tooltip. */
+export function buildEffectiveTaxRateExplanation(ctx: EffectiveTaxRateContext): string {
+  const rate = computeEffectiveTaxRate(ctx.totalTax, ctx.taxableIncome)
+  const priorRate = computeEffectiveTaxRate(ctx.priorTotalTax, ctx.priorTaxableIncome)
+  if (rate === null || priorRate === null) {
+    return 'Effective tax rate is total tax (Line 24) divided by taxable income (Line 15).'
+  }
+
+  const parts: string[] = []
+  const diff = rate - priorRate
+  if (Math.abs(diff) < 0.05) {
+    parts.push(`Effective rate is about the same as last year (${formatEffectiveTaxRate(priorRate)}).`)
+  } else if (diff > 0) {
+    parts.push(
+      `Rate rose from ${formatEffectiveTaxRate(priorRate)} to ${formatEffectiveTaxRate(rate)} (+${diff.toFixed(1)} pts).`,
+    )
+  } else {
+    parts.push(
+      `Rate fell from ${formatEffectiveTaxRate(priorRate)} to ${formatEffectiveTaxRate(rate)} (${diff.toFixed(1)} pts).`,
+    )
+  }
+
+  const tiDelta = ctx.taxableIncome - ctx.priorTaxableIncome
+  if (Math.abs(tiDelta) >= 500) {
+    parts.push(
+      tiDelta > 0
+        ? 'Higher taxable income increases the share of income going to tax.'
+        : 'Lower taxable income reduces the share of income going to tax.',
+    )
+  }
+
+  const niit = ctx.niitTax ?? 0
+  const priorNiit = ctx.priorNiitTax ?? 0
+  if (niit > 0 && niit > priorNiit + 500) {
+    parts.push('NIIT (Form 8960) adds tax on investment income and can push the effective rate up.')
+  } else if (niit > 0 && priorNiit === 0) {
+    parts.push('NIIT applies this year and was not on the prior return.')
+  }
+
+  const dedDelta = (ctx.stdDeduction ?? 0) - (ctx.priorStdDeduction ?? 0)
+  if (Math.abs(dedDelta) >= 100) {
+    parts.push(
+      dedDelta > 0
+        ? 'A larger deduction lowered taxable income relative to total tax.'
+        : 'Smaller deductions increased taxable income relative to total tax.',
+    )
+  }
+
+  const taxDelta = ctx.totalTax - ctx.priorTotalTax
+  const incomeTaxDelta = (ctx.incomeTax ?? 0) - (ctx.priorIncomeTax ?? 0)
+  if (Math.abs(taxDelta) >= 1000 && Math.abs(incomeTaxDelta) >= 500 && Math.abs(tiDelta) < 500) {
+    parts.push('Tax on the same taxable-income base shifted — check bracket mix and credits.')
+  }
+
+  return parts.join(' ')
+}
+
 /** Parse a currency draft (commas / $) into a number; empty → 0. */
 export function parseAmountDraft(raw: string): number {
   if (!raw || !raw.trim()) return 0

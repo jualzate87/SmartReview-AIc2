@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { CircleCheck, Comment } from '@design-systems/icons'
 import Tooltip from './Tooltip'
+import DocVerifyHeaderActions from './DocVerifyHeaderActions'
 import { PRIOR_YEAR_1040_FIELDS } from './priorYear1040Data'
+import type { ActivityEntry } from '../../hooks/useSyncedReviewState'
 import styles from '../../styles/data-review/DetailFields.module.css'
 
 // Real 2024 figures — matches PRIOR_YEAR_1040_VALUES in priorYear1040Data.ts (the single
-// source of truth for YoY comparisons and the prior-year document preview).
+// source of truth for YoY comparisons and the prior-year document preview.
 const FIELDS = PRIOR_YEAR_1040_FIELDS
 
 /** Agent / summary keys → prior-year Details row keys (line numbers). */
@@ -30,6 +32,9 @@ interface PriorYear1040FieldsProps {
   reviewedFields?: Map<string, { by: string; at: string }>
   onAddFieldNote?: (text: string, context: string) => void
   verifiedDocs?: Set<string>
+  verifiedDocsMeta?: Map<string, ActivityEntry>
+  reviewerConfirmedDocs?: Set<string>
+  reviewerConfirmedDocsMeta?: Map<string, ActivityEntry>
   onVerifyDoc?: (docKey: string) => void
 }
 
@@ -51,6 +56,9 @@ export default function PriorYear1040Fields({
   reviewedFields,
   onAddFieldNote,
   verifiedDocs,
+  verifiedDocsMeta,
+  reviewerConfirmedDocs,
+  reviewerConfirmedDocsMeta,
   onVerifyDoc,
 }: PriorYear1040FieldsProps) {
   const [commentField, setCommentField] = useState<string | null>(null)
@@ -107,6 +115,7 @@ export default function PriorYear1040Fields({
     return (
       <>
         <Tooltip text="Add a comment" placement="top"><button
+          type="button"
           className={`${styles.commentBtn} ${isOpen ? styles.commentBtnActive : ''}`}
           aria-label={`Add comment for ${label}`}
           onClick={e => { e.stopPropagation(); isOpen ? (setCommentField(null), setCommentDraft(''), setCommentAnchor(null)) : openComment(fieldKey, e.currentTarget) }}
@@ -133,8 +142,9 @@ export default function PriorYear1040Fields({
               rows={3}
             />
             <div className={styles.commentPopoverActions}>
-              <button className={styles.commentPopoverCancel} onClick={e => { e.stopPropagation(); setCommentField(null); setCommentDraft(''); setCommentAnchor(null) }}>Cancel</button>
+              <button type="button" className={styles.commentPopoverCancel} onClick={e => { e.stopPropagation(); setCommentField(null); setCommentDraft(''); setCommentAnchor(null) }}>Cancel</button>
               <button
+                type="button"
                 className={`${styles.commentPopoverPost} ${commentDraft.trim() ? styles.commentPopoverPostActive : ''}`}
                 disabled={!commentDraft.trim()}
                 onClick={e => { e.stopPropagation(); postComment(context) }}
@@ -149,7 +159,6 @@ export default function PriorYear1040Fields({
     )
   }
 
-  const docVerified = verifiedDocs?.has(DOC_KEY) ?? false
   const rowHighlight = highlightMode === 'orange' ? styles.fieldRowHighlightedOrange : styles.fieldRowHighlighted
   const inputHighlight = highlightMode === 'orange' ? styles.fieldInputHighlightedOrange : styles.fieldInputHighlighted
 
@@ -158,11 +167,14 @@ export default function PriorYear1040Fields({
       <div className={styles.pageHeader}>
         <div className={styles.headerActions}>
           <h2 className={styles.title} style={{ flex: 1, textAlign: 'left' }}>Prior Year 1040 (2024) — Jessica Drake</h2>
-          {docVerified ? (
-            <button className={styles.verifiedBadge} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 4, display: 'flex', alignItems: 'center' }} onClick={() => onVerifyDoc?.(DOC_KEY)}><CircleCheck size="small" /> Verified</button>
-          ) : (
-            <button className={styles.markVerifiedBtn} onClick={() => onVerifyDoc?.(DOC_KEY)}>Mark as verified</button>
-          )}
+          <DocVerifyHeaderActions
+            docKey={DOC_KEY}
+            verifiedDocs={verifiedDocs}
+            verifiedDocsMeta={verifiedDocsMeta}
+            reviewerConfirmedDocs={reviewerConfirmedDocs}
+            reviewerConfirmedDocsMeta={reviewerConfirmedDocsMeta}
+            onVerifyDoc={onVerifyDoc}
+          />
         </div>
       </div>
       <div className={styles.inputContainer}>
@@ -194,11 +206,11 @@ export default function PriorYear1040Fields({
               />
               {isReviewed ? (
                 <Tooltip text="Click to unmark" placement="top">
-                  <button className={styles.reviewedBadge} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }} onClick={e => { e.stopPropagation(); onMarkReviewed?.(fieldKey) }}><CircleCheck size="small" /></button>
+                  <button type="button" className={styles.reviewedBadge} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }} onClick={e => { e.stopPropagation(); onMarkReviewed?.(fieldKey) }}><CircleCheck size="small" /></button>
                 </Tooltip>
               ) : (
                 <div className={styles.fieldActions}>
-                  <Tooltip text="Mark as correct" placement="top"><button className={styles.markCorrectBtn} onClick={e => { e.stopPropagation(); onMarkReviewed?.(fieldKey) }}><CircleCheck size="small" /></button></Tooltip>
+                  <Tooltip text="Mark as correct" placement="top"><button type="button" className={styles.markCorrectBtn} onClick={e => { e.stopPropagation(); onMarkReviewed?.(fieldKey) }}><CircleCheck size="small" /></button></Tooltip>
                   {renderCommentBtn(fieldKey, row.label ?? '')}
                 </div>
               )}

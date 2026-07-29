@@ -96,26 +96,17 @@
 .needsConfirmBadge {
   display: inline-flex;
   align-items: center;
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 9999px;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 18px;
-  background: #fef3e8;
-  color: #c9500f;
-  border: 1px solid #e8a05c;
+  margin-left: var(--space-component-gap-small, 6px);
+  flex-shrink: 0;
 }
 
 .needsConfirmBadgeActive {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.5);
+  opacity: 0.95;
 }
 
 .tabNeedsConfirm:not(.tabActive) {
-  border-color: #e8a05c;
-  background: #fffaf5;
+  border-color: var(--color-container-border-attention, #e5a043);
+  background: var(--color-container-background-attention-secondary, #fff8eb);
 }
 
 .tabConfirmed:not(.tabActive) {

@@ -1557,6 +1557,11 @@
   padding-left: 32px;
   border-top: 1px solid var(--color-divider-tertiary);
 }
+.summaryRateLabelRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-component-gap-small, 4px);
+}
 .summaryRateLabel {
   font-family: var(--font-family-component);
   font-size: var(--font-size-component-small);

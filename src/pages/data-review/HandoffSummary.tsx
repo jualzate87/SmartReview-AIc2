@@ -8,7 +8,7 @@ import { B3 } from '@ids-ts/typography'
 import '@ids-ts/typography/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
 import '@ids-ts/tabs/dist/main.css'
-import { AiSparkles, ChevronRight, CircleCheck, CircleCheckFill, Link } from '@design-systems/icons'
+import { AiSparkles, ChevronRight, CircleCheck, CircleCheckFill } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import type { LiveAmounts } from '../../data/liveReturn'
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
@@ -77,23 +77,6 @@ function PhaseVerifiedBadge({ status }: { status: 'action-needed' | 'verified' }
     <Badge status="success" priority="secondary" capitalization="sentence" className={styles.phasePill}>
       Verified
     </Badge>
-  )
-}
-
-function CompletionTypeIcon({ type }: { type?: StrategicChecklistItem['completionType'] }) {
-  if (!type) return null
-  const title =
-    type === 'auto'
-      ? 'Auto-completed by system'
-      : type === 'linked'
-        ? 'Linked to field or document verification'
-        : 'Manual attestation'
-  return (
-    <span className={styles.completionTypeIcon} title={title} aria-label={title}>
-      {type === 'auto' && <AiSparkles size="x-small" aria-hidden />}
-      {type === 'linked' && <Link size="x-small" aria-hidden />}
-      {type === 'declaration' && <CircleCheck size="x-small" aria-hidden />}
-    </span>
   )
 }
 
@@ -174,7 +157,6 @@ function ChecklistItemRow({
           <ChecklistStatusIcon item={item} onToggle={onToggle} />
           <div className={styles.checklistText}>
             <span className={`${styles.checklistTitleRow} ${isComplete ? styles.checklistTitleDone : ''}`}>
-              <CompletionTypeIcon type={item.completionType} />
               <span className={styles.checklistTitle}>{item.title}</span>
               {item.attribution && isComplete && (
                 <span
@@ -294,33 +276,30 @@ function BriefTextLine({ parts }: { parts: BriefTextPart[] }) {
 function ConversationalBriefCard({ brief }: { brief: ConversationalBrief }) {
   return (
     <section className={styles.conversationalBrief} aria-labelledby="executive-brief-heading">
-      <div className={styles.conversationalBriefHead}>
-        <span className={styles.conversationalBriefIcon} aria-hidden>
-          <AiSparkles size="small" />
-        </span>
-        <div className={styles.conversationalBriefHeadText}>
-          <h3 id="executive-brief-heading" className={styles.conversationalBriefHeading}>
-            {brief.heading}
-          </h3>
-          <B3 className={styles.conversationalBriefIntro}>{brief.intro}</B3>
-        </div>
-      </div>
+      <h3 id="executive-brief-heading" className={styles.conversationalBriefHeading}>
+        {brief.heading}
+      </h3>
+      <B3 className={styles.conversationalBriefIntro}>{brief.intro}</B3>
 
-      <div className={styles.conversationalBriefSection}>
-        <h4 className={styles.conversationalBriefSectionLabel}>
-          <CircleCheckFill size="x-small" className={styles.conversationalBriefSectionIconDone} aria-hidden />
-          {brief.completed.label}
-        </h4>
-        <ul className={styles.conversationalBriefList}>
-          {brief.completed.items.map(item => (
-            <li key={item.id} className={styles.conversationalBriefListItem}>
-              <B3 className={styles.conversationalBriefListText}>
-                <BriefTextLine parts={item.parts} />
-              </B3>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {brief.completed.items.length > 0 && (
+        <div className={styles.conversationalBriefSection}>
+          {brief.completed.label ? (
+            <h4 className={styles.conversationalBriefSectionLabel}>
+              <CircleCheckFill size="x-small" className={styles.conversationalBriefSectionIconDone} aria-hidden />
+              {brief.completed.label}
+            </h4>
+          ) : null}
+          <ul className={styles.conversationalBriefList}>
+            {brief.completed.items.map(item => (
+              <li key={item.id} className={styles.conversationalBriefListItem}>
+                <B3 className={styles.conversationalBriefListText}>
+                  <BriefTextLine parts={item.parts} />
+                </B3>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {brief.attention && (
         <div className={styles.conversationalBriefSection}>
