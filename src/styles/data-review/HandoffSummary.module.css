@@ -74,7 +74,7 @@
 .executiveSynced {
   margin: var(--space-component-gap-small, 4px) 0 0;
   font-family: var(--font-family-component);
-  font-size: var(--font-size-component-x-small);
+  font-size: var(--font-size-component-small);
   color: var(--color-text-secondary);
 }
 
@@ -122,7 +122,7 @@
 .phaseCardDescription {
   margin: 0;
   font-family: var(--font-family-body);
-  font-size: var(--font-size-body-4);
+  font-size: var(--font-size-body-3);
   line-height: 1.45;
   color: var(--color-text-secondary);
 }
@@ -178,13 +178,55 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: var(--size-action-icon-small, 16px);
-  min-height: var(--size-action-icon-small, 16px);
-  margin-top: 1px;
+  width: 32px;
+  min-height: 32px;
 }
 
-.checklistIconSlot :global(.ids-checkbox) {
-  margin: 0;
+.checklistCheckBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-ui-positive);
+  box-sizing: border-box;
+  transition: color 100ms ease;
+}
+
+.checklistCheckBtnEmpty::after {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--color-border-secondary, #c3ced5);
+  border-radius: 50%;
+  background: var(--color-container-background-secondary, #f4f5f8);
+  box-sizing: border-box;
+}
+
+.checklistCheckBtnEmpty:hover::after {
+  border-color: var(--color-ui-positive);
+  background: rgba(16, 128, 0, 0.08);
+}
+
+.checklistCheckBtnActive {
+  cursor: pointer;
+}
+
+.checklistCheckEmptyLocked::after {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--color-border-tertiary, #d4d7dc);
+  border-radius: 50%;
+  background: var(--color-container-background-secondary, #f4f5f8);
+  opacity: 0.7;
+  box-sizing: border-box;
 }
 
 .checklistText {
@@ -211,7 +253,7 @@
 .checklistNote {
   margin: 0;
   font-family: var(--font-family-body);
-  font-size: var(--font-size-body-4);
+  font-size: var(--font-size-body-3);
   line-height: 1.45;
   color: var(--color-text-secondary);
 }
@@ -233,7 +275,7 @@
   background: transparent;
   color: var(--color-action-standard);
   font-family: var(--font-family-component);
-  font-size: var(--font-size-action-x-small);
+  font-size: var(--font-size-action-small);
   font-weight: var(--font-weight-component-semibold);
   cursor: pointer;
   padding: 2px 0;
@@ -291,7 +333,7 @@
   gap: var(--space-component-gap-small, 4px);
   flex-shrink: 0;
   font-family: var(--font-family-component);
-  font-size: var(--font-size-component-x-small);
+  font-size: var(--font-size-component-small);
   font-weight: var(--font-weight-component-semibold);
   color: var(--color-ui-positive);
 }
@@ -339,7 +381,7 @@
 
 .activityEntryDetail {
   font-family: var(--font-family-body);
-  font-size: var(--font-size-body-4);
+  font-size: var(--font-size-body-3);
   line-height: 1.4;
   color: var(--color-text-secondary);
 }
@@ -392,7 +434,7 @@
 .signOffBlocker {
   margin: 0;
   font-family: var(--font-family-body);
-  font-size: var(--font-size-body-4);
+  font-size: var(--font-size-body-3);
   line-height: 1.45;
   color: var(--color-text-secondary);
 }
@@ -515,7 +557,7 @@
 }
 
 .choiceBody {
-  font-size: var(--font-size-body-4);
+  font-size: var(--font-size-body-3);
   color: var(--color-text-secondary);
   line-height: 1.4;
 }

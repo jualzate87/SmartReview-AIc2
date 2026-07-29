@@ -936,7 +936,7 @@ export default function DataReviewPage() {
     setShow1040(true)
     setOutputFormId('summary')
     setPass2Filter('flags')
-    // Pass 2 sign-off opens on Strategic checklist (Tab 1), not Pass 1 briefing
+    // Pass 2 sign-off opens on Reviewer checklist (Tab 1), not Pass 1 briefing
     openSummaryPanel('signoff-review', {
       pass: 2,
       actor: REVIEWER_NAME,

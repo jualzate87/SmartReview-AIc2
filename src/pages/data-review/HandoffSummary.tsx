@@ -4,8 +4,6 @@ import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
 import { Badge } from '@ids-ts/badge'
 import '@ids-ts/badge/dist/main.css'
-import { Checkbox } from '@ids-ts/checkbox'
-import '@ids-ts/checkbox/dist/main.css'
 import PageMessage from '@ids-ts/page-message'
 import '@ids-ts/page-message/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
@@ -86,6 +84,7 @@ function ChecklistStatusIcon({
   const isComplete = item.checked
   const canToggle = !!onToggle && !item.locked
 
+  /* Auto-verified / locked complete — filled green check, not interactive */
   if (item.locked && isComplete) {
     return (
       <span className={styles.checklistIconSlot} aria-hidden>
@@ -94,15 +93,30 @@ function ChecklistStatusIcon({
     )
   }
 
+  /* Locked incomplete (open items) — muted empty circle, not interactive */
+  if (item.locked && !isComplete) {
+    return (
+      <span className={styles.checklistIconSlot} aria-label={`${item.title} pending`}>
+        <span className={styles.checklistCheckEmptyLocked} aria-hidden />
+      </span>
+    )
+  }
+
+  /* Manual items — same checkmark-button language as output-form attest columns */
   return (
     <span className={styles.checklistIconSlot}>
-      <Checkbox
-        checked={isComplete}
+      <button
+        type="button"
+        className={[
+          styles.checklistCheckBtn,
+          isComplete ? styles.checklistCheckBtnActive : styles.checklistCheckBtnEmpty,
+        ].join(' ')}
+        aria-label={isComplete ? `Mark ${item.title} incomplete` : `Mark ${item.title} complete`}
         disabled={!canToggle}
-        onChange={canToggle ? e => onToggle!(item.id, e.target.checked) : undefined}
-        size="small"
-        aria-label={canToggle ? `Mark ${item.title} complete` : `${item.title} pending`}
-      />
+        onClick={() => onToggle?.(item.id, !isComplete)}
+      >
+        {isComplete ? <CircleCheckFill size="small" className={styles.checklistSuccessIcon} /> : null}
+      </button>
     </span>
   )
 }
@@ -474,7 +488,7 @@ export default function HandoffSummary({
           isHorizontalRuleVisible
           className={styles.briefTabs}
         >
-          <Tab id="checklist" title="Strategic checklist">
+          <Tab id="checklist" title="Reviewer checklist">
             <StrategicChecklistTab
               phases={brief.phases}
               executiveBrief={brief.executiveBrief}

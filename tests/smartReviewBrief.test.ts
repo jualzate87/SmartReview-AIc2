@@ -21,7 +21,7 @@ const emptyChecklist: ReviewChecklistState = {
   blockers: [],
 }
 
-describe('buildSmartReviewBrief strategic checklist', () => {
+describe('buildSmartReviewBrief reviewer checklist', () => {
   it('shows reviewer-strategic view with phased checklist and executive brief', () => {
     const snapshot = buildHandoffSnapshot('signoff-review', 2, 'Jordan Lee', {
       reviewedFields: new Map([['ssn-techCircle', meta()]]),
@@ -64,7 +64,7 @@ describe('buildSmartReviewBrief strategic checklist', () => {
     expect(phase2Items.some(i => i.note?.includes('8960') || i.note?.includes('capital gains'))).toBe(true)
   })
 
-  it('hides strategic checklist in reviewer-briefing mode', () => {
+  it('hides reviewer checklist in reviewer-briefing mode', () => {
     const snapshot = buildHandoffSnapshot(
       'signoff-review',
       1,
@@ -98,7 +98,7 @@ describe('buildSmartReviewBrief strategic checklist', () => {
     expect(brief.executiveBrief).toBeNull()
   })
 
-  it('counts open strategic checklist items for toolbar badge', () => {
+  it('counts open reviewer checklist items for toolbar badge', () => {
     const snapshot = buildHandoffSnapshot('signoff-review', 2, 'Jordan Lee', {
       reviewedFields: new Map(),
       verifiedDocs: new Set(),

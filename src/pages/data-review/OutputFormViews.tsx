@@ -189,12 +189,32 @@ function LineRow({
       <td className={styles.cellLineRight}>{line}</td>
       <td className={styles.cellValue}>
         <div className={styles.cellValueInner}>
-          <div
-            className={valueBoxCls}
-          >
-            <span className={valueNumCls}>
-              {display}
-            </span>
+          <div className={styles.cellValueAmountGroup}>
+            <div className={valueBoxCls}>
+              <span className={valueNumCls}>
+                {display}
+              </span>
+            </div>
+
+            {hasFlyout && (
+              <Tooltip
+                text={kind === 'calc' ? 'Click row or icon to view subtotals' : 'Click row or icon to view sources'}
+                placement="top"
+                disabled={isOpen}
+              >
+                <button
+                  type="button"
+                  className={`${styles.summaryInfoBtn} ${isOpen ? styles.summaryInfoBtnActive : ''}`}
+                  aria-label={kind === 'calc' ? `View subtotals for ${label}` : `View sources for ${label}`}
+                  onClick={e => {
+                    e.stopPropagation()
+                    onOpenFlyout(fieldId, e.currentTarget)
+                  }}
+                >
+                  <CircleInfo size="small" />
+                </button>
+              </Tooltip>
+            )}
           </div>
 
           {showAttest && (
@@ -207,26 +227,6 @@ function LineRow({
               onToggleReviewer={onToggleReviewer}
               interactive={attest.toggleable}
             />
-          )}
-
-          {hasFlyout && (
-            <Tooltip
-              text={kind === 'calc' ? 'Click row or icon to view subtotals' : 'Click row or icon to view sources'}
-              placement="top"
-              disabled={isOpen}
-            >
-              <button
-                type="button"
-                className={`${styles.summaryInfoBtn} ${isOpen ? styles.summaryInfoBtnActive : ''}`}
-                aria-label={kind === 'calc' ? `View subtotals for ${label}` : `View sources for ${label}`}
-                onClick={e => {
-                  e.stopPropagation()
-                  onOpenFlyout(fieldId, e.currentTarget)
-                }}
-              >
-                <CircleInfo size="small" />
-              </button>
-            </Tooltip>
           )}
         </div>
       </td>

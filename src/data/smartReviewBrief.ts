@@ -585,7 +585,7 @@ function buildExecutiveBrief(
   const { attested, required, open } = countStrategicProgress(phases)
   const attentionCount = Math.max(open, outstandingOpenCount)
 
-  const doneLine = `${preparerFirst} completed ${checks} baseline checks across ${docCount} source documents. ${attested} of ${required} strategic checklist items are attested.`
+  const doneLine = `${preparerFirst} completed ${checks} baseline checks across ${docCount} source documents. ${attested} of ${required} reviewer checklist items are attested.`
 
   let body: string
   let type: 'info' | 'success' | 'warn' = 'info'
@@ -641,7 +641,7 @@ function buildSignOffStatus(
   }
   const blockerText =
     blockers.length === 0
-      ? 'Complete the strategic checklist before you sign off.'
+      ? 'Complete the reviewer checklist before you sign off.'
       : `${blockers.join('. ')}.`
   return {
     ready: false,

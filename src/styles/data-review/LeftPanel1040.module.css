@@ -253,8 +253,8 @@
 
 .lineNote {
   display: block;
-  font-size: 11px;
-  color: #6b6c72;
+  font-size: var(--font-size-body-3);
+  color: var(--color-text-secondary);
   font-weight: 400;
 }
 
@@ -662,7 +662,16 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Amount + info icon — kept together before prep/rev attest columns */
+.cellValueAmountGroup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 /* Prep / Rev columns on Form 1040 output rows — mirrors Return Summary */
@@ -1231,16 +1240,24 @@
   transition: color 100ms ease, opacity 100ms ease;
 }
 .summaryAttestColEmpty {
-  /* Subtle inactive placeholder — same footprint as active icon */
+  /* Subtle inactive placeholder — visible affordance, same footprint as active icon */
 }
 .summaryAttestColEmpty::after {
   content: '';
   display: block;
   width: 20px;
   height: 20px;
-  border: 1px dashed var(--color-border-tertiary, #d4d7dc);
+  border: 1.5px solid var(--color-border-secondary, #c3ced5);
   border-radius: 50%;
-  opacity: 0.55;
+  background: var(--color-container-background-secondary, #f4f5f8);
+  opacity: 1;
+  box-sizing: border-box;
+}
+.summaryAttestColPrepEmpty::after {
+  border-color: var(--color-border-secondary, #c3ced5);
+}
+.summaryAttestColRevEmpty::after {
+  border-color: var(--color-border-secondary, #c3ced5);
 }
 .summaryAttestColPrepActive {
   color: var(--color-action-success, #00856d);
@@ -1248,14 +1265,20 @@
 .summaryAttestColRevActive {
   color: #205ea3;
 }
-.summaryAttestCol:hover:not(:disabled):not(.summaryAttestColReadonly).summaryAttestColEmpty::after {
-  border-color: var(--color-action-standard, #0077c5);
-  opacity: 0.85;
+.summaryAttestCol:hover:not(:disabled):not(.summaryAttestColReadonly).summaryAttestColPrepEmpty::after {
+  border-color: var(--color-action-success, #00856d);
+  background: rgba(0, 133, 109, 0.08);
+}
+.summaryAttestCol:hover:not(:disabled):not(.summaryAttestColReadonly).summaryAttestColRevEmpty::after {
+  border-color: #205ea3;
+  background: rgba(32, 94, 163, 0.08);
 }
 .summaryAttestColReadonly {
   cursor: default;
   pointer-events: none;
-  opacity: 0.4;
+}
+.summaryAttestColReadonly.summaryAttestColEmpty::after {
+  opacity: 0.65;
 }
 .summaryAttestCol:disabled {
   cursor: default;
@@ -1439,9 +1462,9 @@
 /* Sub-row line note — x-small, secondary text */
 .summarySubNote {
   font-family: var(--font-family-component);
-  font-size: var(--font-size-component-x-small); /* 12px */
+  font-size: var(--font-size-component-small); /* 14px */
   font-weight: var(--font-weight-component); /* 400 */
-  color: var(--color-text-secondary); /* #6B6C72 — AA compliant */
+  color: var(--color-text-secondary); /* #6B6C72 — AA compliant at 14px */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -805,11 +805,34 @@ export default function LeftPanel1040({
         <td className={styles.cellLineRight}>{line}</td>
         <td className={styles.cellValue}>
           <div className={styles.cellValueInner}>
-            <div className={valueCellCls}>
-              {value !== undefined && (
-                <span className={valueNumCls}>
-                  {typeof value === 'number' ? fmt(value) : value}
-                </span>
+            <div className={styles.cellValueAmountGroup}>
+              <div className={valueCellCls}>
+                {value !== undefined && (
+                  <span className={valueNumCls}>
+                    {typeof value === 'number' ? fmt(value) : value}
+                  </span>
+                )}
+              </div>
+
+              {/* Info — immediately adjacent to amount, before prep/rev columns */}
+              {!!field && fieldHasPopover(field) && value !== undefined && (
+                <Tooltip
+                  text={kind === 'calc' ? 'View subtotals' : 'View sources'}
+                  placement="top"
+                  disabled={isPopoverOpen}
+                >
+                  <button
+                    type="button"
+                    className={`${styles.summaryInfoBtn} ${isPopoverOpen ? styles.summaryInfoBtnActive : ''}`}
+                    aria-label={kind === 'calc' ? `View subtotals for ${label}` : `View sources for ${label}`}
+                    onClick={e => {
+                      e.stopPropagation()
+                      openFormInfo(field!, e.currentTarget)
+                    }}
+                  >
+                    <CircleInfo size="small" />
+                  </button>
+                </Tooltip>
               )}
             </div>
 
@@ -822,27 +845,6 @@ export default function LeftPanel1040({
                 onTogglePreparer={togglePreparer}
                 onToggleReviewer={toggleReviewer}
               />
-            )}
-
-            {/* Info — opens FieldPopover only from this button */}
-            {!!field && fieldHasPopover(field) && value !== undefined && (
-              <Tooltip
-                text={kind === 'calc' ? 'View subtotals' : 'View sources'}
-                placement="top"
-                disabled={isPopoverOpen}
-              >
-                <button
-                  type="button"
-                  className={`${styles.summaryInfoBtn} ${isPopoverOpen ? styles.summaryInfoBtnActive : ''}`}
-                  aria-label={kind === 'calc' ? `View subtotals for ${label}` : `View sources for ${label}`}
-                  onClick={e => {
-                    e.stopPropagation()
-                    openFormInfo(field!, e.currentTarget)
-                  }}
-                >
-                  <CircleInfo size="small" />
-                </button>
-              </Tooltip>
             )}
 
             {/* Comment button — outside value box, shown on hover */}

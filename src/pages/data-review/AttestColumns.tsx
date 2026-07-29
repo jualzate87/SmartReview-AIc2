@@ -42,7 +42,9 @@ export default function AttestColumns({
           type="button"
           className={[
             styles.summaryAttestCol,
-            preparerEntry ? styles.summaryAttestColPrepActive : styles.summaryAttestColEmpty,
+            preparerEntry
+              ? styles.summaryAttestColPrepActive
+              : `${styles.summaryAttestColEmpty} ${styles.summaryAttestColPrepEmpty}`,
             prepDisabled ? styles.summaryAttestColReadonly : '',
           ].filter(Boolean).join(' ')}
           aria-label={preparerEntry ? `Verified by ${preparerEntry.by}` : 'Preparer verify'}
@@ -60,7 +62,9 @@ export default function AttestColumns({
           type="button"
           className={[
             styles.summaryAttestCol,
-            reviewerEntry ? styles.summaryAttestColRevActive : styles.summaryAttestColEmpty,
+            reviewerEntry
+              ? styles.summaryAttestColRevActive
+              : `${styles.summaryAttestColEmpty} ${styles.summaryAttestColRevEmpty}`,
             revDisabled ? styles.summaryAttestColReadonly : '',
           ].filter(Boolean).join(' ')}
           aria-label={reviewerEntry ? `Confirmed by ${reviewerEntry.by}` : 'Reviewer confirm'}
