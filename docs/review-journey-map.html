@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartReview — Preparer & Reviewer Journey Map</title>
+  <style>
+    :root {
+      --text-primary: #393a3d;
+      --text-secondary: #6b6c72;
+      --text-tertiary: #8d9096;
+      --border: #d4d7dc;
+      --bg-page: #f4f5f8;
+      --bg-card: #ffffff;
+      --lane-prep: #e8f4fd;
+      --lane-rev: #eef6ee;
+      --lane-sys: #f5f0fa;
+      --handoff: #0077c5;
+      --accent-prep: #0077c5;
+      --accent-rev: #00892e;
+      --accent-sys: #6b47a8;
+      --font: "Avenir Next", Avenir, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-primary);
+      background: var(--bg-page);
+      padding: 32px 40px 48px;
+    }
+
+    header.doc-header {
+      max-width: 960px;
+      margin: 0 auto 28px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .meta {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .meta strong { color: var(--text-primary); font-weight: 600; }
+
+    section {
+      max-width: 960px;
+      margin: 0 auto 32px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px 28px;
+    }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    p.lead {
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      max-width: 72ch;
+    }
+
+    /* ── Swimlane diagram ─────────────────────────────── */
+    .swimlane-wrap {
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    .swimlane {
+      display: grid;
+      grid-template-columns: 120px repeat(10, minmax(88px, 1fr));
+      gap: 0;
+      min-width: 900px;
+      font-size: 11px;
+    }
+
+    .lane-label {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 8px 12px 8px 0;
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--text-secondary);
+      border-right: 2px solid var(--border);
+    }
+
+    .lane-label.prep { color: var(--accent-prep); }
+    .lane-label.rev { color: var(--accent-rev); }
+    .lane-label.sys { color: var(--accent-sys); }
+
+    .lane-row {
+      display: contents;
+    }
+
+    .cell {
+      min-height: 56px;
+      padding: 6px 4px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .cell.lane-bg-prep { background: var(--lane-prep); }
+    .cell.lane-bg-rev { background: var(--lane-rev); }
+    .cell.lane-bg-sys { background: var(--lane-sys); }
+
+    .step {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 10px;
+      line-height: 1.35;
+      width: 100%;
+      max-width: 92px;
+    }
+
+    .step.handoff {
+      border-color: var(--handoff);
+      background: #e8f4fd;
+      font-weight: 600;
+      color: var(--handoff);
+    }
+
+    .step small {
+      display: block;
+      color: var(--text-tertiary);
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    .arrow-row {
+      grid-column: 2 / -1;
+      height: 20px;
+      position: relative;
+      border-bottom: none;
+    }
+
+    .arrow-row::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 24px;
+      top: 50%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--border), var(--handoff));
+    }
+
+    .phase-labels {
+      display: grid;
+      grid-template-columns: 120px repeat(10, minmax(88px, 1fr));
+      gap: 0;
+      min-width: 900px;
+      margin-bottom: 4px;
+      font-size: 10px;
+      color: var(--text-tertiary);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .phase-labels span:first-child { grid-column: 1; }
+    .phase-labels .col-welcome { grid-column: 2 / 3; text-align: center; }
+    .phase-labels .col-p1 { grid-column: 3 / 6; text-align: center; }
+    .phase-labels .col-p2 { grid-column: 6 / 8; text-align: center; }
+    .phase-labels .col-handoff { grid-column: 8 / 9; text-align: center; color: var(--handoff); }
+    .phase-labels .col-brief { grid-column: 9 / 10; text-align: center; }
+    .phase-labels .col-pass2 { grid-column: 10 / 12; text-align: center; }
+
+    .handoff-legend {
+      display: flex;
+      gap: 20px;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .handoff-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .handoff-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      background: #e8f4fd;
+      border: 2px solid var(--handoff);
+    }
+
+    /* ── Tables ───────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      font-weight: 600;
+      background: var(--bg-page);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-secondary);
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    td:first-child { font-weight: 500; white-space: nowrap; }
+
+    .handoff-list {
+      list-style: none;
+      counter-reset: handoff;
+    }
+
+    .handoff-list li {
+      counter-increment: handoff;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+      padding-left: 36px;
+      position: relative;
+    }
+
+    .handoff-list li:last-child { border-bottom: none; }
+
+    .handoff-list li::before {
+      content: counter(handoff);
+      position: absolute;
+      left: 0;
+      top: 14px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--handoff);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .handoff-list h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .handoff-list p {
+      color: var(--text-secondary);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .checklist-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .check-item {
+      display: flex;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--bg-page);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .check-box {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      margin-top: 1px;
+    }
+
+    .check-item strong { display: block; margin-bottom: 2px; }
+    .check-item span { color: var(--text-secondary); font-size: 12px; }
+
+    .print-hint {
+      max-width: 960px;
+      margin: 0 auto;
+      font-size: 12px;
+      color: var(--text-tertiary);
+      text-align: center;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        padding: 16px 20px;
+        font-size: 11px;
+      }
+
+      section {
+        break-inside: avoid;
+        box-shadow: none;
+        page-break-inside: avoid;
+        margin-bottom: 20px;
+        padding: 16px 18px;
+      }
+
+      h1 { font-size: 22px; }
+
+      .swimlane-wrap { overflow: visible; }
+
+      .print-hint { display: none; }
+
+      @page {
+        margin: 0.6in;
+        size: letter landscape;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="doc-header">
+    <h1>SmartReview — Preparer & Reviewer Journey Map</h1>
+    <p class="meta">
+      <strong>Prototype:</strong> SmartReview-ProtoC2 &nbsp;·&nbsp;
+      <strong>Return:</strong> Jessica Drake 1040 &nbsp;·&nbsp;
+      <strong>Preparer:</strong> Sara Chen &nbsp;·&nbsp;
+      <strong>Reviewer:</strong> Jordan Lee
+    </p>
+  </header>
+
+  <section>
+    <h2>Overview</h2>
+    <p class="lead">
+      SmartReview splits tax return review into <strong>data accuracy first, insights second</strong>.
+      Sara (preparer) completes Pass 1 in two sequential phases—import accuracy, then AI diagnostics—before handing the return to Jordan (reviewer).
+      Jordan opens a Pass 1 briefing (activity log), then begins Pass 2 with a phased reviewer checklist, output attestation, and sign-off.
+      The Smart review brief is the shared handoff surface across both roles.
+    </p>
+  </section>
+
+  <section>
+    <h2>Swimlane journey map</h2>
+    <div class="swimlane-wrap">
+      <div class="phase-labels">
+        <span></span>
+        <span class="col-welcome">Welcome</span>
+        <span class="col-p1">Phase 1 · Import</span>
+        <span class="col-p2">Phase 2 · Diagnostics</span>
+        <span class="col-handoff">⚡ Handoff</span>
+        <span class="col-brief">Briefing</span>
+        <span class="col-pass2">Pass 2 · Sign-off</span>
+      </div>
+      <div class="swimlane">
+        <!-- Preparer row -->
+        <div class="lane-label prep">Preparer<br/>Sara</div>
+        <div class="cell lane-bg-prep"><div class="step">Welcome<small>Begin Step 1</small></div></div>
+        <div class="cell lane-bg-prep"><div class="step">Verify docs<small>Source panel</small></div></div>
+        <div class="cell lane-bg-prep"><div class="step">Clear OCR flags<small>Edit / mark correct</small></div></div>
+        <div class="cell lane-bg-prep"><div class="step">Phase 1 done<small>Continue →</small></div></div>
+        <div class="cell lane-bg-prep"><div class="step">AI diagnostics<small>Mark reviewed</small></div></div>
+        <div class="cell lane-bg-prep"><div class="step">Prep attest<small>1040 / schedules</small></div></div>
+        <div class="cell lane-bg-prep"><div class="step handoff">⚡ Send to reviewer<small>Pass to reviewer</small></div></div>
+        <div class="cell lane-bg-prep"></div>
+        <div class="cell lane-bg-prep"></div>
+        <div class="cell lane-bg-prep"></div>
+
+        <!-- Reviewer row -->
+        <div class="lane-label rev">Reviewer<br/>Jordan</div>
+        <div class="cell lane-bg-rev"></div>
+        <div class="cell lane-bg-rev"></div>
+        <div class="cell lane-bg-rev"></div>
+        <div class="cell lane-bg-rev"></div>
+        <div class="cell lane-bg-rev"></div>
+        <div class="cell lane-bg-rev"></div>
+        <div class="cell lane-bg-rev"></div>
+        <div class="cell lane-bg-rev"><div class="step">Pass 1 briefing<small>Activity log</small></div></div>
+        <div class="cell lane-bg-rev"><div class="step handoff">⚡ Begin Pass 2<small>Checklist tab</small></div></div>
+        <div class="cell lane-bg-rev"><div class="step handoff">⚡ Sign off<small>Approve return</small></div></div>
+
+        <!-- System row -->
+        <div class="lane-label sys">System<br/>/ AI</div>
+        <div class="cell lane-bg-sys"><div class="step">Intuit Assist<small>Two-step intro</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">OCR flags<small>Orange highlights</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">Sync panels<small>Doc ↔ fields</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">Unlock Phase 2<small>Counter = 0</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">Diagnostic cards<small>Agent report</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">Snapshot<small>Handoff data</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">Await reviewer<small>State frozen</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">Activity log<small>5 categories</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">Checklist gate<small>4 phases</small></div></div>
+        <div class="cell lane-bg-sys"><div class="step">Sign-off gate<small>All clear</small></div></div>
+      </div>
+    </div>
+    <div class="handoff-legend">
+      <span><span class="handoff-dot"></span> Handoff moment</span>
+      <span>Flow left → right across time</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Moments</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Phase</th>
+          <th>Actor</th>
+          <th>What they do</th>
+          <th>UI surface</th>
+          <th>Outcome</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Welcome</td>
+          <td>Preparer</td>
+          <td>Reads two-step overview; starts import review</td>
+          <td>Welcome pane</td>
+          <td>Phase = import</td>
+        </tr>
+        <tr>
+          <td>Import accuracy</td>
+          <td>Preparer</td>
+          <td>Verifies PDFs vs OCR; edits or marks correct</td>
+          <td>Source docs + detail fields; Phase 1 banner</td>
+          <td>Flags cleared; docs verified</td>
+        </tr>
+        <tr>
+          <td>Import complete</td>
+          <td>Preparer</td>
+          <td>Confirms all flags + docs done</td>
+          <td>Phase 1 completion</td>
+          <td>Phase 2 unlocks</td>
+        </tr>
+        <tr>
+          <td>AI diagnostics</td>
+          <td>Preparer</td>
+          <td>Reviews compliance, YoY, opportunities</td>
+          <td>AI Review panel; 1040 expanded</td>
+          <td>Diagnostics cleared</td>
+        </tr>
+        <tr>
+          <td>Output attestation</td>
+          <td>Preparer</td>
+          <td>Checks summary lines</td>
+          <td>Output forms · Prep column</td>
+          <td>Preparer checks stamped</td>
+        </tr>
+        <tr>
+          <td>Handoff 1</td>
+          <td>Preparer</td>
+          <td>Sends return to reviewer</td>
+          <td>Smart review brief → Send to reviewer</td>
+          <td>Awaiting reviewer</td>
+        </tr>
+        <tr>
+          <td>Pass 1 briefing</td>
+          <td>Reviewer</td>
+          <td>Reads Sara's Pass 1 work</td>
+          <td>Brief · activity log tab</td>
+          <td>Context for Pass 2</td>
+        </tr>
+        <tr>
+          <td>Handoff 2</td>
+          <td>Reviewer</td>
+          <td>Starts Pass 2</td>
+          <td>Begin Pass 2 review</td>
+          <td>Strategic checklist opens</td>
+        </tr>
+        <tr>
+          <td>Reviewer checklist</td>
+          <td>Reviewer</td>
+          <td>Attests phased checklist items</td>
+          <td>Brief · Reviewer checklist tab</td>
+          <td>Open → attested</td>
+        </tr>
+        <tr>
+          <td>Output attestation</td>
+          <td>Reviewer</td>
+          <td>Confirms preparer lines</td>
+          <td>Output forms · Rev column</td>
+          <td>Dual Prep/Rev trail</td>
+        </tr>
+        <tr>
+          <td>Handoff 3</td>
+          <td>Reviewer</td>
+          <td>Signs off return</td>
+          <td>Approve &amp; sign off return</td>
+          <td>Ready to file</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Handoffs</h2>
+    <ol class="handoff-list">
+      <li>
+        <h3>Preparer → Reviewer (Send to reviewer)</h3>
+        <p><strong>Trigger:</strong> Sara completes Pass 1 and chooses Pass to reviewer → Send to reviewer.</p>
+        <p><strong>Transfers:</strong> Handoff snapshot, activity log (docs verified, flags cleared, edits, summary checks, diagnostics), preparer attestations, notes, live amounts.</p>
+      </li>
+      <li>
+        <h3>Pass 1 briefing → Pass 2 (Begin Pass 2 review)</h3>
+        <p><strong>Trigger:</strong> Jordan reads activity log and clicks Begin Pass 2 review.</p>
+        <p><strong>Transfers:</strong> Session state persists; UI switches to Pass 2 with Reviewer checklist tab and four strategic phases.</p>
+      </li>
+      <li>
+        <h3>Pass 2 complete → Sign-off</h3>
+        <p><strong>Trigger:</strong> Checklist attested, outstanding items = 0, Rev confirmations current.</p>
+        <p><strong>Transfers:</strong> Reviewer attestation + manual checklist = record of Pass 2 approval.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Review aspects checklist</h2>
+    <div class="checklist-grid">
+      <div class="check-item">
+        <div class="check-box"></div>
+        <div>
+          <strong>Import accuracy</strong>
+          <span>Pass 1 · Phase 1 — clear OCR/import flags</span>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-box"></div>
+        <div>
+          <strong>Doc verification</strong>
+          <span>Pass 1 — mark each packet doc verified vs PDF</span>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-box"></div>
+        <div>
+          <strong>Diagnostics</strong>
+          <span>Pass 1 · Phase 2 — mark AI cards reviewed</span>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-box"></div>
+        <div>
+          <strong>Output attestation</strong>
+          <span>Prep ✓ then Rev ✓ on 1040 / schedule rows</span>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-box"></div>
+        <div>
+          <strong>Reviewer checklist</strong>
+          <span>Pass 2 — four brief phases + manual items</span>
+        </div>
+      </div>
+      <div class="check-item">
+        <div class="check-box"></div>
+        <div>
+          <strong>Sign-off</strong>
+          <span>Pass 2 — Approve &amp; sign off when gate clears</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="print-hint">Print this page (Cmd/Ctrl+P) → Save as PDF · Landscape recommended</p>
+
+</body>
+</html>
