@@ -62,6 +62,14 @@
   text-overflow: ellipsis;
 }
 
+.subtitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-component-gap-medium, 8px);
+  min-width: 0;
+}
+
 .subtitle {
   margin: 0;
   font-family: var(--font-family-body);

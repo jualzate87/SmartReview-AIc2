@@ -293,6 +293,23 @@ function PreparerSummaryTab({ categories, actorLabel }: { categories: ActivityLo
   )
 }
 
+function PassBadge({ label }: { label: string }) {
+  return (
+    <Badge status="info" priority="secondary" capitalization="sentence" className={styles.passBadge}>
+      {label}
+    </Badge>
+  )
+}
+
+function BriefHeaderMeta({ pass1Line, passBadge }: { pass1Line: string; passBadge: string | null }) {
+  return (
+    <div className={styles.briefMeta}>
+      <span className={styles.pass1Line}>{pass1Line}</span>
+      {passBadge ? <PassBadge label={passBadge} /> : null}
+    </div>
+  )
+}
+
 function BriefStickyHeader({
   title,
   pass1Line,
@@ -305,14 +322,7 @@ function BriefStickyHeader({
   return (
     <div className={styles.stickyHeader}>
       <h2 className={styles.briefTitle}>{title}</h2>
-      <div className={styles.briefMeta}>
-        <span className={styles.pass1Line}>{pass1Line}</span>
-        {passBadge && (
-          <Badge status="info" priority="secondary" capitalization="sentence" className={styles.passBadge}>
-            {passBadge}
-          </Badge>
-        )}
-      </div>
+      <BriefHeaderMeta pass1Line={pass1Line} passBadge={passBadge} />
     </div>
   )
 }
@@ -439,13 +449,17 @@ export default function HandoffSummary({
     </div>
   ) : null
 
+  const showInlineHeader = variant === 'embedded'
+
   const briefContent = (
     <div className={`${sidePanelStyles.scroll} ${styles.brief}`}>
-      <BriefStickyHeader
-        title={brief.header.title}
-        pass1Line={brief.header.pass1Line}
-        passBadge={brief.header.passBadge}
-      />
+      {showInlineHeader ? (
+        <BriefStickyHeader
+          title={brief.header.title}
+          pass1Line={brief.header.pass1Line}
+          passBadge={brief.header.passBadge}
+        />
+      ) : null}
 
       {showTabs ? (
         <Tabs
@@ -476,6 +490,9 @@ export default function HandoffSummary({
 
   const panelTitle = brief.header.title
   const panelSubtitle = brief.header.pass1Line
+  const panelHeaderMeta = brief.header.passBadge ? (
+    <PassBadge label={brief.header.passBadge} />
+  ) : null
 
   if (variant === 'embedded') {
     return (
@@ -494,6 +511,7 @@ export default function HandoffSummary({
       <ReviewSidePanel
         title={panelTitle}
         subtitle={panelSubtitle}
+        headerMeta={panelHeaderMeta}
         titleId="handoff-title"
         onClose={onClose}
         closeLabel="Close summary"
@@ -511,7 +529,7 @@ export default function HandoffSummary({
         <header className={styles.overlayHeader}>
           <div>
             <h2 id="handoff-title" className={styles.embeddedTitle}>{panelTitle}</h2>
-            <p className={styles.embeddedSubtitle}>{panelSubtitle}</p>
+            <BriefHeaderMeta pass1Line={panelSubtitle} passBadge={brief.header.passBadge} />
           </div>
           {onClose && (
             <button type="button" className={styles.overlayClose} onClick={onClose} aria-label="Close summary">

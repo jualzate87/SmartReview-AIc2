@@ -5,6 +5,8 @@ import styles from '../../styles/data-review/ReviewSidePanel.module.css'
 type Props = {
   title: string
   subtitle?: string
+  /** Renders inline with subtitle (e.g. Pass 2 badge) */
+  headerMeta?: ReactNode
   titleId?: string
   onClose: () => void
   closeLabel?: string
@@ -22,6 +24,7 @@ type Props = {
 export default function ReviewSidePanel({
   title,
   subtitle,
+  headerMeta,
   titleId = 'side-panel-title',
   onClose,
   closeLabel = 'Close panel',
@@ -39,7 +42,12 @@ export default function ReviewSidePanel({
       <header className={styles.header}>
         <div className={styles.headerText}>
           <h2 id={titleId} className={styles.title}>{title}</h2>
-          {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+          {(subtitle || headerMeta) ? (
+            <div className={styles.subtitleRow}>
+              {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+              {headerMeta}
+            </div>
+          ) : null}
         </div>
         <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={closeLabel}>
           <Close size="small" />
