@@ -1,4 +1,5 @@
 import { CircleCheck } from '@design-systems/icons'
+import type { DocConfirmStatus } from './docReviewStatus'
 import styles from '../../styles/data-review/PeelTab.module.css'
 
 interface PeelTabProps {
@@ -8,6 +9,8 @@ interface PeelTabProps {
     badge?: number
     /** True when this payer originally had flags (or is verified) and count is 0 */
     showClearedCheck?: boolean
+    /** Reviewer doc confirm state (Pass 2) */
+    confirmStatus?: DocConfirmStatus
   }[]
   activeKey: string
   onChange: (key: string) => void
@@ -19,19 +22,41 @@ export default function PeelTab({ tabs, activeKey, onChange }: PeelTabProps) {
       {tabs.map(tab => {
         const isActive = tab.key === activeKey
         const count = tab.badge ?? 0
+        const confirmStatus = tab.confirmStatus
         return (
           <button
             key={tab.key}
-            className={`${styles.tab} ${isActive ? styles.tabActive : styles.tabInactive}`}
+            className={[
+              styles.tab,
+              isActive ? styles.tabActive : styles.tabInactive,
+              confirmStatus === 'needs-confirm' ? styles.tabNeedsConfirm : '',
+              confirmStatus === 'confirmed' && !isActive ? styles.tabConfirmed : '',
+            ].filter(Boolean).join(' ')}
             onClick={() => onChange(tab.key)}
           >
             {tab.label}
-            {count > 0 && !tab.showClearedCheck && (
+            {count > 0 && !tab.showClearedCheck && confirmStatus !== 'needs-confirm' && (
               <span className={`${styles.badge} ${isActive ? styles.badgeActive : styles.badgeInactive}`}>
                 {count}
               </span>
             )}
-            {tab.showClearedCheck && (
+            {confirmStatus === 'needs-confirm' && (
+              <span
+                className={`${styles.needsConfirmBadge} ${isActive ? styles.needsConfirmBadgeActive : ''}`}
+                aria-label="Needs reviewer confirmation"
+              >
+                Needs confirm
+              </span>
+            )}
+            {confirmStatus === 'confirmed' && (
+              <span
+                className={`${styles.clearedCheck} ${isActive ? styles.clearedCheckActive : ''}`}
+                aria-label="Confirmed by reviewer"
+              >
+                <CircleCheck size="small" />
+              </span>
+            )}
+            {!confirmStatus && tab.showClearedCheck && (
               <span
                 className={`${styles.clearedCheck} ${isActive ? styles.clearedCheckActive : ''}`}
                 aria-label="Document reviewed"

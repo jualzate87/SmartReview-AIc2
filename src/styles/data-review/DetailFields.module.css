@@ -57,8 +57,52 @@
   gap: 4px;
   font-family: var(--font-family-component) !important;
   font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-positive, #1a6b35);
+}
+
+.needsConfirmBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--color-container-border-attention, #e5a043);
+  background: var(--color-container-background-attention-secondary, #fff8eb);
+  font-family: var(--font-family-component) !important;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-attention, #8a6116);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.needsConfirmBadge:hover {
+  background: var(--color-container-background-attention-primary, #fff3d9);
+}
+
+.needsConfirmBadgeMuted {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-family-component) !important;
+  font-size: 12px;
   font-weight: 500;
-  color: #205ea3;
+  color: var(--color-text-secondary, #6b6c72);
+  white-space: nowrap;
+}
+
+.awaitingPreparerBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px dashed var(--color-divider-secondary, #d5dee3);
+  font-family: var(--font-family-component) !important;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b6c72);
+  white-space: nowrap;
 }
 
 .verifyStatusGroup {

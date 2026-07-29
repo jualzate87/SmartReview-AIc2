@@ -92,3 +92,32 @@
 .clearedCheckActive {
   color: #ffffff;
 }
+
+.needsConfirmBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  background: #fef3e8;
+  color: #c9500f;
+  border: 1px solid #e8a05c;
+}
+
+.needsConfirmBadgeActive {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.tabNeedsConfirm:not(.tabActive) {
+  border-color: #e8a05c;
+  background: #fffaf5;
+}
+
+.tabConfirmed:not(.tabActive) {
+  border-color: var(--color-action-success, #00856d);
+}

@@ -79,12 +79,12 @@ export default function DocVerifyHeaderActions({
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 4, display: 'flex', alignItems: 'center' }}
             onClick={() => isReviewerActor && onVerifyDoc?.(docKey)}
           >
-            <CheckIcon size={14} /> Confirmed by {reviewerMeta?.by ?? 'reviewer'}
+            <CheckIcon size={14} /> Confirmed
           </button>
         </Tooltip>
       ) : isReviewerActor && isPreparerVerified ? (
-        <button type="button" className={styles.markVerifiedBtn} onClick={() => onVerifyDoc?.(docKey)}>
-          Confirm for sign-off
+        <button type="button" className={styles.needsConfirmBadge} onClick={() => onVerifyDoc?.(docKey)}>
+          Needs confirmation
         </button>
       ) : null}
     </div>

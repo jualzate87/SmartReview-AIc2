@@ -1,16 +1,15 @@
 /**
  * Process-level review checklist for Phase 2 sign-off attestation.
  * Distinct from granular open items in handoffSnapshot.
+ * Items here are reviewer actions only — preparer work lives in the activity log.
  */
 import type { ActivityEntry } from '../hooks/useSyncedReviewState'
 import { computeLiveReturn, type LiveAmounts } from './liveReturn'
 import {
-  PHASE1_FLAG_KEYS,
-  isPhase1FlagResolved,
-  type Phase1FlagKey,
-} from '../pages/data-review/phase1FieldSync'
+  allRequiredFormsSignedOff,
+  REQUIRED_REVIEWER_FORM_SIGNOFFS,
+} from '../pages/data-review/outputForms'
 import { getPhase2Progress } from '../pages/data-review/phase2FlagSync'
-import type { Note } from '../pages/data-review/NotesPane'
 import type { HandoffJump } from './handoffSnapshot'
 import {
   isVerifiedInSet,
@@ -23,19 +22,19 @@ export const EXPECTED_SOURCE_DOCS = PACKET_VERIFY_DOC_KEYS
 export type ManualChecklistId =
   | 'final-walkthrough'
   | 'yoy-variances'
-  | 'output-forms-signoff'
   | 'law-compliance'
   | 'deductions-optimization'
+  | 'reviewed-notes'
 
 export type ReviewChecklistItemId =
   | 'source-docs'
-  | 'reviewed-inputs'
   | 'reviewed-outputs'
   | 'reviewed-notes'
   | 'law-compliance'
   | 'deductions-optimization'
   | 'summary-lines'
   | ManualChecklistId
+  | `form-signoff-${string}`
 
 export type ReviewChecklistItem = {
   id: ReviewChecklistItemId
@@ -59,142 +58,115 @@ export type ReviewChecklistState = {
 }
 
 export type ReviewChecklistInputs = {
-  reviewedFields: Map<string, ActivityEntry>
   verifiedDocs: Set<string>
   reviewerConfirmedDocs: Set<string>
   summaryCheckedFields: Set<string>
   reviewerConfirmedFields: Set<string>
   reviewerConfirmStaleFields: Set<string>
-  notes: Note[]
+  reviewerSignedOffForms: Set<string>
   amounts: LiveAmounts
   manualChecklistItems: Record<string, boolean>
   outstandingOpenCount: number
+  reviewedFields: Map<string, ActivityEntry>
 }
 
-function openPreparerNotes(notes: Note[]): Note[] {
-  return notes.filter(n => {
-    if ((n.status ?? 'open') !== 'open') return false
-    const role = n.role ?? 'preparer'
-    return role === 'preparer'
-  })
+const FORM_SIGNOFF_LABELS: Record<string, { label: string; jump: HandoffJump; jumpLabel: string }> = {
+  'return-summary': { label: 'Return Summary', jump: { type: 'field', field: 'wages' }, jumpLabel: 'Open summary' },
+  'form-1040': { label: 'Form 1040', jump: { type: 'field', field: 'wages' }, jumpLabel: 'Open Form 1040' },
+  'schedule-1': { label: 'Schedule 1', jump: { type: 'outputForm', formId: 'sch1' }, jumpLabel: 'Open Schedule 1' },
+  'schedule-c': { label: 'Schedule C', jump: { type: 'outputForm', formId: 'schC' }, jumpLabel: 'Open Schedule C' },
+  'schedule-a': { label: 'Schedule A', jump: { type: 'outputForm', formId: 'schA' }, jumpLabel: 'Open Schedule A' },
+  'schedule-d': { label: 'Schedule D', jump: { type: 'outputForm', formId: 'schD' }, jumpLabel: 'Open Schedule D' },
+  'form-8960': { label: 'Form 8960', jump: { type: 'outputForm', formId: 'f8960' }, jumpLabel: 'Open Form 8960' },
 }
 
 export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewChecklistState {
-  const phase1Keys = PHASE1_FLAG_KEYS as readonly Phase1FlagKey[]
-  const openImportFlags = phase1Keys.filter(k => !isPhase1FlagResolved(k, input.reviewedFields))
-
   const live = computeLiveReturn(input.amounts)
   const p2 = getPhase2Progress({
     reviewedFields: input.reviewedFields,
     live,
     amounts: input.amounts,
   })
-  const diagsOpenRaw = p2.activeKeys.filter(k => !input.reviewedFields.has(k))
-  const diagsOpen =
-    openImportFlags.length > 0
-      ? diagsOpenRaw.filter(k => k !== 'importMismatches')
-      : diagsOpenRaw
+  const diagsOpen = p2.activeKeys.filter(k => !input.reviewedFields.has(k))
   const hasActiveDiags = p2.activeKeys.length > 0
 
-  const docsMissingVerify = EXPECTED_SOURCE_DOCS.filter(
+  const docsNeedingConfirm = EXPECTED_SOURCE_DOCS.filter(
+    d => isVerifiedInSet(input.verifiedDocs, d) && !isVerifiedInSet(input.reviewerConfirmedDocs, d),
+  )
+  const docsNotVerified = EXPECTED_SOURCE_DOCS.filter(
     d => !isVerifiedInSet(input.verifiedDocs, d),
   )
-  const docsMissingConfirm = EXPECTED_SOURCE_DOCS.filter(d =>
-    isVerifiedInSet(input.verifiedDocs, d) && !isVerifiedInSet(input.reviewerConfirmedDocs, d),
-  )
-  const docsIncomplete = [...new Set([...docsMissingVerify, ...docsMissingConfirm])]
-  const sourceDocsComplete = docsIncomplete.length === 0
+  const sourceDocsComplete =
+    docsNeedingConfirm.length === 0 && docsNotVerified.length === 0
 
-  const prepNotes = openPreparerNotes(input.notes)
-  const preparerNotesComplete = prepNotes.length === 0
-
-  const importComplete = openImportFlags.length === 0
-  const aiComplete = diagsOpen.length === 0
-
-  const needsConfirm = [...input.summaryCheckedFields].filter(
+  const needsConfirmSummary = [...input.summaryCheckedFields].filter(
     f => !input.reviewerConfirmedFields.has(f),
   )
-  const summaryIncomplete = needsConfirm.length > 0 || input.reviewerConfirmStaleFields.size > 0
+  const summaryIncomplete = needsConfirmSummary.length > 0 || input.reviewerConfirmStaleFields.size > 0
   const summaryComplete = !summaryIncomplete
 
+  const outputsComplete = allRequiredFormsSignedOff(input.reviewerSignedOffForms)
+
+  const firstDocGap = docsNeedingConfirm[0] ?? docsNotVerified[0]
   const firstSummaryGap =
     input.reviewerConfirmStaleFields.size > 0
       ? [...input.reviewerConfirmStaleFields][0]
-      : needsConfirm[0]
-
-  const firstDocGap = docsMissingVerify[0] ?? docsMissingConfirm[0]
-  const firstImportFlag = openImportFlags[0]
+      : needsConfirmSummary[0]
   const firstDiag = diagsOpen[0]
-  const firstPrepNote = prepNotes[0]
+  const firstUnsignedForm = REQUIRED_REVIEWER_FORM_SIGNOFFS.find(
+    k => !input.reviewerSignedOffForms.has(k),
+  )
 
   const manual = input.manualChecklistItems
 
   const lawComplianceManual = !hasActiveDiags
   const lawComplianceComplete = lawComplianceManual
     ? !!manual['law-compliance']
-    : aiComplete
+    : diagsOpen.length === 0
+
+  const unconfirmedDocCount = docsNeedingConfirm.length + docsNotVerified.length
+
+  const formSignoffItems: ReviewChecklistItem[] = REQUIRED_REVIEWER_FORM_SIGNOFFS.map(key => {
+    const meta = FORM_SIGNOFF_LABELS[key] ?? { label: key, jump: { type: 'field' as const, field: 'wages' }, jumpLabel: 'Open form' }
+    return {
+      id: `form-signoff-${key}` as ReviewChecklistItemId,
+      label: `Confirm ${meta.label} review complete`,
+      description: input.reviewerSignedOffForms.has(key)
+        ? 'You signed off this output form.'
+        : `Open ${meta.label}, walk key lines, then click Confirm in the form header.`,
+      kind: 'auto',
+      required: true,
+      complete: input.reviewerSignedOffForms.has(key),
+      jump: meta.jump,
+      jumpLabel: meta.jumpLabel,
+    }
+  })
 
   const items: ReviewChecklistItem[] = [
     {
       id: 'source-docs',
-      label: 'All source documents verified and confirmed',
+      label: 'Confirm all source documents',
       description: sourceDocsComplete
-        ? 'Every expected document is verified and confirmed for sign-off.'
-        : docsMissingVerify.length
-          ? `${docsMissingVerify.length} document${docsMissingVerify.length === 1 ? '' : 's'} still need verification.`
-          : `${docsMissingConfirm.length} document${docsMissingConfirm.length === 1 ? '' : 's'} verified but awaiting your confirmation.`,
+        ? 'Every packet document is confirmed for sign-off.'
+        : docsNeedingConfirm.length
+          ? `${docsNeedingConfirm.length} document${docsNeedingConfirm.length === 1 ? '' : 's'} need${docsNeedingConfirm.length === 1 ? 's' : ''} your confirmation in the Rev column.`
+          : `${docsNotVerified.length} document${docsNotVerified.length === 1 ? '' : 's'} still need verification.`,
       kind: 'auto',
       required: true,
       complete: sourceDocsComplete,
       jump: firstDocGap ? { type: 'doc', docId: firstDocGap } : undefined,
-      jumpLabel: 'View document',
-    },
-    {
-      id: 'reviewed-inputs',
-      label: 'Reviewed inputs',
-      description: importComplete
-        ? 'Import accuracy cleared — source docs and Phase 1 flags resolved.'
-        : `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open.`,
-      kind: 'auto',
-      required: true,
-      complete: importComplete,
-      jump: firstImportFlag ? { type: 'field', field: firstImportFlag } : undefined,
-      jumpLabel: 'View field',
-    },
-    {
-      id: 'reviewed-outputs',
-      label: 'Form 1040, Schedule B, Schedule D, and Form 8960 reviewed',
-      description: 'Confirm wages, dividends, deductions, total tax liability, and refund or balance due match verified inputs.',
-      kind: 'manual',
-      required: true,
-      complete: !!manual['output-forms-signoff'],
-      jump: { type: 'field', field: 'wages' },
-      jumpLabel: 'Open Form 1040',
-    },
-    {
-      id: 'reviewed-notes',
-      label: 'Reviewed notes',
-      description: preparerNotesComplete
-        ? 'No open notes from the preparer.'
-        : `${prepNotes.length} preparer note${prepNotes.length === 1 ? '' : 's'} still open.`,
-      kind: 'auto',
-      required: true,
-      complete: preparerNotesComplete,
-      jump: firstPrepNote
-        ? { type: 'note', noteId: firstPrepNote.id }
-        : prepNotes.length
-          ? { type: 'notesPane' }
-          : undefined,
-      jumpLabel: firstPrepNote ? 'Read note' : 'Open notes',
+      jumpLabel: unconfirmedDocCount
+        ? `View ${unconfirmedDocCount} unconfirmed document${unconfirmedDocCount === 1 ? '' : 's'}`
+        : 'View documents',
     },
     {
       id: 'law-compliance',
-      label: 'Checked law compliance application',
+      label: 'Attest tax law & AI diagnostics review',
       description: lawComplianceManual
         ? 'No AI diagnostics on this return — attest compliance review manually.'
-        : aiComplete
-          ? 'All active AI diagnostics have been reviewed.'
-          : `${diagsOpen.length} diagnostic${diagsOpen.length === 1 ? '' : 's'} still open.`,
+        : diagsOpen.length === 0
+          ? 'All active AI diagnostics reviewed — attest your compliance check.'
+          : `${diagsOpen.length} diagnostic${diagsOpen.length === 1 ? '' : 's'} still open — review before attesting.`,
       kind: lawComplianceManual ? 'manual' : 'auto',
       required: true,
       complete: lawComplianceComplete,
@@ -203,22 +175,41 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
     },
     {
       id: 'deductions-optimization',
-      label: 'Checked applied deductions and optimization',
-      description: 'Deductions, credits, and planning opportunities make sense for this client.',
+      label: 'Attest deductions & optimization review',
+      description: 'Confirm Schedule A / C deductions and planning positions make sense for this client.',
       kind: 'manual',
       required: true,
       complete: !!manual['deductions-optimization'],
-      jump: { type: 'diagnostic', issueKey: 'optItemize' },
-      jumpLabel: 'Open AI review',
+      jump: { type: 'outputForm', formId: 'schA' },
+      jumpLabel: 'Open Schedule A',
+    },
+    ...formSignoffItems,
+    {
+      id: 'reviewed-outputs',
+      label: 'All required output forms signed off',
+      description: outputsComplete
+        ? 'Return Summary, Form 1040, and all schedules are signed off.'
+        : firstUnsignedForm
+          ? `${REQUIRED_REVIEWER_FORM_SIGNOFFS.filter(k => !input.reviewerSignedOffForms.has(k)).length} form${REQUIRED_REVIEWER_FORM_SIGNOFFS.filter(k => !input.reviewerSignedOffForms.has(k)).length === 1 ? '' : 's'} still need your sign-off.`
+          : 'Confirm each output form using the header control.',
+      kind: 'auto',
+      required: true,
+      complete: outputsComplete,
+      jump: firstUnsignedForm && FORM_SIGNOFF_LABELS[firstUnsignedForm]
+        ? FORM_SIGNOFF_LABELS[firstUnsignedForm].jump
+        : { type: 'field', field: 'wages' },
+      jumpLabel: firstUnsignedForm && FORM_SIGNOFF_LABELS[firstUnsignedForm]
+        ? FORM_SIGNOFF_LABELS[firstUnsignedForm].jumpLabel
+        : 'Open outputs',
     },
     {
       id: 'summary-lines',
-      label: '1040 summary totals confirmed (wages, dividends, tax, refund/balance due)',
+      label: 'Confirm 1040 summary totals (Rev column)',
       description: summaryComplete
-        ? 'Executive summary totals are confirmed for sign-off.'
+        ? 'Executive summary totals confirmed for sign-off.'
         : input.reviewerConfirmStaleFields.size > 0
-          ? `${input.reviewerConfirmStaleFields.size} line${input.reviewerConfirmStaleFields.size === 1 ? '' : 's'} edited since verify. Confirm again.`
-          : `${needsConfirm.length} verified line${needsConfirm.length === 1 ? '' : 's'} awaiting your confirmation.`,
+          ? `${input.reviewerConfirmStaleFields.size} line${input.reviewerConfirmStaleFields.size === 1 ? '' : 's'} edited since your last confirm — check Rev column again.`
+          : `${needsConfirmSummary.length} summary line${needsConfirmSummary.length === 1 ? '' : 's'} awaiting your Rev confirmation.`,
       kind: 'auto',
       required: true,
       complete: summaryComplete,
@@ -226,17 +217,29 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
       jumpLabel: 'View 1040 totals',
     },
     {
+      id: 'reviewed-notes',
+      label: 'Review preparer notes',
+      description: 'Read open preparer notes and resolve or acknowledge before sign-off.',
+      kind: 'manual',
+      required: true,
+      complete: !!manual['reviewed-notes'],
+      jump: { type: 'notesPane' },
+      jumpLabel: 'Open notes',
+    },
+    {
       id: 'final-walkthrough',
       label: 'Executive 1040 totals walkthrough complete',
-      description: 'Walk wages, total income, tax liability, and refund or balance due one last time.',
+      description: `Walk wages ${live.wages.toLocaleString()}, total income, tax liability, and refund or balance due one last time.`,
       kind: 'manual',
       required: true,
       complete: !!manual['final-walkthrough'],
+      jump: { type: 'field', field: 'totalIncome' },
+      jumpLabel: 'View summary',
     },
     {
       id: 'yoy-variances',
-      label: 'Executive 1040 totals and YoY variance walkthrough',
-      description: 'Material YoY changes in wages, dividends, total income, and tax liability make sense for this client (optional).',
+      label: 'YoY variance walkthrough (optional)',
+      description: 'Material YoY changes in wages, dividends, total income, and tax liability make sense for this client.',
       kind: 'manual',
       required: false,
       complete: !!manual['yoy-variances'],

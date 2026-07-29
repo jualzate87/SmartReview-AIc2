@@ -10,6 +10,44 @@ export type OutputFormId =
   | 'f8960'
   | 'f2210'
 
+/** Stable keys for per-form reviewer sign-off (reviewerSignedOffFormsList). */
+export const OUTPUT_FORM_SIGNOFF_KEYS: Record<OutputFormId, string> = {
+  summary: 'return-summary',
+  '1040': 'form-1040',
+  sch1: 'schedule-1',
+  schC: 'schedule-c',
+  schA: 'schedule-a',
+  schD: 'schedule-d',
+  f8960: 'form-8960',
+  f2210: 'form-2210',
+}
+
+/** Output forms the reviewer must sign off before final approval. */
+export const REQUIRED_REVIEWER_FORM_SIGNOFFS = [
+  'return-summary',
+  'form-1040',
+  'schedule-1',
+  'schedule-c',
+  'schedule-a',
+  'schedule-d',
+  'form-8960',
+] as const
+
+export type ReviewerFormSignoffKey = (typeof REQUIRED_REVIEWER_FORM_SIGNOFFS)[number]
+
+export function outputFormSignoffKey(formId: OutputFormId): string {
+  return OUTPUT_FORM_SIGNOFF_KEYS[formId]
+}
+
+export function outputFormSignoffLabel(formId: OutputFormId): string {
+  const opt = OUTPUT_FORM_OPTIONS.find(o => o.id === formId)
+  return opt?.shortLabel ?? formId
+}
+
+export function allRequiredFormsSignedOff(signedOff: Set<string>): boolean {
+  return REQUIRED_REVIEWER_FORM_SIGNOFFS.every(k => signedOff.has(k))
+}
+
 export const OUTPUT_FORM_OPTIONS: { id: OutputFormId; label: string; shortLabel: string }[] = [
   { id: 'summary', label: 'Return Summary', shortLabel: 'Summary' },
   { id: '1040', label: 'Form 1040', shortLabel: '1040' },

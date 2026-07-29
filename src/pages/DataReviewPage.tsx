@@ -21,6 +21,7 @@ import {
   deriveReviewChecklist,
   canSignOff,
   signOffBlockerText,
+  EXPECTED_SOURCE_DOCS,
 } from '../data/reviewChecklist'
 import {
   buildSmartReviewBrief,
@@ -46,8 +47,12 @@ import type { IntPayer } from './data-review/DetailFields1099'
 import DetailFieldsDiv, { DIV_PAYER_TABS, divVerifiedDocKey } from './data-review/DetailFieldsDiv'
 import type { DivPayer } from './data-review/DetailFieldsDiv'
 import {
+  buildTabConfirmStatus,
   buildTabVerifiedKeys,
   buildTypeReviewed,
+  countDocsIncompleteForReviewer,
+  getDocConfirmStatus,
+  getFirstDocNeedingReviewerAttention,
   getNextUnreviewedSourceDoc,
   getUnreviewedSourceDocs,
 } from './data-review/docReviewStatus'
@@ -172,6 +177,9 @@ export default function DataReviewPage() {
     editedFieldsMeta,
     manualChecklistItems,
     setManualChecklistItem,
+    reviewerSignedOffForms,
+    reviewerSignedOffFormsMeta,
+    toggleReviewerFormSignOff,
   } = useSyncedReviewState()
   const liveTotals = computeLiveReturn(amounts)
   const total1a = liveTotals.wages
@@ -301,6 +309,19 @@ export default function DataReviewPage() {
     intCounts: intPayerFieldCounts,
     rRemaining: tabFlagCounts['1099-rs'] ?? 0,
   })
+  const tabConfirmStatus = buildTabConfirmStatus({
+    verifiedDocs,
+    reviewerConfirmedDocs,
+    tabVerifiedKeys,
+    isReviewer: reviewRole === 'reviewer',
+  })
+
+  const peelDocConfirmStatus = (docKey: string) => {
+    if (reviewRole !== 'reviewer') return undefined
+    const status = getDocConfirmStatus(verifiedDocs, docKey, reviewerConfirmedDocs)
+    return status === 'unverified' ? 'needs-confirm' : status
+  }
+
   const unreviewedSourceDocs = getUnreviewedSourceDocs({
     verifiedDocs,
     w2Counts: w2PayerFieldCounts,
@@ -778,10 +799,20 @@ export default function DataReviewPage() {
     return set.size ? set : new Set(['__none__'])
   })()
 
-  const pass2ConfirmOpenCount = new Set([
+  const pass2SummaryConfirmOpenCount = new Set([
     ...[...summaryCheckedFields].filter(f => !reviewerConfirmedFields.has(f)),
     ...reviewerConfirmStaleFields,
   ]).size
+
+  const pass2DocConfirmOpenCount = reviewRole === 'reviewer'
+    ? countDocsIncompleteForReviewer({
+        verifiedDocs,
+        reviewerConfirmedDocs,
+        docKeys: EXPECTED_SOURCE_DOCS,
+      })
+    : 0
+
+  const pass2ConfirmOpenCount = pass2DocConfirmOpenCount + pass2SummaryConfirmOpenCount
 
   const buildSnapshot = (
     mode: HandoffMode,
@@ -888,6 +919,12 @@ export default function DataReviewPage() {
       setPhase('diagnostics')
       openRightPanel('ai')
       setAgentView('report')
+      return
+    }
+    if (jump.type === 'outputForm') {
+      setShow1040(true)
+      setOutputFormId(jump.formId as OutputFormId)
+      return
     }
   }, [
     handleNavigateToSourceDoc,
@@ -1105,7 +1142,7 @@ export default function DataReviewPage() {
     summaryCheckedFields,
     reviewerConfirmedFields,
     reviewerConfirmStaleFields,
-    notes,
+    reviewerSignedOffForms,
     amounts,
     manualChecklistItems,
     outstandingOpenCount,
@@ -1320,6 +1357,15 @@ export default function DataReviewPage() {
                       setOutputFormId('summary')
                     }
                   } else if (id === 'confirm') {
+                    const firstDoc = getFirstDocNeedingReviewerAttention({
+                      verifiedDocs,
+                      reviewerConfirmedDocs,
+                      docKeys: EXPECTED_SOURCE_DOCS,
+                    })
+                    if (firstDoc) {
+                      handleNavigateToSourceDoc(firstDoc)
+                      return
+                    }
                     const first = [...summaryCheckedFields].find(f => !reviewerConfirmedFields.has(f))
                     if (first) {
                       setSelectedField(first)
@@ -1594,8 +1640,9 @@ export default function DataReviewPage() {
             onTogglePreparerCheck={toggleSummaryPreparerCheck}
             onToggleReviewerConfirm={toggleSummaryReviewerConfirm}
             reviewRole={reviewRole}
-            outputFormsSignedOff={!!manualChecklistItems['output-forms-signoff']}
-            onConfirmOutputForms={() => setManualChecklistItem('output-forms-signoff', true)}
+            reviewerSignedOffForms={reviewerSignedOffForms}
+            reviewerSignedOffFormsMeta={reviewerSignedOffFormsMeta}
+            onToggleFormSignOff={toggleReviewerFormSignOff}
             flaggedFields={summaryFlaggedFields}
             flaggedMeta={summaryFlaggedMeta}
             onToggleFlagged={toggleSummaryFlagged}
@@ -1739,6 +1786,7 @@ export default function DataReviewPage() {
                 verifiedDocs={verifiedDocs}
                 tabVerifiedKeys={tabVerifiedKeys}
                 typeReviewed={inImportPhase ? typeReviewed : undefined}
+                tabConfirmStatus={reviewRole === 'reviewer' ? tabConfirmStatus : undefined}
                 onTopTabChange={(tab) => {
                   setActiveTopTab(tab)
                   setFromAgent(false)
@@ -1754,6 +1802,7 @@ export default function DataReviewPage() {
                     ...t,
                     badge: divPayerFieldCounts[t.key],
                     showClearedCheck: isDocShownVerified(verifiedDocs, divVerifiedDocKey(t.key), reviewerConfirmedDocs),
+                    confirmStatus: peelDocConfirmStatus(divVerifiedDocKey(t.key)),
                   }))}
                   activeKey={activeDivPayer}
                   onChange={key => setActiveDivPayer(key as DivPayer)}
@@ -1765,6 +1814,7 @@ export default function DataReviewPage() {
                     ...t,
                     badge: intPayerFieldCounts[t.key],
                     showClearedCheck: isDocShownVerified(verifiedDocs, intVerifiedDocKey(t.key), reviewerConfirmedDocs),
+                    confirmStatus: peelDocConfirmStatus(intVerifiedDocKey(t.key)),
                   }))}
                   activeKey={activeIntPayer}
                   onChange={key => setActiveIntPayer(key as IntPayer)}
@@ -1776,6 +1826,7 @@ export default function DataReviewPage() {
                     ...t,
                     badge: w2PayerFieldCounts[t.key],
                     showClearedCheck: isDocShownVerified(verifiedDocs, t.key, reviewerConfirmedDocs),
+                    confirmStatus: peelDocConfirmStatus(t.key),
                   }))}
                   activeKey={activeSubTab}
                   onChange={key => setActiveSubTab(key as W2Employer)}
@@ -1787,6 +1838,7 @@ export default function DataReviewPage() {
                     ...t,
                     badge: tabFlagCounts['1099-rs'],
                     showClearedCheck: isDocShownVerified(verifiedDocs, '1099-r', reviewerConfirmedDocs),
+                    confirmStatus: peelDocConfirmStatus('1099-r'),
                   }))}
                   activeKey="meridian"
                   onChange={() => {}}
@@ -1798,6 +1850,7 @@ export default function DataReviewPage() {
                     ...t,
                     badge: 0,
                     showClearedCheck: isDocShownVerified(verifiedDocs, '1099-nec', reviewerConfirmedDocs),
+                    confirmStatus: peelDocConfirmStatus('1099-nec'),
                   }))}
                   activeKey="summit"
                   onChange={() => {}}

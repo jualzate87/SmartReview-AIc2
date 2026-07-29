@@ -186,3 +186,22 @@
   margin-left: 6px;
   color: var(--color-action-success, #00856d);
 }
+
+.tabNeedsConfirmBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  background: #fef3e8;
+  color: #c9500f;
+  border: 1px solid #e8a05c;
+  white-space: nowrap;
+}
+
+.tabNeedsConfirm .tabLabelInactive {
+  color: #9a4b0a;
+}

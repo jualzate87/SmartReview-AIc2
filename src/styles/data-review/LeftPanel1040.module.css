@@ -1113,7 +1113,8 @@
   letter-spacing: 0.6px;
 }
 
-.outputFormsSignoffBtn {
+.outputFormsSignoffBtn,
+.formSignoffBtn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1129,15 +1130,34 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.outputFormsSignoffBtn:hover:not(:disabled) {
+.outputFormsSignoffBtn:hover:not(:disabled),
+.formSignoffBtn:hover:not(:disabled) {
   border-color: var(--color-action-standard);
   background: #eef5fb;
 }
-.outputFormsSignoffBtnDone {
-  border-color: #205ea3;
-  color: #205ea3;
-  background: #eef5fb;
-  cursor: default;
+.outputFormsSignoffBtnDone,
+.formSignoffBtnDone {
+  border-color: var(--color-action-success, #00856d);
+  color: var(--color-action-success, #00856d);
+  background: #e8f5ef;
+  cursor: pointer;
+}
+
+.formSignoffToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 16px 0;
+  flex-shrink: 0;
+}
+
+.summarySignoffRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 16px 8px;
+  border-bottom: 1px solid var(--color-divider-tertiary);
 }
 
 .summaryBody {

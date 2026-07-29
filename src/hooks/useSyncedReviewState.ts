@@ -40,6 +40,8 @@ interface SyncedState {
   reviewerConfirmedFieldsList: [string, ActivityEntry][]
   /** Docs marked verified by preparer */
   reviewerConfirmedDocsList: [string, ActivityEntry][]
+  /** Per output form / schedule reviewer sign-off (e.g. schedule-c, form-1040) */
+  reviewerSignedOffFormsList: [string, ActivityEntry][]
   /** Summary fields needing reviewer re-confirm after post-verify edit */
   reviewerConfirmStaleFieldsList: string[]
   /** Manual attestation checkboxes for review checklist (Phase 2 sign-off) */
@@ -68,7 +70,7 @@ interface SyncedState {
 
 const CHANNEL_NAME = 'protoc2-data-review-sync'
 // Bump whenever DEFAULT_STATE shape or seed values change so stale sessions reset.
-const STATE_VERSION = 24
+const STATE_VERSION = 25
 const STORAGE_KEY = 'protoc2-data-review-state-v' + STATE_VERSION
 export const PREPARER_NAME = 'Sara Chen'
 export const REVIEWER_NAME = 'Jordan Lee'
@@ -249,6 +251,7 @@ const DEFAULT_STATE: SyncedState = {
   summaryCheckedFieldsList: [],
   reviewerConfirmedFieldsList: [],
   reviewerConfirmedDocsList: [],
+  reviewerSignedOffFormsList: [],
   reviewerConfirmStaleFieldsList: [],
   manualChecklistItems: {},
   summaryFlaggedFieldsList: [],
@@ -297,6 +300,7 @@ function loadInitialState(): SyncedState {
         summaryCheckedFieldsList?: unknown
         reviewerConfirmedFieldsList?: unknown
         reviewerConfirmedDocsList?: unknown
+        reviewerSignedOffFormsList?: unknown
         reviewerConfirmStaleFieldsList?: unknown
         manualChecklistItems?: unknown
         summaryFlaggedFieldsList?: unknown
@@ -326,6 +330,7 @@ function loadInitialState(): SyncedState {
         reviewerConfirmStaleFieldsList: Array.isArray(parsed.reviewerConfirmStaleFieldsList)
           ? parsed.reviewerConfirmStaleFieldsList.filter((k): k is string => typeof k === 'string')
           : [],
+        reviewerSignedOffFormsList: migrateActivityList(parsed.reviewerSignedOffFormsList),
         summaryFlaggedFieldsList: migrateActivityList(parsed.summaryFlaggedFieldsList),
         summaryFlagNotes: parsed.summaryFlagNotes ?? {},
         summaryFlagActivity: parsed.summaryFlagActivity ?? {},
@@ -667,6 +672,17 @@ export function useSyncedReviewState() {
     update({ manualChecklistItems: next })
   }
 
+  const reviewerSignedOffForms = new Map(state.reviewerSignedOffFormsList)
+  const reviewerSignedOffFormKeys = new Set(state.reviewerSignedOffFormsList.map(([k]) => k))
+
+  const toggleReviewerFormSignOff = (formKey: string) => {
+    if (!isReviewerActor()) return
+    const next = new Map(stateRef.current.reviewerSignedOffFormsList)
+    if (next.has(formKey)) next.delete(formKey)
+    else next.set(formKey, nowEntry())
+    update({ reviewerSignedOffFormsList: Array.from(next.entries()) })
+  }
+
   const setManualChecklistItem = (itemId: string, checked: boolean) => {
     update({
       manualChecklistItems: {
@@ -730,5 +746,8 @@ export function useSyncedReviewState() {
     manualChecklistItems: state.manualChecklistItems,
     toggleManualChecklistItem,
     setManualChecklistItem,
+    reviewerSignedOffForms: reviewerSignedOffFormKeys,
+    reviewerSignedOffFormsMeta: reviewerSignedOffForms,
+    toggleReviewerFormSignOff,
   }
 }

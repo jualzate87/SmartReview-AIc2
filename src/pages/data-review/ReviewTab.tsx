@@ -1,5 +1,6 @@
 import { CircleCheck } from '@design-systems/icons'
 import sparklesIcon from '../../assets/icons/sparkles.svg'
+import type { DocConfirmStatus } from './docReviewStatus'
 import styles from '../../styles/data-review/ReviewTab.module.css'
 
 // Import docs first; Questionnaire + Prior Year 1040 last (reference / Organizer)
@@ -41,6 +42,8 @@ interface ReviewTabProps {
    * When provided, drives the L1 green check (preferred over internal heuristics).
    */
   typeReviewed?: Record<string, boolean>
+  /** Pass 2 reviewer: aggregate confirm status per top tab */
+  tabConfirmStatus?: Record<string, DocConfirmStatus>
 }
 
 export default function ReviewTab({
@@ -52,6 +55,7 @@ export default function ReviewTab({
   verifiedDocs,
   tabVerifiedKeys,
   typeReviewed,
+  tabConfirmStatus,
 }: ReviewTabProps) {
   const handleTabClick = (key: string, label: string) => {
     if (TAB_KEYS.has(key)) {
@@ -61,12 +65,27 @@ export default function ReviewTab({
   }
 
   const renderBadge = (tabKey: string) => {
+    const confirmStatus = tabConfirmStatus?.[tabKey]
+    if (confirmStatus === 'needs-confirm') {
+      return (
+        <span className={styles.tabNeedsConfirmBadge} aria-label="Documents need reviewer confirmation">
+          Needs confirm
+        </span>
+      )
+    }
+    if (confirmStatus === 'confirmed') {
+      return (
+        <span className={styles.tabClearedCheck} aria-label="All documents confirmed">
+          <CircleCheck size="small" />
+        </span>
+      )
+    }
+
     if (!flagCounts && !typeReviewed && !verifiedDocs) return null
     const count = flagCounts?.[tabKey] ?? 0
     if (count > 0) {
       return <span className={styles.tabFlagBadge}>{count}</span>
     }
-    // Prefer explicit type-level reviewed signal from parent
     if (typeReviewed?.[tabKey]) {
       return (
         <span className={styles.tabClearedCheck} aria-label="All documents reviewed">
@@ -74,12 +93,10 @@ export default function ReviewTab({
         </span>
       )
     }
-    // Fallback: all verified-doc keys for this type are marked verified
     const verifiedKeys = tabVerifiedKeys?.[tabKey] ?? []
     const allVerified =
       verifiedKeys.length > 0 && verifiedKeys.every(k => verifiedDocs?.has(k))
     const initial = initialFlagCounts?.[tabKey] ?? 0
-    // Legacy: flags existed and are now cleared (single-doc types)
     const flagsCleared = initial > 0 && count === 0 && verifiedKeys.length <= 1
     if (allVerified || flagsCleared) {
       return (
@@ -97,7 +114,10 @@ export default function ReviewTab({
         {TABS.map((tab) => (
           <button
             key={tab.key}
-            className={styles.tab}
+            className={[
+              styles.tab,
+              tabConfirmStatus?.[tab.key] === 'needs-confirm' ? styles.tabNeedsConfirm : '',
+            ].filter(Boolean).join(' ')}
             onClick={() => handleTabClick(tab.key, tab.label)}
           >
             <div className={styles.tabContent}>

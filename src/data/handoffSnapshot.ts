@@ -37,6 +37,7 @@ export type HandoffJump =
   | { type: 'note'; noteId: string }
   | { type: 'diagnostic'; issueKey: string }
   | { type: 'notesPane' }
+  | { type: 'outputForm'; formId: string }
 
 export type HandoffItem = {
   /** Stable anchor id for open-item subnav (open items only) */
@@ -488,6 +489,8 @@ export function jumpActionLabel(jump: HandoffJump): string {
       return 'Open notes'
     case 'diagnostic':
       return 'Open AI review'
+    case 'outputForm':
+      return 'Open form'
     default:
       return 'View'
   }

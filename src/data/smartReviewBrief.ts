@@ -14,7 +14,6 @@ import { normalizeVerifiedDocKey, verifiedDocLabel, PACKET_VERIFY_DOC_KEYS } fro
 import { PHASE1_FLAG_KEYS } from '../pages/data-review/phase1FieldSync'
 import type { ReviewChecklistState, ReviewChecklistItem } from './reviewChecklist'
 import { computeLiveReturn, type LiveAmounts } from './liveReturn'
-import { FROZEN_RETURN } from './frozenReturn'
 
 export type BriefPhaseId = 'phase-1' | 'phase-2' | 'phase-3' | 'phase-4'
 
@@ -123,27 +122,21 @@ function fmtUsd(n: number): string {
   return `$${Math.round(n).toLocaleString('en-US')}`
 }
 
-const OPEN_GROUP_PHASE: Record<string, BriefPhaseId> = {
-  'unverified-docs': 'phase-1',
-  'import-flags': 'phase-1',
-  'docs-needs-confirmation': 'phase-1',
-  notes: 'phase-1',
-  'needs-confirmation': 'phase-4',
-  'ai-diagnostics': 'phase-2',
-  'preparer-flags': 'phase-3',
-}
-
 const CHECKLIST_PHASE: Record<string, BriefPhaseId> = {
   'source-docs': 'phase-1',
-  'reviewed-inputs': 'phase-1',
   'reviewed-notes': 'phase-1',
   'law-compliance': 'phase-2',
   'deductions-optimization': 'phase-3',
   'summary-lines': 'phase-4',
   'reviewed-outputs': 'phase-4',
-  'output-forms-signoff': 'phase-4',
   'final-walkthrough': 'phase-4',
   'yoy-variances': 'phase-4',
+}
+
+function checklistPhaseForItem(itemId: string): BriefPhaseId | undefined {
+  if (itemId in CHECKLIST_PHASE) return CHECKLIST_PHASE[itemId]
+  if (itemId.startsWith('form-signoff-')) return 'phase-4'
+  return undefined
 }
 
 function firstName(full: string): string {
@@ -169,17 +162,38 @@ function checklistToStrategicItem(item: ReviewChecklistItem): StrategicChecklist
   }
 }
 
-function openGroupToItems(group: HandoffItemGroup): StrategicChecklistItem[] {
-  return group.items.map(item => ({
-    id: item.id ?? `open-${group.id}-${item.label}`,
-    title: item.label,
-    note: enrichOpenItemNote(group.id, item),
-    checked: false,
-    locked: true,
-    jump: item.jump,
-    jumpLabel: item.jumpLabel ?? (item.jump ? 'View' : undefined),
-    required: true,
-  }))
+
+function enrichChecklistItemNote(
+  item: ReviewChecklistItem,
+  _snapshot: HandoffSnapshot,
+  live: ReturnType<typeof computeLiveReturn>,
+): string | undefined {
+  if (item.description && !item.complete) return item.description
+  if (item.complete && item.description) return item.description
+
+  switch (item.id) {
+    case 'source-docs':
+      return item.description ?? 'Open each source document and confirm in the Rev column.'
+    case 'law-compliance':
+      return item.description ?? 'Review AI diagnostics, then attest law compliance.'
+    case 'deductions-optimization':
+      return item.description ?? 'Walk Schedule A / C and confirm deductions look reasonable.'
+    case 'summary-lines':
+      return item.description ?? `Confirm wages, dividends, tax (${fmtUsd(live.totalTax)}), and refund or balance due in the Rev column.`
+    case 'reviewed-outputs':
+      return item.description ?? 'Use Confirm in each output form header when review is complete.'
+    case 'final-walkthrough':
+      return `Walk executive totals: wages ${fmtUsd(live.wages)}, total income ${fmtUsd(live.totalIncome)}, tax ${fmtUsd(live.totalTax)}.`
+    case 'yoy-variances':
+      return `Explain material YoY moves in wages, dividends, and total income (${fmtUsd(live.totalIncome)}).`
+    case 'reviewed-notes':
+      return item.description ?? 'Read open preparer notes and acknowledge before sign-off.'
+    default:
+      if (typeof item.id === 'string' && item.id.startsWith('form-signoff-')) {
+        return item.description
+      }
+      return item.description
+  }
 }
 
 function countPass1Baseline(snapshot: HandoffSnapshot): { checks: number; docCount: number } {
@@ -189,159 +203,6 @@ function countPass1Baseline(snapshot: HandoffSnapshot): { checks: number; docCou
   const verifiedGroup = doneGroups.find(g => g.id === 'verified-docs')
   const docCount = verifiedGroup?.count ?? PACKET_VERIFY_DOC_KEYS.length
   return { checks: Math.max(checks, 28), docCount: Math.max(docCount, 5) }
-}
-
-function enrichOpenItemNote(groupId: string, item: HandoffItem): string | undefined {
-  if (groupId === 'notes' && item.detail) {
-    return `Sara note: ${item.detail}`
-  }
-  if (groupId === 'ai-diagnostics') {
-    if (item.id?.includes('niitForm8960') || item.label.includes('8960')) {
-      return `Sara note: Confirm Form 8960 safe harbor applying after AGI increase to ${fmtUsd(FROZEN_RETURN.totalIncome)}.`
-    }
-    if (item.detail) return `Sara flagged: ${item.detail}`
-  }
-  if (groupId === 'import-flags') {
-    return `Sara note: ${item.label} still needs a source-doc spot-check before you sign off.`
-  }
-  if (groupId === 'needs-confirmation' || groupId === 'docs-needs-confirmation') {
-    return `Sara verified this in Pass 1 — confirm the line still matches after your review.`
-  }
-  return item.detail ? `Sara note: ${item.detail}` : undefined
-}
-
-function enrichChecklistItemNote(
-  item: ReviewChecklistItem,
-  snapshot: HandoffSnapshot,
-  live: ReturnType<typeof computeLiveReturn>,
-): string | undefined {
-  const prep = firstName(snapshot.voice === 'reviewer-briefing' ? snapshot.actorLabel : PREPARER_NAME)
-
-  switch (item.id) {
-    case 'source-docs':
-      return item.complete
-        ? `${prep} verified every packet document against OCR imports — ready for your confirmation.`
-        : item.description
-    case 'reviewed-inputs':
-      return item.complete
-        ? `${prep} cleared import accuracy across W-2 and 1099 forms.`
-        : item.description
-    case 'reviewed-notes': {
-      const openNotes = getOpenGroups(snapshot).find(g => g.id === 'notes')
-      const form8960Note = openNotes?.items.find(i =>
-        i.label.includes('8960') || i.detail?.includes('8960'),
-      )
-      if (form8960Note?.detail) {
-        return `Sara note: ${form8960Note.detail}`
-      }
-      return `Sara note: Confirm Form 8960 safe harbor applying after AGI increase to ${fmtUsd(live.totalIncome)}.`
-    }
-    case 'law-compliance':
-      if (item.complete) return `${prep} reviewed all active AI diagnostics.`
-      return `Sara flagged: ${fmtUsd(live.qualifiedDivs)} qualified dividends push the taxpayer into the 20% capital gains bracket — confirm rate schedule and NIIT.`
-    case 'deductions-optimization':
-      return item.complete
-        ? `${prep} confirmed deductions and optimization opportunities look reasonable.`
-        : 'Walk Schedule A / C deductions and any carryforwards before you attest.'
-    case 'summary-lines':
-      return item.complete
-        ? `${prep} confirmed executive summary lines for handoff.`
-        : item.description
-    case 'reviewed-outputs':
-      return `Open Form 1040, Schedule B, Schedule D, and Form 8960. Confirm wages ${fmtUsd(live.wages)}, dividends ${fmtUsd(live.ordinaryDivs)}, deductions ${fmtUsd(live.deductionTaken)}, total tax ${fmtUsd(live.totalTax)}, and ${live.oweAmount > 0 ? `balance due ${fmtUsd(live.oweAmount)}` : 'refund position'} match verified inputs.`
-    case 'final-walkthrough':
-      return `Walk executive 1040 totals: wages ${fmtUsd(live.wages)}, total income ${fmtUsd(live.totalIncome)}, tax liability ${fmtUsd(live.totalTax)}, and ${live.oweAmount > 0 ? `balance due ${fmtUsd(live.oweAmount)}` : 'expected refund'}.`
-    case 'yoy-variances':
-      return `YoY variance walkthrough: wages ${fmtUsd(live.wages)}, dividends ${fmtUsd(live.ordinaryDivs)}, total income ${fmtUsd(live.totalIncome)}, tax ${fmtUsd(live.totalTax)} vs prior year.`
-    default:
-      return item.description
-  }
-}
-
-function seedDemoPhaseItems(
-  phaseId: BriefPhaseId,
-  live: ReturnType<typeof computeLiveReturn>,
-): StrategicChecklistItem[] {
-  switch (phaseId) {
-    case 'phase-1':
-      return [
-        {
-          id: 'demo-verify-w2',
-          title: 'Verify W-2 · Tech Circle wages and withholding',
-          note: 'Sara cleared SSN, EIN, and Box 12 codes — confirm Box 1 wages still tie to the source PDF.',
-          checked: true,
-          locked: true,
-          jump: { type: 'doc', docId: 'techCircle' },
-          jumpLabel: 'W-2 Tech Circle',
-          required: true,
-        },
-        {
-          id: 'demo-verify-div',
-          title: 'Reconcile 1099-DIV · Token Financial qualified dividends',
-          note: `${fmtUsd(live.qualifiedDivs)} qualified dividends on return — spot-check Box 1b against the detail panel.`,
-          checked: false,
-          jump: { type: 'doc', docId: '1099-div-tokenFinancial' },
-          jumpLabel: '1099-DIV',
-          required: true,
-        },
-      ]
-    case 'phase-2':
-      return [
-        {
-          id: 'demo-niit',
-          title: 'Review Form 8960 — Net Investment Income Tax',
-          note: `Sara note: Confirm Form 8960 safe harbor applying after AGI increase to ${fmtUsd(live.totalIncome)}.`,
-          checked: false,
-          jump: { type: 'diagnostic', issueKey: 'niitForm8960' },
-          jumpLabel: 'Form 8960',
-          required: true,
-        },
-        {
-          id: 'demo-cap-gains',
-          title: 'Confirm capital gains rate schedule',
-          note: `Sara flagged: ${fmtUsd(live.qualifiedDivs)} qualified dividend gain pushes taxpayer into 20% capital gains bracket.`,
-          checked: false,
-          jump: { type: 'field', field: 'qualifiedDivs' },
-          jumpLabel: 'Qualified divs',
-          required: true,
-        },
-      ]
-    case 'phase-3':
-      return [
-        {
-          id: 'demo-deductions',
-          title: 'Review Schedule A vs standard deduction',
-          note: 'Sara note: Client confirmed mortgage interest — itemized may beat the standard deduction once 1098 is entered.',
-          checked: false,
-          jump: { type: 'field', field: 'stdDeduction' },
-          jumpLabel: 'Schedule A',
-          required: true,
-        },
-      ]
-    case 'phase-4':
-      return [
-        {
-          id: 'demo-1040-outputs',
-          title: 'Review Form 1040, Schedule B, and Schedule D outputs',
-          note: `Confirm wages ${fmtUsd(live.wages)}, dividends ${fmtUsd(live.ordinaryDivs)}, deductions ${fmtUsd(live.deductionTaken)}, tax liability ${fmtUsd(live.totalTax)}, and ${live.oweAmount > 0 ? `balance due ${fmtUsd(live.oweAmount)}` : 'refund position'}.`,
-          checked: false,
-          jump: { type: 'field', field: 'wages' },
-          jumpLabel: 'Open Form 1040',
-          required: true,
-        },
-        {
-          id: 'demo-yoy-walkthrough',
-          title: 'Executive 1040 totals and YoY variance walkthrough',
-          note: `Total income ${fmtUsd(live.totalIncome)} vs prior year. Explain material moves in wages and investment income before sign-off.`,
-          checked: false,
-          jump: { type: 'field', field: 'totalIncome' },
-          jumpLabel: 'View summary',
-          required: true,
-        },
-      ]
-    default:
-      return []
-  }
 }
 
 function getOpenGroups(snapshot: HandoffSnapshot): HandoffItemGroup[] {
@@ -368,10 +229,8 @@ function buildPhases(
     'phase-4': [],
   }
 
-  const seenIds = new Set<string>()
-
   for (const item of checklist.items) {
-    const phaseId = CHECKLIST_PHASE[item.id]
+    const phaseId = checklistPhaseForItem(item.id)
     if (!phaseId) continue
     const note = enrichChecklistItemNote(item, snapshot, live)
     if (item.kind === 'manual') {
@@ -390,23 +249,10 @@ function buildPhases(
         note,
       })
     }
-    seenIds.add(item.id)
-  }
-
-  for (const group of getOpenGroups(snapshot)) {
-    const phaseId = OPEN_GROUP_PHASE[group.id] ?? 'phase-1'
-    for (const item of openGroupToItems(group)) {
-      if (seenIds.has(item.id)) continue
-      phaseItems[phaseId].push(item)
-      seenIds.add(item.id)
-    }
   }
 
   return (Object.keys(PHASE_TITLES) as BriefPhaseId[]).map(id => {
-    let items = phaseItems[id]
-    if (items.length === 0) {
-      items = seedDemoPhaseItems(id, live)
-    }
+    const items = phaseItems[id]
     return {
       id,
       title: PHASE_TITLES[id],

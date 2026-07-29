@@ -29,7 +29,13 @@ import { PRIOR_YEAR_1040_VALUES, buildYoyMap, yoyPercent } from './priorYear1040
 import AttestColumns, { preparerCheckTooltip, reviewerCheckTooltip } from './AttestColumns'
 import OutputFormViews from './OutputFormViews'
 import OutputRowActions from './OutputRowActions'
-import { OUTPUT_FORM_OPTIONS, type OutputFormId } from './outputForms'
+import FormSignOffControl from './FormSignOffControl'
+import {
+  OUTPUT_FORM_OPTIONS,
+  outputFormSignoffKey,
+  outputFormSignoffLabel,
+  type OutputFormId,
+} from './outputForms'
 import styles from '../../styles/data-review/LeftPanel1040.module.css'
 
 /** Tooltip body with optional who/when meta line */
@@ -108,11 +114,12 @@ interface LeftPanel1040Props {
   onTogglePreparerCheck?: (fieldName: string) => void
   /** Toggle reviewer confirm slot (reviewer only) */
   onToggleReviewerConfirm?: (fieldName: string) => void
-  /** C2 review role — drives output-forms sign-off affordance */
+  /** C2 review role — drives per-form sign-off affordance */
   reviewRole?: 'preparer' | 'reviewer'
-  /** Reviewer attestation that output forms were reviewed */
-  outputFormsSignedOff?: boolean
-  onConfirmOutputForms?: () => void
+  /** Per-form reviewer sign-off keys (e.g. schedule-c, form-1040) */
+  reviewerSignedOffForms?: Set<string>
+  reviewerSignedOffFormsMeta?: Map<string, ActivityEntry>
+  onToggleFormSignOff?: (signoffKey: string) => void
   /** Summary-row user flags — mutually exclusive with checks */
   flaggedFields?: Set<string>
   /** Who/when for currently active flags */
@@ -212,8 +219,9 @@ export default function LeftPanel1040({
   onTogglePreparerCheck,
   onToggleReviewerConfirm,
   reviewRole = 'preparer',
-  outputFormsSignedOff = false,
-  onConfirmOutputForms,
+  reviewerSignedOffForms = new Set(),
+  reviewerSignedOffFormsMeta = new Map(),
+  onToggleFormSignOff,
   flaggedFields = new Set(),
   flaggedMeta = new Map(),
   onToggleFlagged,
@@ -1009,28 +1017,23 @@ export default function LeftPanel1040({
             ))}
           </select>
         </CoachTip>
-        {isReviewerRole && outputFormId !== 'summary' && onConfirmOutputForms && (
-          <button
-            type="button"
-            className={`${styles.outputFormsSignoffBtn} ${outputFormsSignedOff ? styles.outputFormsSignoffBtnDone : ''}`}
-            onClick={onConfirmOutputForms}
-            disabled={outputFormsSignedOff}
-          >
-            {outputFormsSignedOff ? (
-              <>
-                <CircleCheck size="small" aria-hidden />
-                Output forms confirmed
-              </>
-            ) : (
-              'Confirm output forms'
-            )}
-          </button>
-        )}
       </div>
 
       {/* ── SUMMARY TABLE VIEW — Figma ProConnect style ── */}
       {view === 'table' && (
         <div className={styles.summaryWrapper}>
+          {isReviewerRole && onToggleFormSignOff && (
+            <div className={styles.summarySignoffRow}>
+              <FormSignOffControl
+                formLabel={outputFormSignoffLabel('summary')}
+                signoffKey={outputFormSignoffKey('summary')}
+                signedOff={reviewerSignedOffForms.has(outputFormSignoffKey('summary'))}
+                signoffMeta={reviewerSignedOffFormsMeta.get(outputFormSignoffKey('summary'))}
+                isReviewerRole={isReviewerRole}
+                onToggle={onToggleFormSignOff}
+              />
+            </div>
+          )}
           <div className={styles.summaryCard}>
             <div className={styles.summaryCardHeader}>
               <span className={styles.summaryCardLabel}>RETURN BREAKDOWN</span>
@@ -1499,9 +1502,25 @@ export default function LeftPanel1040({
             onToggleFlagged={onToggleFlagged}
             onOpenComment={openComment1040}
             onFlagClick={handleOutputFlagClick}
+            reviewerSignedOffForms={reviewerSignedOffForms}
+            reviewerSignedOffFormsMeta={reviewerSignedOffFormsMeta}
+            onToggleFormSignOff={onToggleFormSignOff}
           />
         ) : (
         <div className={styles.formDoc}>
+
+          {isReviewerRole && onToggleFormSignOff && outputFormId === '1040' && (
+            <div className={styles.formSignoffToolbar}>
+              <FormSignOffControl
+                formLabel={outputFormSignoffLabel('1040')}
+                signoffKey={outputFormSignoffKey('1040')}
+                signedOff={reviewerSignedOffForms.has(outputFormSignoffKey('1040'))}
+                signoffMeta={reviewerSignedOffFormsMeta.get(outputFormSignoffKey('1040'))}
+                isReviewerRole={isReviewerRole}
+                onToggle={onToggleFormSignOff}
+              />
+            </div>
+          )}
 
           {/* ── IRS Header ── */}
           <div className={styles.irsHeader}>

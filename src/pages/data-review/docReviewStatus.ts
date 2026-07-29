@@ -16,6 +16,45 @@ import type { TopTab } from './ReviewTab'
 import { QUESTIONNAIRE_DOC_KEY } from './questionnaireData'
 import { isDocShownVerified, isVerifiedInSet } from '../../data/verifiedDocKeys'
 
+export type DocConfirmStatus = 'confirmed' | 'needs-confirm' | 'unverified'
+
+/** Reviewer-facing confirm state for a single source document. */
+export function getDocConfirmStatus(
+  verifiedDocs: Set<string>,
+  docKey: string,
+  reviewerConfirmedDocs?: Set<string>,
+): DocConfirmStatus {
+  if (reviewerConfirmedDocs && isVerifiedInSet(reviewerConfirmedDocs, docKey)) {
+    return 'confirmed'
+  }
+  if (isVerifiedInSet(verifiedDocs, docKey)) {
+    return 'needs-confirm'
+  }
+  return 'unverified'
+}
+
+/** Count packet docs awaiting reviewer confirmation (preparer verified, reviewer not). */
+export function countDocsNeedingReviewerConfirm(args: {
+  verifiedDocs: Set<string>
+  reviewerConfirmedDocs: Set<string>
+  docKeys: readonly string[]
+}): number {
+  const { verifiedDocs, reviewerConfirmedDocs, docKeys } = args
+  return docKeys.filter(
+    k => isVerifiedInSet(verifiedDocs, k) && !isVerifiedInSet(reviewerConfirmedDocs, k),
+  ).length
+}
+
+/** Count docs not yet reviewer-confirmed (includes unverified + needs-confirm). */
+export function countDocsIncompleteForReviewer(args: {
+  verifiedDocs: Set<string>
+  reviewerConfirmedDocs: Set<string>
+  docKeys: readonly string[]
+}): number {
+  const { verifiedDocs, reviewerConfirmedDocs, docKeys } = args
+  return docKeys.filter(k => !isDocShownVerified(verifiedDocs, k, reviewerConfirmedDocs)).length
+}
+
 /**
  * A document shows a green check when marked verified, OR when it originally
  * had import flags and those are all cleared (legacy “cleared” signal).
@@ -29,6 +68,40 @@ export function isDocReviewed(
 ): boolean {
   if (isDocShownVerified(verifiedDocs, docKey, reviewerConfirmedDocs)) return true
   return initialFlagCount > 0 && remainingFlagCount === 0
+}
+
+/** Aggregate reviewer confirm state per L1 document type tab. */
+export function buildTabConfirmStatus(args: {
+  verifiedDocs: Set<string>
+  reviewerConfirmedDocs: Set<string>
+  tabVerifiedKeys: Record<string, string[]>
+  isReviewer: boolean
+}): Record<string, DocConfirmStatus> {
+  if (!args.isReviewer) return {}
+  const out: Record<string, DocConfirmStatus> = {}
+  for (const [tabKey, keys] of Object.entries(args.tabVerifiedKeys)) {
+    if (keys.length === 0) continue
+    const statuses = keys.map(k =>
+      getDocConfirmStatus(args.verifiedDocs, k, args.reviewerConfirmedDocs),
+    )
+    if (statuses.every(s => s === 'confirmed')) {
+      out[tabKey] = 'confirmed'
+    } else {
+      out[tabKey] = 'needs-confirm'
+    }
+  }
+  return out
+}
+
+/** First packet doc key still awaiting reviewer confirmation (or preparer verify). */
+export function getFirstDocNeedingReviewerAttention(args: {
+  verifiedDocs: Set<string>
+  reviewerConfirmedDocs: Set<string>
+  docKeys: readonly string[]
+}): string | undefined {
+  return args.docKeys.find(
+    k => !isDocShownVerified(args.verifiedDocs, k, args.reviewerConfirmedDocs),
+  )
 }
 
 export function buildTabVerifiedKeys(): Record<string, string[]> {
