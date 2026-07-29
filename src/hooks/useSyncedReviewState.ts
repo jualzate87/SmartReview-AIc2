@@ -7,6 +7,7 @@ import type { IntPayer } from '../pages/data-review/DetailFields1099'
 import { PHASE1_TO_PHASE2_ISSUES } from '../pages/data-review/phase2FlagSync'
 import { getPhase1FlagKeysForVerifiedDoc } from '../pages/data-review/phase1FieldSync'
 import { normalizeVerifiedDocEntries, normalizeVerifiedDocKey } from '../data/verifiedDocKeys'
+import type { MilestoneCompletion } from '../data/reviewMilestones'
 
 // ProtoC: source-doc review state persisted in sessionStorage. BroadcastChannel
 // remains available for cross-tab sync if a second view is added later.
@@ -46,6 +47,8 @@ interface SyncedState {
   reviewerConfirmStaleFieldsList: string[]
   /** Manual attestation checkboxes for review checklist (Phase 2 sign-off) */
   manualChecklistItems: Record<string, boolean>
+  /** Declaration milestone completions — who/when for flexible checklist */
+  completedMilestones: Record<string, MilestoneCompletion>
   /**
    * Summary-row user flags (preparer attention markers).
    * Mutually exclusive with checks. Notes may remain when flag is off.
@@ -70,7 +73,7 @@ interface SyncedState {
 
 const CHANNEL_NAME = 'protoc2-data-review-sync'
 // Bump whenever DEFAULT_STATE shape or seed values change so stale sessions reset.
-const STATE_VERSION = 25
+const STATE_VERSION = 26
 const STORAGE_KEY = 'protoc2-data-review-state-v' + STATE_VERSION
 export const PREPARER_NAME = 'Sara Chen'
 export const REVIEWER_NAME = 'Jordan Lee'
@@ -254,6 +257,7 @@ const DEFAULT_STATE: SyncedState = {
   reviewerSignedOffFormsList: [],
   reviewerConfirmStaleFieldsList: [],
   manualChecklistItems: {},
+  completedMilestones: {},
   summaryFlaggedFieldsList: [],
   summaryFlagNotes: {},
   summaryFlagActivity: {},
@@ -303,6 +307,7 @@ function loadInitialState(): SyncedState {
         reviewerSignedOffFormsList?: unknown
         reviewerConfirmStaleFieldsList?: unknown
         manualChecklistItems?: unknown
+        completedMilestones?: unknown
         summaryFlaggedFieldsList?: unknown
       }
       const dualSlots = migrateDualSlotLists(parsed)
@@ -326,6 +331,9 @@ function loadInitialState(): SyncedState {
         ...normalizedDualSlots,
         manualChecklistItems: parsed.manualChecklistItems && typeof parsed.manualChecklistItems === 'object'
           ? parsed.manualChecklistItems as Record<string, boolean>
+          : {},
+        completedMilestones: parsed.completedMilestones && typeof parsed.completedMilestones === 'object'
+          ? parsed.completedMilestones as Record<string, MilestoneCompletion>
           : {},
         reviewerConfirmStaleFieldsList: Array.isArray(parsed.reviewerConfirmStaleFieldsList)
           ? parsed.reviewerConfirmStaleFieldsList.filter((k): k is string => typeof k === 'string')
@@ -692,6 +700,36 @@ export function useSyncedReviewState() {
     })
   }
 
+  const toggleMilestoneDeclaration = (milestoneId: string) => {
+    const next = { ...stateRef.current.completedMilestones }
+    if (next[milestoneId]) {
+      delete next[milestoneId]
+    } else {
+      const entry = nowEntry()
+      next[milestoneId] = {
+        by: entry.by === REVIEWER_NAME ? 'reviewer' : 'preparer',
+        at: entry.at,
+        name: entry.by,
+      }
+    }
+    update({ completedMilestones: next })
+  }
+
+  const setMilestoneDeclaration = (milestoneId: string, complete: boolean) => {
+    const next = { ...stateRef.current.completedMilestones }
+    if (complete) {
+      const entry = nowEntry()
+      next[milestoneId] = {
+        by: entry.by === REVIEWER_NAME ? 'reviewer' : 'preparer',
+        at: entry.at,
+        name: entry.by,
+      }
+    } else {
+      delete next[milestoneId]
+    }
+    update({ completedMilestones: next })
+  }
+
   return {
     activeTopTab: state.activeTopTab,
     setActiveTopTab: (tab: TopTab) => update({ activeTopTab: tab }),
@@ -746,6 +784,9 @@ export function useSyncedReviewState() {
     manualChecklistItems: state.manualChecklistItems,
     toggleManualChecklistItem,
     setManualChecklistItem,
+    completedMilestones: state.completedMilestones,
+    toggleMilestoneDeclaration,
+    setMilestoneDeclaration,
     reviewerSignedOffForms: reviewerSignedOffFormKeys,
     reviewerSignedOffFormsMeta: reviewerSignedOffForms,
     toggleReviewerFormSignOff,

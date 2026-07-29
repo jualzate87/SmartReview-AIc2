@@ -128,10 +128,15 @@ flowchart LR
 
 ### Strategic checklist phases (Pass 2)
 
-1. **Phase 1:** Source documents & income verification  
-2. **Phase 2:** Tax law strategy, safe harbors & form diagnostics  
-3. **Phase 3:** Deductions, carryforwards & estimates  
-4. **Phase 4:** Executive 1040 totals & YoY variance walkthrough  
+Milestone checklist aligned to CPA review doc — see [milestone-checklist-design.md](./milestone-checklist-design.md):
+
+1. **Phase 1:** Client information & file setup  
+2. **Phase 2:** Income verification (tie-outs)  
+3. **Phase 3:** Deductions & adjustments  
+4. **Phase 4:** Credits & tax calculations  
+5. **Phase 5:** Variance analysis & final check  
+
+Each milestone tracks **who completed it** (single- or dual-person) and uses **auto**, **linked**, or **declaration** completion types.
 
 ---
 

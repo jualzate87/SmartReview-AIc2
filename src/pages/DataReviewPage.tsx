@@ -19,15 +19,13 @@ import {
 } from '../data/handoffSnapshot'
 import {
   deriveReviewChecklist,
-  canSignOff,
-  signOffBlockerText,
   EXPECTED_SOURCE_DOCS,
 } from '../data/reviewChecklist'
 import {
-  buildSmartReviewBrief,
-  canApproveSignOff,
-  countStrategicOpenItems,
-} from '../data/smartReviewBrief'
+  deriveMilestoneState,
+  canSignOffFromMilestones,
+  signOffBlockerFromMilestones,
+} from '../data/reviewMilestones'
 import {
   PREPARER_NAME,
   REVIEWER_NAME,
@@ -177,6 +175,8 @@ export default function DataReviewPage() {
     editedFieldsMeta,
     manualChecklistItems,
     setManualChecklistItem,
+    completedMilestones,
+    setMilestoneDeclaration,
     reviewerSignedOffForms,
     reviewerSignedOffFormsMeta,
     toggleReviewerFormSignOff,
@@ -1148,18 +1148,41 @@ export default function DataReviewPage() {
     outstandingOpenCount,
   })
 
+  const singlePersonMode = reviewPass === 1
+
+  const milestoneState = deriveMilestoneState({
+    verifiedDocs,
+    reviewerConfirmedDocs,
+    summaryCheckedFields,
+    reviewerConfirmedFields,
+    reviewerConfirmStaleFields,
+    reviewerSignedOffForms,
+    verifiedDocsMeta,
+    reviewerConfirmedDocsMeta,
+    reviewerSignedOffFormsMeta,
+    amounts,
+    reviewedFields,
+    completedMilestones,
+    outstandingOpenCount,
+    currentActorName: getReviewActor(),
+    reviewPass,
+    singlePersonMode,
+  })
+
   /** Summary toolbar badge — Pass 2 checklist open items; preparer uses granular open count */
   const summaryBadgeCount = (() => {
     if (reviewRole === 'reviewer' && reviewPass === 2) {
       const pass2Brief = buildSmartReviewBrief({
         snapshot: buildSnapshot('signoff-review', 2, REVIEWER_NAME, 'self'),
         checklist: reviewChecklist,
+        milestoneState,
         outstandingOpenCount,
         manualChecklistItems,
         reviewPass: 2,
         showStrategicChecklist: true,
         isPreparer: false,
         amounts,
+        singlePersonMode,
       })
       return countStrategicOpenItems(pass2Brief.phases)
     }
@@ -1177,20 +1200,22 @@ export default function DataReviewPage() {
   const briefForGating = buildSmartReviewBrief({
     snapshot: buildSnapshot('signoff-review'),
     checklist: reviewChecklist,
+    milestoneState,
     outstandingOpenCount,
     manualChecklistItems,
     reviewPass,
     showStrategicChecklist: showChecklist,
     isPreparer: reviewRole === 'preparer',
     amounts,
+    singlePersonMode,
   })
   const signOffReady = !signOffGatingActive || (
     showChecklist
       ? canApproveSignOff(briefForGating)
-      : canSignOff(reviewChecklist, outstandingOpenCount)
+      : canSignOffFromMilestones(milestoneState, outstandingOpenCount)
   )
   const signOffBlockerMessage = signOffGatingActive
-    ? signOffBlockerText(reviewChecklist, outstandingOpenCount)
+    ? signOffBlockerFromMilestones(milestoneState, outstandingOpenCount)
     : null
 
   // Resize drag between the document preview and detail fields. Axis is frozen
@@ -1522,7 +1547,7 @@ export default function DataReviewPage() {
           onOpenDiagnostics={() => handleAgentOpen()}
           checklistProgress={
             signOffGatingActive
-              ? { complete: reviewChecklist.requiredCompleteCount, total: reviewChecklist.requiredTotal }
+              ? { complete: milestoneState.requiredCompleteCount, total: milestoneState.requiredTotal }
               : undefined
           }
           signOffSlot={
@@ -2285,8 +2310,10 @@ export default function DataReviewPage() {
                   variant="drawer"
                   snapshot={handoffSnapshot}
                   checklist={reviewChecklist}
+                  milestoneState={milestoneState}
+                  singlePersonMode={singlePersonMode}
                   showChecklist={showChecklist}
-                  onToggleChecklistItem={setManualChecklistItem}
+                  onToggleChecklistItem={setMilestoneDeclaration}
                   signOffReady={signOffReady}
                   signOffBlockerText={signOffBlockerMessage}
                   outstandingOpenCount={outstandingOpenCount}

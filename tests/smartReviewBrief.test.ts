@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildHandoffSnapshot } from '../src/data/handoffSnapshot'
 import { buildSmartReviewBrief, countStrategicOpenItems } from '../src/data/smartReviewBrief'
+import { deriveMilestoneState } from '../src/data/reviewMilestones'
 import { computeLiveReturn, SEED_AMOUNTS } from '../src/data/liveReturn'
 import type { ActivityEntry } from '../src/hooks/useSyncedReviewState'
 import type { ReviewChecklistState } from '../src/data/reviewChecklist'
@@ -44,9 +45,29 @@ describe('buildSmartReviewBrief reviewer checklist', () => {
       amounts,
     })
 
+    const milestoneState = deriveMilestoneState({
+      verifiedDocs: new Set(['techCircle']),
+      reviewerConfirmedDocs: new Set(),
+      summaryCheckedFields: new Set(['qualifiedDivs']),
+      reviewerConfirmedFields: new Set(),
+      reviewerConfirmStaleFields: new Set(),
+      reviewerSignedOffForms: new Set(),
+      verifiedDocsMeta: new Map([['techCircle', meta()]]),
+      reviewerConfirmedDocsMeta: new Map(),
+      reviewerSignedOffFormsMeta: new Map(),
+      amounts,
+      reviewedFields: new Map([['ssn-techCircle', meta()]]),
+      completedMilestones: {},
+      outstandingOpenCount: 1,
+      currentActorName: 'Jordan Lee',
+      reviewPass: 2,
+      singlePersonMode: false,
+    })
+
     const brief = buildSmartReviewBrief({
       snapshot,
       checklist: emptyChecklist,
+      milestoneState,
       outstandingOpenCount: 1,
       manualChecklistItems: {},
       reviewPass: 2,
@@ -58,12 +79,12 @@ describe('buildSmartReviewBrief reviewer checklist', () => {
     expect(brief.viewMode).toBe('reviewer-strategic')
     expect(brief.executiveBrief?.intro).toContain('Pass 2')
     expect(brief.executiveBrief?.attention?.items.some(i =>
-      i.parts.some(p => p.text.includes('still need')),
+      i.parts.some(p => p.text.includes('milestone')),
     )).toBe(true)
-    expect(brief.phases).toHaveLength(4)
-    expect(brief.phases[0].description).toContain('packet documents')
+    expect(brief.phases).toHaveLength(5)
+    expect(brief.phases[0].title).toContain('Client information')
     const phase2Items = brief.phases.find(p => p.id === 'phase-2')?.items ?? []
-    expect(phase2Items.some(i => i.note?.includes('8960') || i.note?.includes('capital gains'))).toBe(true)
+    expect(phase2Items.some(i => i.title.includes('W-2'))).toBe(true)
   })
 
   it('hides reviewer checklist in reviewer-briefing mode', () => {
@@ -112,9 +133,29 @@ describe('buildSmartReviewBrief reviewer checklist', () => {
       amounts,
     })
 
+    const milestoneState = deriveMilestoneState({
+      verifiedDocs: new Set(),
+      reviewerConfirmedDocs: new Set(),
+      summaryCheckedFields: new Set(),
+      reviewerConfirmedFields: new Set(),
+      reviewerConfirmStaleFields: new Set(),
+      reviewerSignedOffForms: new Set(),
+      verifiedDocsMeta: new Map(),
+      reviewerConfirmedDocsMeta: new Map(),
+      reviewerSignedOffFormsMeta: new Map(),
+      amounts,
+      reviewedFields: new Map(),
+      completedMilestones: {},
+      outstandingOpenCount: 0,
+      currentActorName: 'Jordan Lee',
+      reviewPass: 2,
+      singlePersonMode: false,
+    })
+
     const brief = buildSmartReviewBrief({
       snapshot,
       checklist: emptyChecklist,
+      milestoneState,
       outstandingOpenCount: 0,
       manualChecklistItems: {},
       reviewPass: 2,

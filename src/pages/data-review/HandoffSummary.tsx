@@ -8,10 +8,11 @@ import { B3 } from '@ids-ts/typography'
 import '@ids-ts/typography/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
 import '@ids-ts/tabs/dist/main.css'
-import { AiSparkles, ChevronRight, CircleCheck, CircleCheckFill } from '@design-systems/icons'
+import { AiSparkles, ChevronRight, CircleCheck, CircleCheckFill, Link } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import type { LiveAmounts } from '../../data/liveReturn'
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
+import type { MilestoneState } from '../../data/reviewMilestones'
 import {
   buildSmartReviewBrief,
   canApproveSignOff,
@@ -45,6 +46,8 @@ type Props = {
   signOffBlockerText?: string | null
   outstandingOpenCount?: number
   manualChecklistItems?: Record<string, boolean>
+  milestoneState?: MilestoneState
+  singlePersonMode?: boolean
   reviewPass?: 1 | 2
   isPreparer?: boolean
   amounts?: LiveAmounts
@@ -77,6 +80,23 @@ function PhaseVerifiedBadge({ status }: { status: 'action-needed' | 'verified' }
   )
 }
 
+function CompletionTypeIcon({ type }: { type?: StrategicChecklistItem['completionType'] }) {
+  if (!type) return null
+  const title =
+    type === 'auto'
+      ? 'Auto-completed by system'
+      : type === 'linked'
+        ? 'Linked to field or document verification'
+        : 'Manual attestation'
+  return (
+    <span className={styles.completionTypeIcon} title={title} aria-label={title}>
+      {type === 'auto' && <AiSparkles size="x-small" aria-hidden />}
+      {type === 'linked' && <Link size="x-small" aria-hidden />}
+      {type === 'declaration' && <CircleCheck size="x-small" aria-hidden />}
+    </span>
+  )
+}
+
 function ChecklistStatusIcon({
   item,
   onToggle,
@@ -85,9 +105,9 @@ function ChecklistStatusIcon({
   onToggle?: (itemId: string, checked: boolean) => void
 }) {
   const isComplete = item.checked
-  const canToggle = !!onToggle && !item.locked
+  const canToggle = !!onToggle && (item.canToggle ?? !item.locked)
 
-  /* Auto-verified / locked complete — filled green check, not interactive */
+  /* Auto-verified / linked complete — filled green check, not interactive */
   if (item.locked && isComplete) {
     return (
       <span className={styles.checklistIconSlot} aria-hidden>
@@ -105,7 +125,7 @@ function ChecklistStatusIcon({
     )
   }
 
-  /* Manual items — same checkmark-button language as output-form attest columns */
+  /* Declaration items — same checkmark-button language as output-form attest columns */
   return (
     <span className={styles.checklistIconSlot}>
       <button
@@ -153,8 +173,12 @@ function ChecklistItemRow({
         <div className={styles.checklistCheck}>
           <ChecklistStatusIcon item={item} onToggle={onToggle} />
           <div className={styles.checklistText}>
-            <span className={`${styles.checklistTitle} ${isComplete ? styles.checklistTitleDone : ''}`}>
-              {item.title}
+            <span className={`${styles.checklistTitleRow} ${isComplete ? styles.checklistTitleDone : ''}`}>
+              <CompletionTypeIcon type={item.completionType} />
+              <span className={styles.checklistTitle}>{item.title}</span>
+              {item.attribution && isComplete && (
+                <span className={styles.checklistAttribution}>{item.attribution}</span>
+              )}
             </span>
             {item.note && (
               <p className={`${styles.checklistNote} ${isComplete ? styles.checklistNoteDone : ''}`}>
@@ -431,6 +455,8 @@ export default function HandoffSummary({
   signOffBlockerText: _signOffBlockerText,
   outstandingOpenCount = 0,
   manualChecklistItems = {},
+  milestoneState,
+  singlePersonMode = false,
   reviewPass = snapshot.pass,
   isPreparer = false,
   amounts,
@@ -440,14 +466,16 @@ export default function HandoffSummary({
       buildSmartReviewBrief({
         snapshot,
         checklist: checklist ?? { items: [], completeCount: 0, totalCount: 0, requiredCompleteCount: 0, requiredTotal: 0, allRequiredComplete: true, blockers: [] },
+        milestoneState,
         outstandingOpenCount,
         manualChecklistItems,
         reviewPass,
         showStrategicChecklist: showChecklist,
         isPreparer,
         amounts,
+        singlePersonMode,
       }),
-    [snapshot, checklist, outstandingOpenCount, manualChecklistItems, reviewPass, showChecklist, isPreparer, amounts],
+    [snapshot, checklist, milestoneState, outstandingOpenCount, manualChecklistItems, reviewPass, showChecklist, isPreparer, amounts, singlePersonMode],
   )
 
   const signOffReady = canApproveSignOff(brief)

@@ -12,10 +12,19 @@ import {
 } from './handoffSnapshot'
 import { normalizeVerifiedDocKey, verifiedDocLabel, PACKET_VERIFY_DOC_KEYS } from './verifiedDocKeys'
 import { PHASE1_FLAG_KEYS } from '../pages/data-review/phase1FieldSync'
-import type { ReviewChecklistState, ReviewChecklistItem } from './reviewChecklist'
-import { computeLiveReturn, type LiveAmounts } from './liveReturn'
+import type { ReviewChecklistState } from './reviewChecklist'
+import type { LiveAmounts } from './liveReturn'
+import {
+  countMilestonesByRole,
+  formatMilestoneAttribution,
+  MILESTONE_PHASE_DESCRIPTIONS,
+  MILESTONE_PHASE_TITLES,
+  type MilestoneCompletionType,
+  type MilestoneState,
+  type ResolvedMilestone,
+} from './reviewMilestones'
 
-export type BriefPhaseId = 'phase-1' | 'phase-2' | 'phase-3' | 'phase-4'
+export type BriefPhaseId = 'phase-1' | 'phase-2' | 'phase-3' | 'phase-4' | 'phase-5'
 
 export type StrategicChecklistItem = {
   id: string
@@ -27,6 +36,10 @@ export type StrategicChecklistItem = {
   jump?: HandoffJump
   jumpLabel?: string
   required: boolean
+  completionType?: MilestoneCompletionType
+  /** Who completed — e.g. "Jordan · Jul 29" */
+  attribution?: string
+  canToggle?: boolean
 }
 
 export type BriefPhase = {
@@ -95,6 +108,7 @@ export type SmartReviewBrief = {
 export type SmartReviewBriefInputs = {
   snapshot: HandoffSnapshot
   checklist: ReviewChecklistState
+  milestoneState?: MilestoneState
   outstandingOpenCount: number
   manualChecklistItems: Record<string, boolean>
   syncedAt?: string
@@ -102,41 +116,13 @@ export type SmartReviewBriefInputs = {
   showStrategicChecklist: boolean
   isPreparer: boolean
   amounts?: LiveAmounts
+  singlePersonMode?: boolean
 }
 
-const PHASE_TITLES: Record<BriefPhaseId, string> = {
-  'phase-1': 'Phase 1: Source documents & income verification',
-  'phase-2': 'Phase 2: Tax law strategy, safe harbors & form diagnostics',
-  'phase-3': 'Phase 3: Deductions, carryforwards & estimates',
-  'phase-4': 'Phase 4: Executive 1040 totals & YoY variance walkthrough',
-}
+const BRIEF_PHASE_IDS: BriefPhaseId[] = ['phase-1', 'phase-2', 'phase-3', 'phase-4', 'phase-5']
 
-const PHASE_DESCRIPTIONS: Record<BriefPhaseId, string> = {
-  'phase-1': 'Confirm packet documents match OCR imports and income lines reconcile to source.',
-  'phase-2': 'Validate tax law triggers, safe harbors, and open AI diagnostics before sign-off.',
-  'phase-3': 'Review deductions, credits, carryforwards, and estimated tax positions.',
-  'phase-4': 'Walk executive 1040 totals and material year-over-year variances with the client story.',
-}
-
-function fmtUsd(n: number): string {
-  return `$${Math.round(n).toLocaleString('en-US')}`
-}
-
-const CHECKLIST_PHASE: Record<string, BriefPhaseId> = {
-  'source-docs': 'phase-1',
-  'reviewed-notes': 'phase-1',
-  'law-compliance': 'phase-2',
-  'deductions-optimization': 'phase-3',
-  'summary-lines': 'phase-4',
-  'reviewed-outputs': 'phase-4',
-  'final-walkthrough': 'phase-4',
-  'yoy-variances': 'phase-4',
-}
-
-function checklistPhaseForItem(itemId: string): BriefPhaseId | undefined {
-  if (itemId in CHECKLIST_PHASE) return CHECKLIST_PHASE[itemId]
-  if (itemId.startsWith('form-signoff-')) return 'phase-4'
-  return undefined
+function briefPhaseId(num: 1 | 2 | 3 | 4 | 5): BriefPhaseId {
+  return `phase-${num}` as BriefPhaseId
 }
 
 function firstName(full: string): string {
@@ -149,50 +135,24 @@ function phaseStatus(items: StrategicChecklistItem[]): 'action-needed' | 'verifi
   return required.every(i => i.checked && !i.locked) ? 'verified' : 'action-needed'
 }
 
-function checklistToStrategicItem(item: ReviewChecklistItem): StrategicChecklistItem {
+function milestoneToStrategicItem(
+  m: ResolvedMilestone,
+  singlePersonMode: boolean,
+): StrategicChecklistItem {
   return {
-    id: item.id,
-    title: item.label,
-    note: item.description,
-    checked: item.complete,
-    locked: item.kind === 'auto',
-    jump: item.jump,
-    jumpLabel: item.jumpLabel,
-    required: item.required,
-  }
-}
-
-
-function enrichChecklistItemNote(
-  item: ReviewChecklistItem,
-  _snapshot: HandoffSnapshot,
-  live: ReturnType<typeof computeLiveReturn>,
-): string | undefined {
-  if (item.description && !item.complete) return item.description
-  if (item.complete && item.description) return item.description
-
-  switch (item.id) {
-    case 'source-docs':
-      return item.description ?? 'Open each source document and confirm in the Rev column.'
-    case 'law-compliance':
-      return item.description ?? 'Review AI diagnostics, then attest law compliance.'
-    case 'deductions-optimization':
-      return item.description ?? 'Walk Schedule A / C and confirm deductions look reasonable.'
-    case 'summary-lines':
-      return item.description ?? `Confirm wages, dividends, tax (${fmtUsd(live.totalTax)}), and refund or balance due in the Rev column.`
-    case 'reviewed-outputs':
-      return item.description ?? 'Use Confirm in each output form header when review is complete.'
-    case 'final-walkthrough':
-      return `Walk executive totals: wages ${fmtUsd(live.wages)}, total income ${fmtUsd(live.totalIncome)}, tax ${fmtUsd(live.totalTax)}.`
-    case 'yoy-variances':
-      return `Explain material YoY moves in wages, dividends, and total income (${fmtUsd(live.totalIncome)}).`
-    case 'reviewed-notes':
-      return item.description ?? 'Read open preparer notes and acknowledge before sign-off.'
-    default:
-      if (typeof item.id === 'string' && item.id.startsWith('form-signoff-')) {
-        return item.description
-      }
-      return item.description
+    id: m.id,
+    title: m.title,
+    note: m.complete && m.completion
+      ? m.description
+      : m.description,
+    checked: m.complete,
+    locked: m.locked,
+    jump: m.jumpTarget,
+    jumpLabel: m.jumpLabel,
+    required: m.required,
+    completionType: m.completionType,
+    attribution: formatMilestoneAttribution(m.completion, singlePersonMode),
+    canToggle: m.canToggle,
   }
 }
 
@@ -215,48 +175,30 @@ function getDoneGroups(snapshot: HandoffSnapshot): HandoffItemGroup[] {
   return doneSection?.groups ?? []
 }
 
-function buildPhases(
-  checklist: ReviewChecklistState,
-  snapshot: HandoffSnapshot,
-  manualChecklistItems: Record<string, boolean>,
-  amounts?: LiveAmounts,
+function buildPhasesFromMilestones(
+  milestoneState: MilestoneState,
+  singlePersonMode: boolean,
 ): BriefPhase[] {
-  const live = computeLiveReturn(amounts ?? {} as LiveAmounts)
   const phaseItems: Record<BriefPhaseId, StrategicChecklistItem[]> = {
     'phase-1': [],
     'phase-2': [],
     'phase-3': [],
     'phase-4': [],
+    'phase-5': [],
   }
 
-  for (const item of checklist.items) {
-    const phaseId = checklistPhaseForItem(item.id)
-    if (!phaseId) continue
-    const note = enrichChecklistItemNote(item, snapshot, live)
-    if (item.kind === 'manual') {
-      phaseItems[phaseId].push({
-        id: item.id,
-        title: item.label,
-        note,
-        checked: !!manualChecklistItems[item.id],
-        jump: item.jump,
-        jumpLabel: item.jumpLabel,
-        required: item.required,
-      })
-    } else {
-      phaseItems[phaseId].push({
-        ...checklistToStrategicItem(item),
-        note,
-      })
-    }
+  for (const m of milestoneState.milestones) {
+    const phaseId = briefPhaseId(m.phase)
+    phaseItems[phaseId].push(milestoneToStrategicItem(m, singlePersonMode))
   }
 
-  return (Object.keys(PHASE_TITLES) as BriefPhaseId[]).map(id => {
+  return BRIEF_PHASE_IDS.map(id => {
+    const phaseNum = Number(id.replace('phase-', '')) as 1 | 2 | 3 | 4 | 5
     const items = phaseItems[id]
     return {
       id,
-      title: PHASE_TITLES[id],
-      description: PHASE_DESCRIPTIONS[id],
+      title: MILESTONE_PHASE_TITLES[phaseNum],
+      description: MILESTONE_PHASE_DESCRIPTIONS[phaseNum],
       status: phaseStatus(items),
       items,
     }
@@ -461,6 +403,8 @@ function buildExecutiveBrief(
   allPhasesComplete: boolean,
   outstandingOpenCount: number,
   reviewPass: 1 | 2,
+  milestoneState?: MilestoneState,
+  singlePersonMode = false,
 ): SmartReviewBrief['executiveBrief'] {
   const reviewerFirst = firstName(REVIEWER_NAME)
   const { checks, docCount } = countPass1Baseline(snapshot)
@@ -469,6 +413,7 @@ function buildExecutiveBrief(
   const activity = countActivityEntries(snapshot)
   const resolvedDocCount = Math.max(activity.docsVerified, docCount)
   const resolvedFlagCount = Math.max(activity.flagsCleared, checks > 0 ? checks - resolvedDocCount : 0)
+  const milestoneCounts = milestoneState ? countMilestonesByRole(milestoneState) : null
 
   const passLabel = reviewPass === 2 ? 'Pass 2' : 'Pass 1'
   const heading = `${reviewerFirst}, here's where ${passLabel.toLowerCase()} stands`
@@ -479,6 +424,37 @@ function buildExecutiveBrief(
       : `${preparerFirst} finished ${passLabel} and handed this return to you. Here's what's already done and what still needs your review.`
 
   const completedItems: ConversationalBriefItem[] = []
+
+  if (milestoneCounts && milestoneCounts.complete > 0) {
+    completedItems.push(
+      briefItem('milestones-progress', [
+        { text: String(milestoneCounts.complete), bold: true },
+        { text: ' of ' },
+        { text: String(milestoneState!.requiredTotal), bold: true },
+        { text: ' required milestones complete' },
+      ]),
+    )
+    if (!singlePersonMode && reviewPass === 2 && milestoneCounts.preparer > 0) {
+      completedItems.push(
+        briefItem('milestones-preparer', [
+          { text: preparerFirst, bold: true },
+          { text: ' completed ' },
+          { text: String(milestoneCounts.preparer), bold: true },
+          { text: ` milestone${milestoneCounts.preparer === 1 ? '' : 's'} in Pass 1` },
+        ]),
+      )
+    }
+    if (!singlePersonMode && milestoneCounts.reviewer > 0) {
+      completedItems.push(
+        briefItem('milestones-reviewer', [
+          { text: reviewerFirst, bold: true },
+          { text: ' completed ' },
+          { text: String(milestoneCounts.reviewer), bold: true },
+          { text: ` milestone${milestoneCounts.reviewer === 1 ? '' : 's'} in Pass 2` },
+        ]),
+      )
+    }
+  }
 
   if (reviewPass === 1) {
     completedItems.push(
@@ -509,7 +485,7 @@ function buildExecutiveBrief(
         ]),
       )
     }
-  } else {
+  } else if (!milestoneCounts?.complete) {
     completedItems.push(
       briefItem('pass1-handoff', [
         { text: preparerFirst, bold: true },
@@ -522,13 +498,13 @@ function buildExecutiveBrief(
     )
   }
 
-  if (attested > 0) {
+  if (attested > 0 && !milestoneCounts) {
     completedItems.push(
       briefItem('checklist-attested', [
         { text: String(attested), bold: true },
         { text: ' of ' },
         { text: String(required), bold: true },
-        { text: ` reviewer checklist item${required === 1 ? '' : 's'} attested so far` },
+        { text: ` checklist item${required === 1 ? '' : 's'} attested so far` },
       ]),
     )
   }
@@ -543,30 +519,38 @@ function buildExecutiveBrief(
   }
 
   let attention: ConversationalBriefSection | null = null
+  const remainingMilestones = milestoneState
+    ? milestoneState.requiredTotal - milestoneState.requiredCompleteCount
+    : required - attested
 
-  if (attentionCount > 0) {
-    const attentionItems: ConversationalBriefItem[] = [
-      briefItem('open-checklist', [
-        { text: String(attentionCount), bold: true },
-        {
-          text: ` checklist item${attentionCount === 1 ? '' : 's'} still need${attentionCount === 1 ? 's' : ''} your review`,
-        },
-      ]),
-    ]
+  if (attentionCount > 0 || remainingMilestones > 0) {
+    const attentionItems: ConversationalBriefItem[] = []
 
-    const unattested = required - attested
-    if (unattested > 0 && unattested !== attentionCount) {
+    if (remainingMilestones > 0) {
       attentionItems.push(
-        briefItem('unattested-outputs', [
-          { text: String(unattested), bold: true },
-          { text: ` output attestation${unattested === 1 ? '' : 's'} not yet marked complete` },
+        briefItem('open-milestones', [
+          { text: String(remainingMilestones), bold: true },
+          {
+            text: ` milestone${remainingMilestones === 1 ? '' : 's'} still need${remainingMilestones === 1 ? 's' : ''} completion`,
+          },
+        ]),
+      )
+    }
+
+    if (attentionCount > 0 && attentionCount !== remainingMilestones) {
+      attentionItems.push(
+        briefItem('open-checklist', [
+          { text: String(attentionCount), bold: true },
+          {
+            text: ` item${attentionCount === 1 ? '' : 's'} still need${attentionCount === 1 ? 's' : ''} your review`,
+          },
         ]),
       )
     }
 
     attentionItems.push(
       briefItem('work-phases', [
-        { text: 'Work through the phased checklist below — start with Phase 1 source documents' },
+        { text: 'Work through the milestone checklist below — start with Phase 1 client setup' },
       ]),
     )
 
@@ -579,7 +563,7 @@ function buildExecutiveBrief(
       label: 'Needs your attention',
       items: [
         briefItem('spot-check', [
-          { text: 'Spot-check NIIT, capital gains rate, and executive totals, then attest the remaining checklist items' },
+          { text: 'Spot-check NIIT, capital gains rate, and executive totals, then complete remaining milestones' },
         ]),
       ],
     }
@@ -602,6 +586,7 @@ function buildSignOffStatus(
   allPhasesComplete: boolean,
   outstandingOpenCount: number,
   checklist: ReviewChecklistState,
+  milestoneState?: MilestoneState,
 ): SmartReviewBrief['signOff'] {
   const ready = allPhasesComplete && outstandingOpenCount === 0
   if (ready) {
@@ -620,13 +605,24 @@ function buildSignOffStatus(
     )
   }
   if (!allPhasesComplete) {
-    const incomplete = checklist.items.filter(i => i.required && !i.complete).length
-    if (incomplete > 0) {
-      blockers.push(
-        incomplete === 1
-          ? '1 checklist item still needs attestation'
-          : `${incomplete} checklist items still need attestation`,
-      )
+    if (milestoneState) {
+      const incomplete = milestoneState.requiredTotal - milestoneState.requiredCompleteCount
+      if (incomplete > 0) {
+        blockers.push(
+          incomplete === 1
+            ? '1 milestone still needs completion'
+            : `${incomplete} milestones still need completion`,
+        )
+      }
+    } else {
+      const incomplete = checklist.items.filter(i => i.required && !i.complete).length
+      if (incomplete > 0) {
+        blockers.push(
+          incomplete === 1
+            ? '1 checklist item still needs attestation'
+            : `${incomplete} checklist items still need attestation`,
+        )
+      }
     }
   }
   const blockerText =
@@ -653,12 +649,12 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
   const {
     snapshot,
     checklist,
+    milestoneState,
     outstandingOpenCount,
-    manualChecklistItems,
     reviewPass,
     showStrategicChecklist,
     isPreparer,
-    amounts,
+    singlePersonMode = false,
   } = input
 
   const preparerName = snapshot.voice === 'reviewer-briefing' ? snapshot.actorLabel : PREPARER_NAME
@@ -672,11 +668,13 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
   }
 
   const phases =
-    viewMode === 'reviewer-strategic'
-      ? buildPhases(checklist, snapshot, manualChecklistItems, amounts)
+    viewMode === 'reviewer-strategic' && milestoneState
+      ? buildPhasesFromMilestones(milestoneState, singlePersonMode)
       : []
 
-  const allPhasesComplete = phases.length > 0 ? allRequiredPhasesComplete(phases) : checklist.allRequiredComplete
+  const allPhasesComplete = phases.length > 0
+    ? allRequiredPhasesComplete(phases)
+    : milestoneState?.allRequiredComplete ?? checklist.allRequiredComplete
 
   const activityLog =
     viewMode === 'preparer-summary'
@@ -697,11 +695,20 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
     },
     executiveBrief:
       viewMode === 'reviewer-strategic'
-        ? buildExecutiveBrief(snapshot, preparerFirst, phases, allPhasesComplete, outstandingOpenCount, reviewPass)
+        ? buildExecutiveBrief(
+          snapshot,
+          preparerFirst,
+          phases,
+          allPhasesComplete,
+          outstandingOpenCount,
+          reviewPass,
+          milestoneState,
+          singlePersonMode,
+        )
         : null,
     phases,
     activityLog,
-    signOff: buildSignOffStatus(allPhasesComplete, outstandingOpenCount, checklist),
+    signOff: buildSignOffStatus(allPhasesComplete, outstandingOpenCount, checklist, milestoneState),
     allPhasesComplete,
   }
 }

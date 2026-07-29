@@ -313,6 +313,31 @@
   min-width: 0;
 }
 
+.checklistTitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-component-gap-small, 4px);
+  min-width: 0;
+}
+
+.completionTypeIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  opacity: 0.75;
+}
+
+.checklistAttribution {
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component);
+  color: var(--color-text-secondary);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .checklistTitle {
   font-family: var(--font-family-component);
   font-size: var(--font-size-component-small);
