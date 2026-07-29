@@ -390,7 +390,7 @@ export default function HandoffSummary({
         <div className={styles.footerActionsRow}>
           {onContinue && (
             <Button priority="tertiary" size="medium" onClick={onContinue}>
-              {brief.viewMode === 'reviewer-briefing' ? 'Start Pass 2 review' : 'Close'}
+              Close
             </Button>
           )}
           <div className={sidePanelStyles.footerSpacer} />
