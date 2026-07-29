@@ -315,7 +315,7 @@ function ConversationalBriefCard({ brief }: { brief: ConversationalBrief }) {
   )
 }
 
-function StrategicChecklistTab({
+function ReviewerChecklistTab({
   phases,
   executiveBrief,
   onJump,
@@ -554,14 +554,14 @@ export default function HandoffSummary({
           className={styles.briefTabs}
         >
           <Tab id="checklist" title="Reviewer checklist">
-            <StrategicChecklistTab
+            <ReviewerChecklistTab
               phases={brief.phases}
               executiveBrief={brief.executiveBrief}
               onJump={onJump}
               onToggle={onToggleChecklistItem}
             />
           </Tab>
-          <Tab id="activity" title={`${PREPARER_NAME.split(' ')[0]}'s activity log`}>
+          <Tab id="activity" title={`What ${PREPARER_NAME.split(' ')[0]} completed`}>
             <ActivityLogTab categories={brief.activityLog} />
           </Tab>
         </Tabs>

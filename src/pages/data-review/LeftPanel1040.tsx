@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CircleCheck, CircleInfo, Comment, Flag } from '@design-systems/icons'
+import { CircleCheck, CircleInfo } from '@design-systems/icons'
 import FieldPopover, { FIELD_META } from './FieldPopover'
 import TaxControlDocPopover, {
   docsToSummaryItems,
@@ -28,6 +28,7 @@ import {
 import { PRIOR_YEAR_1040_VALUES, buildYoyMap, yoyPercent } from './priorYear1040Data'
 import AttestColumns, { preparerCheckTooltip, reviewerCheckTooltip } from './AttestColumns'
 import OutputFormViews from './OutputFormViews'
+import OutputRowActions from './OutputRowActions'
 import { OUTPUT_FORM_OPTIONS, type OutputFormId } from './outputForms'
 import styles from '../../styles/data-review/LeftPanel1040.module.css'
 
@@ -253,8 +254,8 @@ export default function LeftPanel1040({
   const [summaryFlyoutRect, setSummaryFlyoutRect] = useState<DOMRect | null>(null)
   const [popoverField, setPopoverField] = useState<string | null>(null)
   const [popoverRect, setPopoverRect]   = useState<DOMRect | null>(null)
-  const [hoveredField, setHoveredField] = useState<string | null>(null)
   const [commentField, setCommentField] = useState<string | null>(null)
+  const [commentContextLabel, setCommentContextLabel] = useState('')
   const [commentDraft, setCommentDraft] = useState('')
   const [commentAnchor, setCommentAnchor] = useState<{ top: number; left: number } | null>(null)
   const commentRef = useRef<HTMLDivElement>(null)
@@ -444,7 +445,7 @@ export default function LeftPanel1040({
     if (!commentField) return
     const onDown = (e: MouseEvent) => {
       if (commentRef.current && !commentRef.current.contains(e.target as Node)) {
-        setCommentField(null); setCommentDraft(''); setCommentAnchor(null)
+        setCommentField(null); setCommentDraft(''); setCommentAnchor(null); setCommentContextLabel('')
       }
     }
     document.addEventListener('mousedown', onDown)
@@ -462,17 +463,25 @@ export default function LeftPanel1040({
     return () => document.removeEventListener('mousedown', onDown)
   }, [flagNoteField])
 
-  const openComment1040 = (fieldKey: string, label: string, btn: HTMLElement) => {
+  const openComment1040 = (fieldKey: string, context: string, btn: HTMLElement) => {
+    if (commentField === fieldKey) {
+      setCommentField(null)
+      setCommentDraft('')
+      setCommentAnchor(null)
+      setCommentContextLabel('')
+      return
+    }
     const btnRect = btn.getBoundingClientRect()
     setCommentAnchor({ top: btnRect.top + btnRect.height / 2, left: btnRect.left - 292 })
     setCommentField(fieldKey)
+    setCommentContextLabel(context)
     setCommentDraft('')
   }
 
   const postComment1040 = (context: string) => {
     if (!commentDraft.trim()) return
     onAddFieldNote?.(commentDraft.trim(), context)
-    setCommentField(null); setCommentDraft(''); setCommentAnchor(null)
+    setCommentField(null); setCommentDraft(''); setCommentAnchor(null); setCommentContextLabel('')
   }
 
   const openFlagNotePopover = (fieldKey: string, btn: HTMLElement) => {
@@ -481,7 +490,7 @@ export default function LeftPanel1040({
     setFlagNoteField(fieldKey)
     setFlagNoteDraft(flagNotes[fieldKey] ?? '')
     // Close comment popover if open — one floaty at a time
-    setCommentField(null); setCommentDraft(''); setCommentAnchor(null)
+    setCommentField(null); setCommentDraft(''); setCommentAnchor(null); setCommentContextLabel('')
   }
 
   const closeFlagNotePopover = () => {
@@ -504,6 +513,15 @@ export default function LeftPanel1040({
       // Turning off — keep note stored; just close editor if open for this row
       if (flagNoteField === fieldKey) closeFlagNotePopover()
     }
+  }
+
+  /** Shared handler for output-form flag buttons (1040 + schedules). */
+  const handleOutputFlagClick = (fieldKey: string, btn: HTMLElement) => {
+    if (flaggedFields.has(fieldKey) && flagNoteField === fieldKey) {
+      closeFlagNotePopover()
+      return
+    }
+    handleFlagClick(fieldKey, btn)
   }
 
   /** Anchor popover to the Amount cell of a form row (Form view only). */
@@ -732,8 +750,20 @@ export default function LeftPanel1040({
       needsReconfirm,
       isReviewerActor,
     } = checkState
-    const isHovered        = !!field && hoveredField === field
     const isPopoverOpen    = !!field && popoverField === field
+    const isFlagged        = !!field && flaggedFields.has(field)
+    const flagNote         = field ? (flagNotes[field] ?? '') : ''
+    const flagActivityEntry =
+      field ? (flaggedMeta.get(field) ?? flagActivity[field]) : undefined
+    const flagTooltipPrimary = isFlagged
+      ? (flagNote
+        ? `Flagged: ${flagNote}`
+        : 'Flagged for follow-up. Click to remove flag')
+      : 'Flag this row for follow-up'
+    const flagTooltip = activityTooltip(
+      flagTooltipPrimary,
+      isFlagged ? flagActivityEntry : undefined,
+    )
     const yoy              = field ? YOY[field] : undefined
     const clickable        = !!field
     const showAttest       = !!field && !!kind && (togglePreparer || toggleReviewer)
@@ -788,8 +818,6 @@ export default function LeftPanel1040({
           e.stopPropagation()
         } : undefined}
         onClick={clickable ? (e) => handleRowClick(field!, e.currentTarget) : undefined}
-        onMouseEnter={field ? () => setHoveredField(field) : undefined}
-        onMouseLeave={field ? () => setHoveredField(null) : undefined}
       >
         <td className={styles.cellLine}>{line}</td>
         <td className={styles.cellLabel}>
@@ -836,31 +864,42 @@ export default function LeftPanel1040({
               )}
             </div>
 
-            {showAttest && (
-              <AttestColumns
-                field={field!}
-                preparerEntry={checkEntry}
-                reviewerEntry={reviewerEntry}
-                isReviewerRole={isReviewerRole}
-                onTogglePreparer={togglePreparer}
-                onToggleReviewer={toggleReviewer}
-              />
-            )}
-
-            {/* Comment button — outside value box, shown on hover */}
-            {commentable && (isHovered || commentField === field) && (
-              <Tooltip text="Add a comment" placement="top" disabled={isCommentOpen}><button
-                className={`${styles.commentBtn1040} ${commentField === field ? styles.commentBtn1040Active : ''}`}
-                aria-label={`Add comment for ${label}`}
-                onClick={e => {
+            <div className={styles.formRowActions}>
+              <OutputRowActions
+                className={styles.outputRowEndActionsCommentFlag}
+                label={label}
+                showComment={commentable}
+                showFlag={!!field && !!onToggleFlagged}
+                commentOpen={commentField === field}
+                flagNoteOpen={flagNoteField === field}
+                isFlagged={isFlagged}
+                flagTooltip={flagTooltip}
+                onCommentClick={e => {
                   e.stopPropagation()
-                  if (commentField === field) { setCommentField(null); setCommentDraft(''); setCommentAnchor(null) }
-                  else openComment1040(field!, label, e.currentTarget)
+                  if (commentField === field) {
+                    setCommentField(null)
+                    setCommentDraft('')
+                    setCommentAnchor(null)
+                  } else {
+                    openComment1040(field!, `Form 1040 · ${label}`, e.currentTarget)
+                  }
                 }}
-              >
-                <Comment size="small" />
-              </button></Tooltip>
-            )}
+                onFlagClick={e => {
+                  e.stopPropagation()
+                  handleOutputFlagClick(field!, e.currentTarget)
+                }}
+              />
+              {showAttest && (
+                <AttestColumns
+                  field={field!}
+                  preparerEntry={checkEntry}
+                  reviewerEntry={reviewerEntry}
+                  isReviewerRole={isReviewerRole}
+                  onTogglePreparer={togglePreparer}
+                  onToggleReviewer={toggleReviewer}
+                />
+              )}
+            </div>
           </div>
         </td>
       </tr>
@@ -1169,8 +1208,6 @@ export default function LeftPanel1040({
                             // Selection only — Sources / flyouts open from (i) or source links
                             onFieldClick?.(row.field!)
                           } : undefined}
-                          onMouseEnter={row.field ? () => setHoveredField(row.field!) : undefined}
-                          onMouseLeave={row.field ? () => setHoveredField(null) : undefined}
                         >
                           <div className={styles.summaryRowLeft}>
                             <div className={styles.summarySubLabelGroup}>
@@ -1249,57 +1286,30 @@ export default function LeftPanel1040({
                             </span>
                             {/* Comment + flag + check — always three equal slots on data rows */}
                             <div className={styles.summaryRowEndActions}>
-                              {!!row.field && !!onAddFieldNote ? (
-                                <Tooltip
-                                  text="Add a comment"
-                                  placement="top"
-                                  disabled={commentField === row.field}
-                                >
-                                  <button
-                                    type="button"
-                                    className={`${styles.summaryActionBtn} ${commentField === row.field ? styles.summaryActionBtnActive : ''}`}
-                                    aria-label={`Add comment for ${row.label}`}
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      if (commentField === row.field) { setCommentField(null); setCommentDraft(''); setCommentAnchor(null) }
-                                      else openComment1040(row.field!, row.label, e.currentTarget)
-                                    }}
-                                  >
-                                    <Comment size="small" />
-                                  </button>
-                                </Tooltip>
-                              ) : (
-                                <span className={styles.summaryActionBtnSlot} aria-hidden="true" />
-                              )}
-                              {!!row.field && !!onToggleFlagged ? (
-                                <Tooltip
-                                  text={flagTooltip}
-                                  placement="top"
-                                  disabled={flagNoteField === row.field}
-                                >
-                                  <button
-                                    type="button"
-                                    className={`${styles.summaryActionBtn} ${isFlagged ? styles.summaryActionBtnFlag : ''} ${flagNoteField === row.field ? styles.summaryActionBtnActive : ''}`}
-                                    aria-label={isFlagged ? `Remove flag from ${row.label}` : `Flag ${row.label} for follow-up`}
-                                    aria-pressed={isFlagged}
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      // Already on + note editor open → treat as edit (keep flagged)
-                                      if (isFlagged && flagNoteField === row.field) {
-                                        closeFlagNotePopover()
-                                        return
-                                      }
-                                      // Already on → second click turns off (note kept in storage)
-                                      // Off → turn on + open optional note prompt (clears check)
-                                      handleFlagClick(row.field!, e.currentTarget)
-                                    }}
-                                  >
-                                    <Flag size="small" />
-                                  </button>
-                                </Tooltip>
-                              ) : (
-                                <span className={styles.summaryActionBtnSlot} aria-hidden="true" />
-                              )}
+                              <OutputRowActions
+                                className={styles.outputRowEndActionsCommentFlag}
+                                label={row.label}
+                                showComment={!!row.field && !!onAddFieldNote}
+                                showFlag={!!row.field && !!onToggleFlagged}
+                                commentOpen={commentField === row.field}
+                                flagNoteOpen={flagNoteField === row.field}
+                                isFlagged={isFlagged}
+                                flagTooltip={flagTooltip}
+                                onCommentClick={e => {
+                                  e.stopPropagation()
+                                  if (commentField === row.field) {
+                                    setCommentField(null)
+                                    setCommentDraft('')
+                                    setCommentAnchor(null)
+                                  } else {
+                                    openComment1040(row.field!, `Return Summary · ${row.label}`, e.currentTarget)
+                                  }
+                                }}
+                                onFlagClick={e => {
+                                  e.stopPropagation()
+                                  handleOutputFlagClick(row.field!, e.currentTarget)
+                                }}
+                              />
                               {!!row.field && (togglePreparer || toggleReviewer) ? (
                                 <>
                                   <Tooltip text={preparerCheckTooltip(checkEntry)} placement="top">
@@ -1479,6 +1489,16 @@ export default function LeftPanel1040({
             onToggleReviewerConfirm={toggleReviewer}
             onNavigateSource={onNavigateSource}
             onNavigateToSourceDoc={onNavigateToSourceDoc}
+            flaggedFields={flaggedFields}
+            flagNotes={flagNotes}
+            flaggedMeta={flaggedMeta}
+            flagActivity={flagActivity}
+            commentField={commentField}
+            flagNoteField={flagNoteField}
+            onAddFieldNote={onAddFieldNote}
+            onToggleFlagged={onToggleFlagged}
+            onOpenComment={openComment1040}
+            onFlagClick={handleOutputFlagClick}
           />
         ) : (
         <div className={styles.formDoc}>
@@ -1542,9 +1562,12 @@ export default function LeftPanel1040({
             <div className={styles.colLineR} />
             <div className={styles.colValWithAttest}>
               <span className={styles.colValAmount}>Amount</span>
-              <span className={styles.colValAttestGroup} aria-hidden="true">
-                <span className={styles.colValAttestLabel}>Prep</span>
-                <span className={styles.colValAttestLabel}>Rev</span>
+              <span className={styles.colValActionGroup} aria-hidden="true">
+                <span className={styles.colValActionSpacer} />
+                <span className={styles.colValAttestGroup}>
+                  <span className={styles.colValAttestLabel}>Prep</span>
+                  <span className={styles.colValAttestLabel}>Rev</span>
+                </span>
               </span>
             </div>
           </div>
@@ -1656,7 +1679,7 @@ export default function LeftPanel1040({
         >
           <div className={styles.commentPopoverCtx}>
             <span className={styles.commentPopoverChip}>
-              Form 1040 · {FIELD_META[commentField]?.label ?? commentField}
+              {commentContextLabel || `Form 1040 · ${FIELD_META[commentField]?.label ?? commentField}`}
             </span>
           </div>
           <textarea
@@ -1667,13 +1690,13 @@ export default function LeftPanel1040({
             onChange={e => setCommentDraft(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey))
-                postComment1040(`Form 1040 · ${FIELD_META[commentField]?.label ?? commentField}`)
+                postComment1040(commentContextLabel || `Form 1040 · ${FIELD_META[commentField]?.label ?? commentField}`)
             }}
             rows={3}
           />
           <div className={styles.commentPopoverActions}>
             <button className={styles.commentPopoverCancel}
-              onClick={e => { e.stopPropagation(); setCommentField(null); setCommentDraft(''); setCommentAnchor(null) }}>
+              onClick={e => { e.stopPropagation(); setCommentField(null); setCommentDraft(''); setCommentAnchor(null); setCommentContextLabel('') }}>
               Cancel
             </button>
             <button
@@ -1681,7 +1704,7 @@ export default function LeftPanel1040({
               disabled={!commentDraft.trim()}
               onClick={e => {
                 e.stopPropagation()
-                postComment1040(`Form 1040 · ${FIELD_META[commentField]?.label ?? commentField}`)
+                postComment1040(commentContextLabel || `Form 1040 · ${FIELD_META[commentField]?.label ?? commentField}`)
               }}
             >
               Post

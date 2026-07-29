@@ -241,6 +241,18 @@
   text-align: right;
 }
 
+.colValActionGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.colValActionSpacer {
+  width: 62px; /* comment + flag — aligns with .outputRowEndActionsCommentFlag */
+  flex-shrink: 0;
+}
+
 .colValAttestGroup {
   display: flex;
   align-items: center;
@@ -711,6 +723,16 @@
 }
 
 /* Prep / Rev columns on Form 1040 output rows — mirrors Return Summary */
+/* Prep / Rev + comment/flag on Form 1040 and schedule output rows */
+.formRowActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 138px;
+  flex-shrink: 0;
+}
+
 .formAttestGroup {
   display: flex;
   align-items: center;
@@ -1246,12 +1268,23 @@
 }
 
 /* End-of-row actions: comment + flag + prep check + rev check */
-.summaryRowEndActions {
+.summaryRowEndActions,
+.outputRowEndActions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
   width: 138px; /* 2 × 28px + 2 × 32px + 3 × 6px gap */
+  flex-shrink: 0;
+}
+
+/* Form 1040 / schedule rows — comment + flag only (attest slots follow in same row) */
+.outputRowEndActionsCommentFlag {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 62px; /* 2 × 28px + 1 × 6px gap */
   flex-shrink: 0;
 }
 

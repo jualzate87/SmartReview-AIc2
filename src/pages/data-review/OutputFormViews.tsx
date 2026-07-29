@@ -7,6 +7,7 @@ import { CLIENT_ADDRESS, formatClientCityStateZip } from '../../data/clientAddre
 import { getScheduleLineFlyout } from '../../data/scheduleFieldOrigins'
 import type { ActivityEntry } from '../../hooks/useSyncedReviewState'
 import AttestColumns from './AttestColumns'
+import OutputRowActions from './OutputRowActions'
 import { getOutputLineAttest, type OutputFormId } from './outputForms'
 import TaxControlDocPopover from './TaxControlDocPopover'
 import Tooltip from './Tooltip'
@@ -73,7 +74,21 @@ type AttestContext = {
   onToggleReviewer?: (fieldName: string) => void
 }
 
-type LineRowProps = AttestContext & {
+type RowActionsContext = {
+  flaggedFields?: Set<string>
+  flagNotes?: Record<string, string>
+  flaggedMeta?: Map<string, ActivityEntry>
+  flagActivity?: Record<string, ActivityEntry>
+  commentField?: string | null
+  flagNoteField?: string | null
+  onAddFieldNote?: (text: string, context: string) => void
+  onToggleFlagged?: (fieldKey: string) => void
+  onOpenComment?: (fieldKey: string, context: string, btn: HTMLElement) => void
+  onFlagClick?: (fieldKey: string, btn: HTMLElement) => void
+  formLabel: string
+}
+
+type LineRowProps = AttestContext & RowActionsContext & {
   line: string
   label: string
   value: string | number
@@ -114,6 +129,17 @@ function LineRow({
   onToggleReviewer,
   highlightField,
   issueField,
+  flaggedFields = new Set(),
+  flagNotes = {},
+  flaggedMeta = new Map(),
+  flagActivity = {},
+  commentField = null,
+  flagNoteField = null,
+  onAddFieldNote,
+  onToggleFlagged,
+  onOpenComment,
+  onFlagClick,
+  formLabel,
 }: LineRowProps) {
   const display = typeof value === 'number' ? fmt(value) : value
   const flyout = getScheduleLineFlyout(formId, fieldId, live, amounts)
@@ -131,6 +157,14 @@ function LineRow({
     !!attest &&
     !!attestKey &&
     (onTogglePreparer || onToggleReviewer)
+  const flagKey = attestKey ?? fieldId
+  const isFlagged = flaggedFields.has(flagKey)
+  const flagNote = flagNotes[flagKey] ?? ''
+  const flagActivityEntry = flaggedMeta.get(flagKey) ?? flagActivity[flagKey]
+  const flagTooltip = isFlagged
+    ? (flagNote ? `Flagged: ${flagNote}` : 'Flagged for follow-up. Click to remove flag')
+    : 'Flag this row for follow-up'
+  const commentContext = `${formLabel} · ${label}`
   const isIssueRow = fieldId === issueField
   const isSelected = fieldId === highlightField
   const isOrange = isIssueRow
@@ -217,17 +251,37 @@ function LineRow({
             )}
           </div>
 
-          {showAttest && (
-            <AttestColumns
-              field={attestKey}
-              preparerEntry={preparerEntry}
-              reviewerEntry={reviewerEntry}
-              isReviewerRole={isReviewerRole}
-              onTogglePreparer={onTogglePreparer}
-              onToggleReviewer={onToggleReviewer}
-              interactive={attest.toggleable}
+          <div className={styles.formRowActions}>
+            <OutputRowActions
+              className={styles.outputRowEndActionsCommentFlag}
+              label={label}
+              showComment={!!onAddFieldNote && !!onOpenComment}
+              showFlag={!!onToggleFlagged && !!onFlagClick}
+              commentOpen={commentField === flagKey}
+              flagNoteOpen={flagNoteField === flagKey}
+              isFlagged={isFlagged}
+              flagTooltip={flagTooltip}
+              onCommentClick={e => {
+                e.stopPropagation()
+                onOpenComment?.(flagKey, commentContext, e.currentTarget)
+              }}
+              onFlagClick={e => {
+                e.stopPropagation()
+                onFlagClick?.(flagKey, e.currentTarget)
+              }}
             />
-          )}
+            {showAttest && (
+              <AttestColumns
+                field={attestKey}
+                preparerEntry={preparerEntry}
+                reviewerEntry={reviewerEntry}
+                isReviewerRole={isReviewerRole}
+                onTogglePreparer={onTogglePreparer}
+                onToggleReviewer={onToggleReviewer}
+                interactive={attest.toggleable}
+              />
+            )}
+          </div>
         </div>
       </td>
     </tr>
@@ -243,9 +297,12 @@ function FormTable({ children }: { children: React.ReactNode }) {
         <div className={styles.colLineR} />
         <div className={styles.colValWithAttest}>
           <span className={styles.colValAmount}>Amount</span>
-          <span className={styles.colValAttestGroup} aria-hidden="true">
-            <span className={styles.colValAttestLabel}>Prep</span>
-            <span className={styles.colValAttestLabel}>Rev</span>
+          <span className={styles.colValActionGroup} aria-hidden="true">
+            <span className={styles.colValActionSpacer} />
+            <span className={styles.colValAttestGroup}>
+              <span className={styles.colValAttestLabel}>Prep</span>
+              <span className={styles.colValAttestLabel}>Rev</span>
+            </span>
           </span>
         </div>
       </div>
@@ -270,6 +327,11 @@ type SharedLineProps = Omit<
   LineRowProps,
   'line' | 'label' | 'value' | 'kind' | 'bold' | 'note' | 'fieldId'
 >
+
+function scheduleFormLabel(formId: OutputFormId): string {
+  const opt = { sch1: 'Schedule 1', schC: 'Schedule C', schA: 'Schedule A', schD: 'Schedule D', f8960: 'Form 8960', f2210: 'Form 2210' } as const
+  return opt[formId as keyof typeof opt] ?? formId
+}
 
 function Schedule1View({ live, ssn, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
   const blank = (line: string, label: string, fieldId: string) => (
@@ -805,6 +867,16 @@ export interface OutputFormViewsProps {
   onToggleReviewerConfirm?: (fieldName: string) => void
   onNavigateSource?: (source: FieldOriginSource) => void
   onNavigateToSourceDoc?: (docId: string) => void
+  flaggedFields?: Set<string>
+  flagNotes?: Record<string, string>
+  flaggedMeta?: Map<string, ActivityEntry>
+  flagActivity?: Record<string, ActivityEntry>
+  commentField?: string | null
+  flagNoteField?: string | null
+  onAddFieldNote?: (text: string, context: string) => void
+  onToggleFlagged?: (fieldKey: string) => void
+  onOpenComment?: (fieldKey: string, context: string, btn: HTMLElement) => void
+  onFlagClick?: (fieldKey: string, btn: HTMLElement) => void
 }
 
 /** Renders non-1040 output forms. Summary and Form 1040 stay in LeftPanel1040. */
@@ -824,6 +896,16 @@ export default function OutputFormViews({
   onToggleReviewerConfirm,
   onNavigateSource,
   onNavigateToSourceDoc,
+  flaggedFields = new Set(),
+  flagNotes = {},
+  flaggedMeta = new Map(),
+  flagActivity = {},
+  commentField = null,
+  flagNoteField = null,
+  onAddFieldNote,
+  onToggleFlagged,
+  onOpenComment,
+  onFlagClick,
 }: OutputFormViewsProps) {
   const ssn = live.employeeSsn || '—'
   const [flyoutField, setFlyoutField] = useState<string | null>(null)
@@ -868,6 +950,17 @@ export default function OutputFormViews({
     isReviewerRole,
     onTogglePreparer: onTogglePreparerCheck,
     onToggleReviewer: onToggleReviewerConfirm,
+    flaggedFields,
+    flagNotes,
+    flaggedMeta,
+    flagActivity,
+    commentField,
+    flagNoteField,
+    onAddFieldNote,
+    onToggleFlagged,
+    onOpenComment,
+    onFlagClick,
+    formLabel: scheduleFormLabel(formId),
   }
 
   let body: React.ReactNode = null
