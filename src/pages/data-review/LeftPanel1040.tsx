@@ -794,7 +794,7 @@ export default function LeftPanel1040({
         <td className={styles.cellLine}>{line}</td>
         <td className={styles.cellLabel}>
           <div className={styles.cellLabelInner}>
-            {label}
+            <span className={styles.cellLabelPrimary}>{label}</span>
             {needsReconfirm && (
               <span className={styles.reconfirmBadge} title="Preparer verified, then value was edited — confirm again for sign-off">
                 Edited since verify — confirm again
@@ -1307,7 +1307,9 @@ export default function LeftPanel1040({
                                       type="button"
                                       className={[
                                         styles.summaryAttestCol,
-                                        checkEntry ? styles.summaryAttestColPrepActive : styles.summaryAttestColEmpty,
+                                        checkEntry
+                                          ? styles.summaryAttestColPrepActive
+                                          : `${styles.summaryAttestColEmpty} ${styles.summaryAttestColPrepEmpty}`,
                                         isReviewerRole ? styles.summaryAttestColReadonly : '',
                                       ].filter(Boolean).join(' ')}
                                       aria-label={checkEntry ? `Verified by ${checkEntry.by}` : 'Preparer verify'}
@@ -1317,7 +1319,7 @@ export default function LeftPanel1040({
                                         if (!isReviewerRole && row.field) togglePreparer?.(row.field)
                                       }}
                                     >
-                                      {checkEntry ? <CircleCheck size="small" /> : null}
+                                      <CircleCheck size="small" aria-hidden />
                                     </button>
                                   </Tooltip>
                                   <Tooltip text={reviewerCheckTooltip(reviewerEntry)} placement="top">
@@ -1325,7 +1327,9 @@ export default function LeftPanel1040({
                                       type="button"
                                       className={[
                                         styles.summaryAttestCol,
-                                        reviewerEntry ? styles.summaryAttestColRevActive : styles.summaryAttestColEmpty,
+                                        reviewerEntry
+                                          ? styles.summaryAttestColRevActive
+                                          : `${styles.summaryAttestColEmpty} ${styles.summaryAttestColRevEmpty}`,
                                         !isReviewerRole ? styles.summaryAttestColReadonly : '',
                                       ].filter(Boolean).join(' ')}
                                       aria-label={reviewerEntry ? `Confirmed by ${reviewerEntry.by}` : 'Reviewer confirm'}
@@ -1335,7 +1339,7 @@ export default function LeftPanel1040({
                                         if (isReviewerRole && row.field) toggleReviewer?.(row.field)
                                       }}
                                     >
-                                      {reviewerEntry ? <CircleCheck size="small" /> : null}
+                                      <CircleCheck size="small" aria-hidden />
                                     </button>
                                   </Tooltip>
                                 </>
@@ -1560,10 +1564,10 @@ export default function LeftPanel1040({
           {/* ── Income table ── */}
           <table className={styles.table}>
             <colgroup>
-              <col style={{ width: '22px' }} />
+              <col style={{ width: '28px' }} />
               <col style={{ width: 'auto' }} />
-              <col style={{ width: '22px' }} />
-              <col style={{ width: '220px' }} />
+              <col style={{ width: '40px' }} />
+              <col style={{ width: '280px' }} />
             </colgroup>
             <tbody>
               <Section title="Income" />

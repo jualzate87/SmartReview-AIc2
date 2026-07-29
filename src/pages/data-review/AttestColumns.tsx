@@ -54,7 +54,7 @@ export default function AttestColumns({
             if (!prepDisabled) onTogglePreparer?.(field)
           }}
         >
-          {preparerEntry ? <CircleCheck size="small" /> : null}
+          <CircleCheck size="small" aria-hidden />
         </button>
       </Tooltip>
       <Tooltip text={reviewerCheckTooltip(reviewerEntry)} placement="top">
@@ -74,7 +74,7 @@ export default function AttestColumns({
             if (!revDisabled) onToggleReviewer?.(field)
           }}
         >
-          {reviewerEntry ? <CircleCheck size="small" /> : null}
+          <CircleCheck size="small" aria-hidden />
         </button>
       </Tooltip>
     </div>

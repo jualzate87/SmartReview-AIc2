@@ -142,10 +142,12 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
-  color: #5d686f;
-  font-weight: 500;
-  letter-spacing: 0.2px;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .legendSwatch {
@@ -179,32 +181,38 @@
 /* ── Column headers ── */
 .colHeaders {
   display: grid;
-  grid-template-columns: 22px 1fr 22px minmax(220px, 280px);
+  grid-template-columns: 28px minmax(140px, 1fr) 40px minmax(260px, 320px);
   padding: 3px 0;
   background: #f7f9fb;
   border-bottom: 1px solid #d4d7dc;
 }
 
 .colLine, .colLineR {
-  font-size: 12px;
-  color: #aaa;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   text-align: center;
   padding: 2px 4px;
 }
 
 .colDesc {
-  font-size: 12px;
-  font-weight: 500;
-  color: #888;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 8px;
 }
 
 .colVal {
-  font-size: 12px;
-  font-weight: 500;
-  color: #888;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 8px;
@@ -224,9 +232,10 @@
 .colValAmount {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
-  font-weight: 500;
-  color: #888;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   text-align: right;
@@ -244,18 +253,23 @@
   align-items: center;
   justify-content: center;
   width: 32px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #888;
+  box-sizing: border-box;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
 }
 
 .lineNote {
   display: block;
+  font-family: var(--font-family-body);
   font-size: var(--font-size-body-3);
+  font-weight: var(--font-weight-body);
+  line-height: var(--line-height-body);
   color: var(--color-text-secondary);
-  font-weight: 400;
+  margin-top: 2px;
 }
 
 /* ── Main table ── */
@@ -274,7 +288,10 @@
 .rowClickable { cursor: pointer; }
 .rowClickable:hover { background: #f4f7fb; }
 
-.rowBold .cellLabel { font-weight: 500; color: #1a1a1a; }
+.rowBold .cellLabelPrimary {
+  font-weight: var(--font-weight-component-bold);
+  color: var(--color-text-primary);
+}
 
 .rowShaded { background: #f7f9fb; }
 
@@ -357,41 +374,60 @@
 
 /* ── Cells ── */
 .cellLine {
-  width: 22px;
-  font-size: 12px;
-  color: #aaa;
+  width: 28px;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-body-3);
+  font-weight: var(--font-weight-component);
+  color: var(--color-text-tertiary);
   text-align: center;
   padding: 5px 2px;
-  vertical-align: middle;
+  vertical-align: top;
   white-space: nowrap;
 }
 
 .cellLineRight {
-  width: 22px;
-  font-size: 12px;
-  color: #aaa;
+  width: 40px;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-body-3);
+  font-weight: var(--font-weight-component);
+  color: var(--color-text-tertiary);
   text-align: center;
   padding: 5px 2px;
-  vertical-align: middle;
+  vertical-align: top;
+  white-space: nowrap;
 }
 
 .cellLabel {
-  font-size: 12px;
-  color: #393a3d;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-component);
+  color: var(--color-text-primary);
   padding: 5px 6px;
-  vertical-align: middle;
-  line-height: 1.35;
+  vertical-align: top;
+  line-height: var(--line-height-component);
+  min-width: 0;
 }
 
-/* Inner wrapper handles the flex — td itself must remain table-cell */
+/* Inner wrapper — primary label + secondary note stack vertically */
 .cellLabelInner {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cellLabelPrimary {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  line-height: inherit;
 }
 
 .cellValue {
-  width: 220px;
+  width: auto;
+  min-width: 260px;
   padding: 4px 6px 4px 0;
   vertical-align: middle;
 }
@@ -684,10 +720,6 @@
 .formAttestGroup .summaryAttestCol {
   width: 32px;
   height: 32px;
-}
-.formAttestGroup .summaryAttestColEmpty::after {
-  width: 20px;
-  height: 20px;
 }
 
 .commentBtn1040 {
@@ -1048,7 +1080,7 @@
   align-items: center;
   justify-content: center;
   width: 32px;
-  padding: 0 2px;
+  padding: 0;
   box-sizing: border-box;
   text-align: center;
   font-family: var(--font-family-component);
@@ -1056,7 +1088,7 @@
   font-weight: var(--font-weight-component-semibold);
   color: var(--color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.6px;
 }
 
 .outputFormsSignoffBtn {
@@ -1235,50 +1267,35 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--color-text-secondary, #6b6c72);
   box-sizing: border-box;
   transition: color 100ms ease, opacity 100ms ease;
 }
 .summaryAttestColEmpty {
-  /* Subtle inactive placeholder — visible affordance, same footprint as active icon */
+  opacity: 0.45;
 }
-.summaryAttestColEmpty::after {
-  content: '';
-  display: block;
-  width: 20px;
-  height: 20px;
-  border: 1.5px solid var(--color-border-secondary, #c3ced5);
-  border-radius: 50%;
-  background: var(--color-container-background-secondary, #f4f5f8);
-  opacity: 1;
-  box-sizing: border-box;
+.summaryAttestColPrepEmpty {
+  color: var(--color-action-success, #00856d);
 }
-.summaryAttestColPrepEmpty::after {
-  border-color: var(--color-border-secondary, #c3ced5);
-}
-.summaryAttestColRevEmpty::after {
-  border-color: var(--color-border-secondary, #c3ced5);
+.summaryAttestColRevEmpty {
+  color: #205ea3;
 }
 .summaryAttestColPrepActive {
+  opacity: 1;
   color: var(--color-action-success, #00856d);
 }
 .summaryAttestColRevActive {
+  opacity: 1;
   color: #205ea3;
 }
-.summaryAttestCol:hover:not(:disabled):not(.summaryAttestColReadonly).summaryAttestColPrepEmpty::after {
-  border-color: var(--color-action-success, #00856d);
-  background: rgba(0, 133, 109, 0.08);
-}
-.summaryAttestCol:hover:not(:disabled):not(.summaryAttestColReadonly).summaryAttestColRevEmpty::after {
-  border-color: #205ea3;
-  background: rgba(32, 94, 163, 0.08);
+.summaryAttestCol:hover:not(:disabled):not(.summaryAttestColReadonly).summaryAttestColEmpty {
+  opacity: 0.75;
 }
 .summaryAttestColReadonly {
   cursor: default;
   pointer-events: none;
 }
-.summaryAttestColReadonly.summaryAttestColEmpty::after {
-  opacity: 0.65;
+.summaryAttestColReadonly.summaryAttestColEmpty {
+  opacity: 0.35;
 }
 .summaryAttestCol:disabled {
   cursor: default;
@@ -1306,6 +1323,7 @@
   background: var(--color-container-background-primary, #ffffff);
   color: var(--color-text-secondary, #6b6c72);
   cursor: pointer;
+  box-sizing: border-box;
   transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
 }
 .summaryActionBtn:hover {
@@ -1459,16 +1477,13 @@
 /* Sub-row values: same shared typography — no separate class needed.
    summaryCurrVal / summaryPriorVal / summaryDiffVal / summaryPctVal apply directly */
 
-/* Sub-row line note — x-small, secondary text */
+/* Sub-row line note — secondary text on its own line when present */
 .summarySubNote {
-  font-family: var(--font-family-component);
-  font-size: var(--font-size-component-small); /* 14px */
-  font-weight: var(--font-weight-component); /* 400 */
-  color: var(--color-text-secondary); /* #6B6C72 — AA compliant at 14px */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.4;
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-3);
+  font-weight: var(--font-weight-body);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-body);
 }
 
 .summaryReviewedIcon {

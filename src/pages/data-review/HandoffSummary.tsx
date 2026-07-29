@@ -8,7 +8,7 @@ import PageMessage from '@ids-ts/page-message'
 import '@ids-ts/page-message/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
 import '@ids-ts/tabs/dist/main.css'
-import { CircleCheckFill } from '@design-systems/icons'
+import { CircleCheck, CircleCheckFill } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import type { LiveAmounts } from '../../data/liveReturn'
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
@@ -93,11 +93,11 @@ function ChecklistStatusIcon({
     )
   }
 
-  /* Locked incomplete (open items) — muted empty circle, not interactive */
+  /* Locked incomplete (open items) — muted checkmark, not interactive */
   if (item.locked && !isComplete) {
     return (
       <span className={styles.checklistIconSlot} aria-label={`${item.title} pending`}>
-        <span className={styles.checklistCheckEmptyLocked} aria-hidden />
+        <CircleCheck size="small" className={styles.checklistCheckEmptyLocked} aria-hidden />
       </span>
     )
   }
@@ -115,7 +115,11 @@ function ChecklistStatusIcon({
         disabled={!canToggle}
         onClick={() => onToggle?.(item.id, !isComplete)}
       >
-        {isComplete ? <CircleCheckFill size="small" className={styles.checklistSuccessIcon} /> : null}
+        {isComplete ? (
+          <CircleCheckFill size="small" className={styles.checklistSuccessIcon} aria-hidden />
+        ) : (
+          <CircleCheck size="small" aria-hidden />
+        )}
       </button>
     </span>
   )

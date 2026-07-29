@@ -175,7 +175,7 @@ function LineRow({
       <td className={styles.cellLine}>{line}</td>
       <td className={styles.cellLabel}>
         <div className={styles.cellLabelInner}>
-          {label}
+          <span className={styles.cellLabelPrimary}>{label}</span>
           {note ? (
             <span className={styles.lineNote}>{note}</span>
           ) : null}

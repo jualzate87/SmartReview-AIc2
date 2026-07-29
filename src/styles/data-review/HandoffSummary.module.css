@@ -197,36 +197,23 @@
   transition: color 100ms ease;
 }
 
-.checklistCheckBtnEmpty::after {
-  content: '';
-  display: block;
-  width: 20px;
-  height: 20px;
-  border: 1.5px solid var(--color-border-secondary, #c3ced5);
-  border-radius: 50%;
-  background: var(--color-container-background-secondary, #f4f5f8);
-  box-sizing: border-box;
+.checklistCheckBtnEmpty {
+  opacity: 0.45;
+  color: var(--color-ui-positive);
 }
 
-.checklistCheckBtnEmpty:hover::after {
-  border-color: var(--color-ui-positive);
-  background: rgba(16, 128, 0, 0.08);
+.checklistCheckBtnEmpty:hover:not(:disabled) {
+  opacity: 0.75;
 }
 
 .checklistCheckBtnActive {
   cursor: pointer;
+  opacity: 1;
 }
 
-.checklistCheckEmptyLocked::after {
-  content: '';
-  display: block;
-  width: 20px;
-  height: 20px;
-  border: 1.5px solid var(--color-border-tertiary, #d4d7dc);
-  border-radius: 50%;
-  background: var(--color-container-background-secondary, #f4f5f8);
-  opacity: 0.7;
-  box-sizing: border-box;
+.checklistCheckEmptyLocked {
+  opacity: 0.35;
+  color: var(--color-text-secondary);
 }
 
 .checklistText {
