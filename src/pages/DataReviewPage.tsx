@@ -22,6 +22,7 @@ import {
   canSignOff,
   signOffBlockerText,
 } from '../data/reviewChecklist'
+import { buildSmartReviewBrief, canApproveSignOff } from '../data/smartReviewBrief'
 import {
   PREPARER_NAME,
   REVIEWER_NAME,
@@ -1082,7 +1083,20 @@ export default function DataReviewPage() {
     (summaryOpts.voice ?? 'self') !== 'reviewer-briefing'
 
   const signOffGatingActive = !inImportPhase && reviewRole === 'reviewer'
-  const signOffReady = !signOffGatingActive || canSignOff(reviewChecklist, outstandingOpenCount)
+  const briefForGating = buildSmartReviewBrief({
+    snapshot: buildSnapshot('signoff-review'),
+    checklist: reviewChecklist,
+    outstandingOpenCount,
+    manualChecklistItems,
+    reviewPass,
+    showStrategicChecklist: showChecklist,
+    isPreparer: reviewRole === 'preparer',
+  })
+  const signOffReady = !signOffGatingActive || (
+    showChecklist
+      ? canApproveSignOff(briefForGating)
+      : canSignOff(reviewChecklist, outstandingOpenCount)
+  )
   const signOffBlockerMessage = signOffGatingActive
     ? signOffBlockerText(reviewChecklist, outstandingOpenCount)
     : null
@@ -2176,6 +2190,10 @@ export default function DataReviewPage() {
                   onToggleChecklistItem={setManualChecklistItem}
                   signOffReady={signOffReady}
                   signOffBlockerText={signOffBlockerMessage}
+                  outstandingOpenCount={outstandingOpenCount}
+                  manualChecklistItems={manualChecklistItems}
+                  reviewPass={reviewPass}
+                  isPreparer={reviewRole === 'preparer'}
                   closing={panelClosing}
                   onClose={handleCloseSummaryPanel}
                   onContinue={() => {

@@ -520,7 +520,7 @@ export function buildHandoffSnapshot(
       items: needsConfirmation.map(([field, meta]) => ({
         id: `confirm-${field}`,
         label: fieldLabel(field),
-        detail: `${firstName(meta.by)} verified · ${formatCheckMeta(meta)}. Confirm for sign-off`,
+        detail: `${firstName(meta.by)} verified · ${formatCheckMeta(meta)} — confirm for sign-off`,
         status: 'open' as const,
         jump: { type: 'field' as const, field },
         jumpLabel: 'Confirm field',
@@ -540,8 +540,8 @@ export function buildHandoffSnapshot(
           id: `doc-confirm-${docId}`,
           label: docLabel(docId),
           detail: meta
-            ? `${firstName(meta.by)} verified · ${formatCheckMeta(meta)}. Confirm for sign-off`
-            : 'Preparer verified. Confirm for sign-off.',
+            ? `${firstName(meta.by)} verified · ${formatCheckMeta(meta)} — confirm for sign-off`
+            : 'Preparer verified — confirm for sign-off',
           status: 'open' as const,
           jump: { type: 'doc' as const, docId },
           jumpLabel: 'Confirm document',
@@ -694,12 +694,12 @@ export function buildHandoffSnapshot(
         )
       }
     } else {
-      story.push('Nothing is left open in this snapshot. Spot-check Pass 1 work if you want a second pair of eyes.')
+      story.push('Nothing is left open in this snapshot — spot-check Pass 1 work if you want a second pair of eyes.')
     }
   } else {
     story.push(
       pass === 2
-        ? `${who}, here’s where this pass stands: what’s still open, then what you’ve already cleared.`
+        ? `${who}, here’s where this pass stands — what’s still open, then what you’ve already cleared.`
         : `${who}, here’s a brief on this pass: what’s outstanding, then what you’ve already handled.`,
     )
     if (clearedFlags.length || preparerVerifiedDocs.length || diagsReviewed.length || edits.length) {
@@ -717,7 +717,7 @@ export function buildHandoffSnapshot(
           : `${granularOpenCount} items still need attention before you finish or pass this on.`,
       )
     } else {
-      story.push('Everything tracked in this snapshot looks clear. You can finish & file or pass to the next reviewer when you’re ready.')
+      story.push('Everything tracked in this snapshot looks clear — you can finish & file or pass to the next reviewer when you’re ready.')
     }
   }
 
@@ -769,7 +769,7 @@ export function buildHandoffSnapshot(
         ? `${preparerDoneCount} item${preparerDoneCount === 1 ? '' : 's'} ${who} handled in Pass 1. Expand a group for jump links.`
         : `${who} hasn’t recorded edits, checks, or verified docs yet.`
       : hasPreparerDone
-        ? 'Work you already cleared on this pass. Expand a group for jump links.'
+        ? 'Work you already cleared on this pass — expand a group for jump links.'
         : 'No completed actions recorded yet.',
     bucket: 'done',
     defaultOpen: false,

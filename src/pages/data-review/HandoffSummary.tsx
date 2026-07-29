@@ -1,30 +1,28 @@
-import { useState, type ReactNode, Fragment } from 'react'
-import { PREPARER_NAME, REVIEWER_NAME } from '../../hooks/useSyncedReviewState'
+import { useMemo, useState } from 'react'
+import { PREPARER_NAME } from '../../hooks/useSyncedReviewState'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
-import { Badge, NumericBadge } from '@ids-ts/badge'
+import { Badge } from '@ids-ts/badge'
 import '@ids-ts/badge/dist/main.css'
-import PageMessage from '@ids-ts/page-message'
-import '@ids-ts/page-message/dist/main.css'
-import { B3 } from '@ids-ts/typography'
-import '@ids-ts/typography/dist/main.css'
-import type { HandoffItem, HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
-import type { ReviewChecklistState } from '../../data/reviewChecklist'
 import { Checkbox } from '@ids-ts/checkbox'
 import '@ids-ts/checkbox/dist/main.css'
-import { ChevronDown, CircleCheckFill } from '@design-systems/icons'
+import { Tabs, Tab } from '@ids-ts/tabs'
+import '@ids-ts/tabs/dist/main.css'
+import { CircleCheckFill } from '@design-systems/icons'
+import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
+import type { ReviewChecklistState } from '../../data/reviewChecklist'
 import {
-  jumpActionLabel,
-  getOpenGroupToggleLabel,
-  getPreparerDoneGroupToggleLabel,
-  getDoneSectionToggleLabel,
-} from '../../data/handoffSnapshot'
+  buildSmartReviewBrief,
+  canApproveSignOff,
+  type ActivityLogCategory,
+  type BriefPhase,
+  type StrategicChecklistItem,
+} from '../../data/smartReviewBrief'
 import ReviewSidePanel, { sidePanelStyles } from './ReviewSidePanel'
 import styles from '../../styles/data-review/HandoffSummary.module.css'
 
 type Props = {
   snapshot: HandoffSnapshot
-  /** drawer = right-rail panel (default for continuous review); overlay kept for rare blocking confirms */
   variant?: 'drawer' | 'overlay' | 'embedded'
   onJump?: (jump: HandoffJump) => void
   onClose?: () => void
@@ -33,249 +31,265 @@ type Props = {
   onPassToReviewer?: () => void
   onConfirmSend?: () => void
   onOpenAsReviewer?: () => void
-  /** @deprecated Chips removed */
-  showQuickLinks?: boolean
   titleOverride?: string
   subtitleOverride?: string
   hideFooter?: boolean
   closing?: boolean
-  /** Process-level review checklist (Phase 2 sign-off, reviewer only) */
   checklist?: ReviewChecklistState
-  /** When false, checklist section is hidden (preparer / Pass 1 briefing) */
   showChecklist?: boolean
   onToggleChecklistItem?: (itemId: string, checked: boolean) => void
   signOffReady?: boolean
   signOffBlockerText?: string | null
+  outstandingOpenCount?: number
+  manualChecklistItems?: Record<string, boolean>
+  reviewPass?: 1 | 2
+  isPreparer?: boolean
 }
 
-function CountBadge({
-  count,
-  countLabel,
-  warning = false,
+function JumpLink({
+  label,
+  jump,
+  onJump,
 }: {
-  count: number
-  countLabel: string
-  warning?: boolean
+  label: string
+  jump: HandoffJump
+  onJump?: (jump: HandoffJump) => void
 }) {
-  if (count <= 0) return null
-  if (warning) {
+  if (!onJump) return null
+  return (
+    <button type="button" className={styles.jumpLink} onClick={() => onJump(jump)}>
+      {label}
+    </button>
+  )
+}
+
+function PhaseStatusPill({ status }: { status: 'action-needed' | 'verified' }) {
+  if (status === 'verified') {
     return (
-      <span className={styles.openCountBadgeWrap}>
-        <Badge
-          status="warning"
-          priority="primary"
-          capitalization="sentence"
-          aria-label={countLabel}
-          className={styles.openCountBadge}
-        >
-          {String(count)}
-        </Badge>
-      </span>
+      <Badge status="success" priority="secondary" capitalization="sentence" className={styles.phasePill}>
+        Verified
+      </Badge>
     )
   }
   return (
-    <span className={styles.openCountBadgeWrap} aria-label={countLabel}>
-      <NumericBadge quantity={count} />
-    </span>
+    <Badge status="warning" priority="secondary" capitalization="sentence" className={styles.phasePill}>
+      Action needed
+    </Badge>
   )
 }
 
-/** Bold names, counts, Pass N, and key phrases in narrative paragraphs */
-function isStoryEmphasis(part: string, actorLabel: string): boolean {
-  if (/^\d+$/.test(part)) return true
-  if (/^Pass [12]$/.test(part)) return true
-  return part === PREPARER_NAME || part === REVIEWER_NAME || part === actorLabel
-}
-
-function renderStoryParagraph(text: string, actorLabel: string): ReactNode {
-  const names = [PREPARER_NAME, REVIEWER_NAME, actorLabel]
-    .filter((n, i, a) => a.indexOf(n) === i)
-    .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  const pattern = new RegExp(
-    `(\\b(?:${names.join('|')})\\b|\\bPass [12]\\b|\\d+)`,
-    'g',
-  )
-  const parts = text.split(pattern)
-  return parts.map((part, i) => {
-    if (!part) return null
-    if (isStoryEmphasis(part, actorLabel)) {
-      return <strong key={i}>{part}</strong>
-    }
-    return <Fragment key={i}>{part}</Fragment>
-  })
-}
-
-function ItemRow({
-  item,
-  itemKey,
-  onJump,
-}: {
-  item: HandoffItem
-  itemKey: string
-  onJump?: (jump: HandoffJump) => void
-}) {
-  const isInfoOnly = item.status === 'info'
-  return (
-    <li
-      key={itemKey}
-      id={item.id ? `handoff-open-${item.id}` : undefined}
-      className={`${styles.item} ${isInfoOnly ? styles.itemInfo : ''}`}
-    >
-      <div className={styles.itemMain}>
-        <div className={styles.itemText}>
-          <span className={styles.itemLabel}>{item.label}</span>
-          {item.detail && <span className={styles.itemDetail}>{item.detail}</span>}
-        </div>
-        {item.jump && onJump && (
-          <button
-            type="button"
-            className={styles.checklistJumpBtn}
-            onClick={() => onJump(item.jump!)}
-          >
-            {item.jumpLabel ?? jumpActionLabel(item.jump)}
-          </button>
-        )}
-      </div>
-    </li>
-  )
-}
-
-/** Progressive disclosure — count lives in the trigger label, not a duplicate section title */
-function DetailsDisclosure({
-  id,
-  collapsedLabel,
-  expandedLabel,
-  countLabel,
-  defaultOpen = false,
-  children,
-}: {
-  id: string
-  collapsedLabel: string
-  expandedLabel: string
-  /** Accessible description of the item count (count is already in the visible label) */
-  countLabel?: string
-  defaultOpen?: boolean
-  children: ReactNode
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  const toggleLabel = open ? expandedLabel : collapsedLabel
-  return (
-    <div id={id} className={styles.disclosure}>
-      <button
-        type="button"
-        className={styles.disclosureToggle}
-        aria-expanded={open}
-        aria-label={countLabel ? `${toggleLabel}. ${countLabel}` : toggleLabel}
-        onClick={() => setOpen(v => !v)}
-      >
-        <ChevronDown
-          size="small"
-          className={`${styles.disclosureChevron} ${open ? styles.disclosureChevronOpen : ''}`}
-          aria-hidden
-        />
-        <span className={styles.disclosureLabel}>{toggleLabel}</span>
-      </button>
-      {open && <div className={styles.disclosureBody}>{children}</div>}
-    </div>
-  )
-}
-
-
-
-function ChecklistRow({
+function ChecklistItemRow({
   item,
   onJump,
   onToggle,
 }: {
-  item: import('../../data/reviewChecklist').ReviewChecklistItem
+  item: StrategicChecklistItem
   onJump?: (jump: HandoffJump) => void
   onToggle?: (itemId: string, checked: boolean) => void
 }) {
-  const isAuto = item.kind === 'auto'
-  const isComplete = item.complete
-  const canToggle = !isAuto && !!onToggle
-  const showAutoSuccess = isAuto && isComplete
-  const rowClass = [
-    styles.checklistItem,
-    isComplete ? styles.checklistItemComplete : styles.checklistItemPending,
-    !isComplete && item.required ? styles.checklistItemRequired : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const isComplete = item.checked
+  const canToggle = !!onToggle && !item.locked
 
   return (
-    <li className={rowClass}>
-      <div className={styles.checklistItemRow}>
+    <li className={`${styles.checklistRow} ${isComplete ? styles.checklistRowComplete : ''}`}>
+      <div className={styles.checklistRowMain}>
         <div className={styles.checklistCheck}>
-          {showAutoSuccess ? (
-            <>
-              <span className={styles.checklistSuccessIcon} aria-hidden>
+          {item.locked ? (
+            <span className={styles.checklistSuccessIcon} aria-hidden>
+              {isComplete ? (
                 <CircleCheckFill size="small" />
-              </span>
-              <span className={styles.checklistLabel}>{item.label}</span>
-            </>
+              ) : (
+                <span className={styles.checklistLockedBox} aria-hidden />
+              )}
+            </span>
           ) : (
             <Checkbox
               checked={isComplete}
-              disabled={isAuto}
-              onChange={canToggle ? (e) => onToggle!(item.id, e.target.checked) : undefined}
+              disabled={false}
+              onChange={canToggle ? e => onToggle!(item.id, e.target.checked) : undefined}
               size="small"
-              className={isComplete ? styles.checklistCheckboxSuccess : undefined}
-            >
-              <span className={isComplete ? styles.checklistLabel : styles.checklistLabelActive}>
-                {item.label}
-              </span>
-            </Checkbox>
+            />
           )}
+          <div className={styles.checklistText}>
+            <span className={`${styles.checklistTitle} ${isComplete ? styles.checklistTitleDone : ''}`}>
+              {item.title}
+            </span>
+            {item.note && (
+              <p className={`${styles.checklistNote} ${isComplete ? styles.checklistNoteDone : ''}`}>
+                {item.note}
+              </p>
+            )}
+          </div>
         </div>
-        {item.jump && onJump && !isComplete && (
-          <button type="button" className={styles.checklistJumpBtn} onClick={() => onJump(item.jump!)}>
-            {item.jumpLabel ?? 'View'}
-          </button>
+        {item.jump && item.jumpLabel && (
+          <JumpLink label={item.jumpLabel} jump={item.jump} onJump={onJump} />
         )}
       </div>
-      {item.description && (
-        <p
-          className={`${styles.checklistDesc} ${isComplete ? styles.checklistDescComplete : ''}`}
-        >
-          {item.description}
-        </p>
-      )}
     </li>
   )
 }
 
-function ChecklistSection({
-  checklist,
+function PhaseCard({
+  phase,
   onJump,
-  onToggleChecklistItem,
+  onToggle,
 }: {
-  checklist: ReviewChecklistState
+  phase: BriefPhase
   onJump?: (jump: HandoffJump) => void
-  onToggleChecklistItem?: (itemId: string, checked: boolean) => void
+  onToggle?: (itemId: string, checked: boolean) => void
 }) {
+  if (phase.items.length === 0) return null
   return (
-    <section id="handoff-checklist" className={styles.checklistSection}>
-      <div className={styles.storySectionHead}>
-        <h3 className={styles.storySectionTitle}>Review checklist</h3>
-        <span className={styles.checklistProgress} aria-live="polite">
-          {checklist.requiredCompleteCount} of {checklist.requiredTotal} review steps complete
-        </span>
-      </div>
-      <p className={styles.sectionIntro}>
-        Process attestation for sign-off. These steps track readiness, not every open item above.
-      </p>
-      <ul className={styles.checklistList}>
-        {checklist.items.map(item => (
-          <ChecklistRow
+    <article className={styles.phaseCard}>
+      <header className={styles.phaseCardHead}>
+        <h3 className={styles.phaseCardTitle}>{phase.title}</h3>
+        <PhaseStatusPill status={phase.status} />
+      </header>
+      <ul className={styles.phaseItemList}>
+        {phase.items.map(item => (
+          <ChecklistItemRow
             key={item.id}
             item={item}
             onJump={onJump}
-            onToggle={onToggleChecklistItem}
+            onToggle={onToggle}
           />
         ))}
       </ul>
-    </section>
+    </article>
+  )
+}
+
+function ActivityCategoryCard({ category }: { category: ActivityLogCategory }) {
+  return (
+    <article className={styles.activityCard}>
+      <header className={styles.activityCardHead}>
+        <h3 className={styles.activityCardTitle}>{category.title}</h3>
+        {category.badge && (
+          <span className={styles.activityBadge}>
+            <CircleCheckFill size="x-small" aria-hidden />
+            {category.badge}
+          </span>
+        )}
+      </header>
+      {category.entries.length === 0 ? (
+        <p className={styles.activityEmpty}>Nothing recorded yet.</p>
+      ) : (
+        <ul className={styles.activityList}>
+          {category.entries.map(entry => (
+            <li key={entry.id} className={styles.activityEntry}>
+              <span className={styles.activityCheckIcon} aria-hidden>
+                <CircleCheckFill size="small" />
+              </span>
+              <div className={styles.activityEntryText}>
+                <span className={styles.activityEntryLabel}>{entry.label}</span>
+                {entry.detail && (
+                  <span className={styles.activityEntryDetail}>{entry.detail}</span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </article>
+  )
+}
+
+function StrategicChecklistTab({
+  phases,
+  executiveBrief,
+  onJump,
+  onToggle,
+}: {
+  phases: BriefPhase[]
+  executiveBrief: { paragraphs: string[]; syncedAt: string } | null
+  onJump?: (jump: HandoffJump) => void
+  onToggle?: (itemId: string, checked: boolean) => void
+}) {
+  return (
+    <div className={styles.tabPanel}>
+      {executiveBrief && (
+        <section className={styles.executiveCard} aria-labelledby="executive-brief-title">
+          <div className={styles.executiveCardHead}>
+            <h3 id="executive-brief-title" className={styles.executiveCardTitle}>
+              AI executive brief
+            </h3>
+            <span className={styles.syncedTime}>{executiveBrief.syncedAt}</span>
+          </div>
+          {executiveBrief.paragraphs.map((para, i) => (
+            <p key={i} className={styles.executivePara}>{para}</p>
+          ))}
+        </section>
+      )}
+      <div className={styles.phaseStack}>
+        {phases.map(phase => (
+          <PhaseCard
+            key={phase.id}
+            phase={phase}
+            onJump={onJump}
+            onToggle={onToggle}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ActivityLogTab({ categories }: { categories: ActivityLogCategory[] }) {
+  return (
+    <div className={styles.tabPanel}>
+      <p className={styles.activityIntro}>
+        Read-only audit trail from Pass 1. Green checks show what {PREPARER_NAME.split(' ')[0]} cleared before handoff.
+      </p>
+      <div className={styles.activityStack}>
+        {categories.map(cat => (
+          <ActivityCategoryCard key={cat.id} category={cat} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PreparerSummaryTab({ categories, actorLabel }: { categories: ActivityLogCategory[]; actorLabel: string }) {
+  return (
+    <div className={styles.tabPanel}>
+      <p className={styles.activityIntro}>
+        Summary of your work on this pass. This is what the next reviewer will see in the activity log.
+      </p>
+      <div className={styles.activityStack}>
+        {categories.map(cat => (
+          <ActivityCategoryCard key={cat.id} category={cat} />
+        ))}
+      </div>
+      {categories.every(c => c.entries.length === 0) && (
+        <p className={styles.activityEmpty}>
+          No completed actions recorded yet for {actorLabel}.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function BriefStickyHeader({
+  title,
+  pass1Line,
+  passBadge,
+}: {
+  title: string
+  pass1Line: string
+  passBadge: string | null
+}) {
+  return (
+    <div className={styles.stickyHeader}>
+      <h2 className={styles.briefTitle}>{title}</h2>
+      <div className={styles.briefMeta}>
+        <span className={styles.pass1Line}>{pass1Line}</span>
+        {passBadge && (
+          <Badge status="info" priority="secondary" capitalization="sentence" className={styles.passBadge}>
+            {passBadge}
+          </Badge>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -289,84 +303,103 @@ export default function HandoffSummary({
   onPassToReviewer,
   onConfirmSend,
   onOpenAsReviewer,
-  titleOverride,
-  subtitleOverride,
   hideFooter = false,
   closing = false,
   checklist,
   showChecklist = false,
   onToggleChecklistItem,
-  signOffReady = true,
-  signOffBlockerText: _signOffBlockerText,
+  signOffReady: _signOffReadyProp,
+  signOffBlockerText,
+  outstandingOpenCount = 0,
+  manualChecklistItems = {},
+  reviewPass = snapshot.pass,
+  isPreparer = false,
 }: Props) {
-  const title =
-    titleOverride ??
-    (snapshot.mode === 'finish-and-file'
-      ? 'Ready to file'
-      : snapshot.mode === 'awaiting-reviewer'
-        ? 'Handoff sent'
-        : snapshot.mode === 'signoff-review'
-          ? 'Review summary'
-          : 'Handoff preview')
+  const brief = useMemo(
+    () =>
+      buildSmartReviewBrief({
+        snapshot,
+        checklist: checklist ?? { items: [], completeCount: 0, totalCount: 0, requiredCompleteCount: 0, requiredTotal: 0, allRequiredComplete: true, blockers: [] },
+        outstandingOpenCount,
+        manualChecklistItems,
+        reviewPass,
+        showStrategicChecklist: showChecklist,
+        isPreparer,
+      }),
+    [snapshot, checklist, outstandingOpenCount, manualChecklistItems, reviewPass, showChecklist, isPreparer],
+  )
 
-  const subtitle =
-    subtitleOverride !== undefined
-      ? subtitleOverride
-      : snapshot.mode === 'finish-and-file'
-        ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
-        : snapshot.mode === 'awaiting-reviewer'
-          ? `Pass ${snapshot.pass} complete · Next person can open as reviewer`
-          : snapshot.mode === 'signoff-review'
-            ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
-            : `Pass ${snapshot.pass} · Preview for the next reviewer`
+  const signOffReady = canApproveSignOff(brief)
+  const blockerText = signOffBlockerText ?? brief.signOff.blockerText
 
-  const verdictType = snapshot.verdict.tone === 'clear' ? 'success' : 'warn'
+  const [activeTab, setActiveTab] = useState(
+    brief.viewMode === 'reviewer-strategic' ? 'checklist' : 'activity',
+  )
+
+  const showTabs = brief.viewMode === 'reviewer-strategic'
 
   const footerActions = !hideFooter ? (
     <div className={styles.footerWrap}>
-      <div className={styles.footerActionsRow}>
-      {snapshot.mode === 'signoff-review' && (
+      {snapshot.mode === 'signoff-review' && brief.viewMode === 'reviewer-strategic' && (
         <>
+          <div className={styles.signOffStatusRow}>
+            <span
+              className={`${styles.signOffStatus} ${signOffReady ? styles.signOffStatusReady : styles.signOffStatusPending}`}
+              aria-live="polite"
+            >
+              {brief.signOff.statusText}
+            </span>
+            {!signOffReady && blockerText && (
+              <p className={styles.signOffBlocker}>{blockerText}</p>
+            )}
+          </div>
+          <div className={styles.footerActionsRow}>
+            {onContinue && (
+              <Button priority="tertiary" size="medium" onClick={onContinue}>
+                Keep reviewing
+              </Button>
+            )}
+            <div className={sidePanelStyles.footerSpacer} />
+            {onFinishAndFile && (
+              <Button priority="primary" size="medium" onClick={onFinishAndFile} disabled={!signOffReady}>
+                Approve &amp; sign off return
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+      {snapshot.mode === 'signoff-review' && brief.viewMode !== 'reviewer-strategic' && (
+        <div className={styles.footerActionsRow}>
           {onContinue && (
             <Button priority="tertiary" size="medium" onClick={onContinue}>
-              Keep reviewing
+              {brief.viewMode === 'reviewer-briefing' ? 'Start Pass 2 review' : 'Close'}
             </Button>
           )}
           <div className={sidePanelStyles.footerSpacer} />
-          {onPassToReviewer && (
-            <Button priority="secondary" size="medium" onClick={onPassToReviewer} disabled={!signOffReady}>
-              Pass to next reviewer
+          {brief.viewMode === 'reviewer-briefing' && onOpenAsReviewer && (
+            <Button priority="primary" size="medium" onClick={onOpenAsReviewer}>
+              Begin Pass 2 review
             </Button>
           )}
-          {onFinishAndFile && (
-            <Button priority="primary" size="medium" onClick={onFinishAndFile} disabled={!signOffReady}>
-              Finish &amp; file
-            </Button>
-          )}
-        </>
+        </div>
       )}
       {snapshot.mode === 'pass-to-reviewer' && (
-        <>
+        <div className={styles.footerActionsRow}>
           {onContinue && (
             <Button priority="tertiary" size="medium" onClick={onContinue}>
               Back
             </Button>
           )}
           <div className={sidePanelStyles.footerSpacer} />
-          {onOpenAsReviewer && (
-            <Button priority="secondary" size="medium" onClick={onOpenAsReviewer}>
-              Open as reviewer
-            </Button>
-          )}
           {onConfirmSend && (
-            <Button priority="primary" size="medium" onClick={onConfirmSend} disabled={!signOffReady}>
+            <Button priority="primary" size="medium" onClick={onConfirmSend}>
               Send to reviewer
             </Button>
           )}
-        </>
+        </div>
       )}
       {snapshot.mode === 'awaiting-reviewer' && (
-        <>
+        <div className={styles.footerActionsRow}>
           {onContinue && (
             <Button priority="tertiary" size="medium" onClick={onContinue}>
               Close
@@ -378,189 +411,62 @@ export default function HandoffSummary({
               Open as reviewer
             </Button>
           )}
-        </>
+        </div>
       )}
       {snapshot.mode === 'finish-and-file' && (
-        <>
+        <div className={styles.footerActionsRow}>
           <div className={sidePanelStyles.footerSpacer} />
           {onContinue && (
-            <Button priority="primary" size="medium" onClick={onContinue} disabled={!signOffReady}>
+            <Button priority="primary" size="medium" onClick={onContinue}>
               Mark ready to file
             </Button>
           )}
-        </>
+        </div>
       )}
-      </div>
     </div>
   ) : null
 
   const briefContent = (
     <div className={`${sidePanelStyles.scroll} ${styles.brief}`}>
-      {snapshot.story.length > 0 && (
-        <div className={styles.story}>
-          {snapshot.story.map((para, i) => (
-            <p key={i} className={styles.storyPara}>{renderStoryParagraph(para, snapshot.actorLabel)}</p>
-          ))}
-        </div>
-      )}
+      <BriefStickyHeader
+        title={brief.header.title}
+        pass1Line={brief.header.pass1Line}
+        passBadge={brief.header.passBadge}
+      />
 
-      <div className={styles.verdictWrap}>
-        <PageMessage
-          type={verdictType}
-          title={snapshot.verdict.title}
-          open
-          dismissible={false}
-          automationId="handoff-verdict"
+      {showTabs ? (
+        <Tabs
+          selected={activeTab}
+          onChange={setActiveTab}
+          isHorizontalRuleVisible
+          className={styles.briefTabs}
         >
-          <B3>{snapshot.verdict.detail}</B3>
-        </PageMessage>
-      </div>
-
-      <div className={styles.sections}>
-        {snapshot.sections.map(section => {
-          const isCritical = section.bucket === 'critical'
-          const isDone = section.bucket === 'done'
-          const hasGroups = !!(section.groups && section.groups.length > 0)
-          const hasItems = section.items.length > 0
-          const preparerFirstName = snapshot.actorLabel.split(/\s+/)[0] || snapshot.actorLabel
-          const showFlatDetails =
-            !hasGroups && hasItems && section.items.some(i => i.status !== 'info')
-
-          return (
-            <section
-              key={section.id}
-              id={`handoff-sec-${section.id}`}
-              className={styles.storySection}
-            >
-              <div className={styles.storySectionHead}>
-                <h3 className={styles.storySectionTitle}>{section.title}</h3>
-                <span className={styles.sectionBadge}>
-                  <CountBadge
-                    count={section.count}
-                    countLabel={section.countLabel}
-                    warning={isCritical && section.count > 0}
-                  />
-                </span>
-              </div>
-              {section.intro && (
-                <p className={styles.sectionIntro}>{section.intro}</p>
-              )}
-
-              {!hasGroups && !showFlatDetails && hasItems && (
-                <ul className={styles.list}>
-                  {section.items.map((item, i) => (
-                    <ItemRow
-                      key={item.id ?? `${section.id}-${i}`}
-                      item={item}
-                      itemKey={item.id ?? `${section.id}-${i}`}
-                      onJump={onJump}
-                    />
-                  ))}
-                </ul>
-              )}
-
-              {hasGroups && (
-                <div className={styles.groupStack}>
-                  {section.groups!.map(group => (
-                    <DetailsDisclosure
-                      key={group.id}
-                      id={`handoff-group-${group.id}`}
-                      collapsedLabel={
-                        isDone
-                          ? getPreparerDoneGroupToggleLabel(
-                              group,
-                              false,
-                              snapshot.voice === 'reviewer-briefing',
-                              preparerFirstName,
-                            )
-                          : getOpenGroupToggleLabel(
-                              group,
-                              false,
-                              snapshot.voice === 'reviewer-briefing',
-                            )
-                      }
-                      expandedLabel={
-                        isDone
-                          ? getPreparerDoneGroupToggleLabel(
-                              group,
-                              true,
-                              snapshot.voice === 'reviewer-briefing',
-                              preparerFirstName,
-                            )
-                          : getOpenGroupToggleLabel(
-                              group,
-                              true,
-                              snapshot.voice === 'reviewer-briefing',
-                            )
-                      }
-                      countLabel={group.countLabel}
-                      defaultOpen={false}
-                    >
-                      <ul className={styles.list}>
-                        {group.items.map((item, i) => (
-                          <ItemRow
-                            key={item.id ?? `${group.id}-${i}`}
-                            item={item}
-                            itemKey={item.id ?? `${group.id}-${i}`}
-                            onJump={onJump}
-                          />
-                        ))}
-                      </ul>
-                    </DetailsDisclosure>
-                  ))}
-                </div>
-              )}
-
-              {!hasGroups && showFlatDetails && (
-                <DetailsDisclosure
-                  id={`handoff-details-${section.id}`}
-                  collapsedLabel={getDoneSectionToggleLabel(
-                    section.count,
-                    false,
-                    snapshot.voice === 'reviewer-briefing',
-                    preparerFirstName,
-                  )}
-                  expandedLabel={getDoneSectionToggleLabel(
-                    section.count,
-                    true,
-                    snapshot.voice === 'reviewer-briefing',
-                    preparerFirstName,
-                  )}
-                  countLabel={section.countLabel}
-                  defaultOpen={section.defaultOpen}
-                >
-                  <ul className={styles.list}>
-                    {section.items.map((item, i) => (
-                      <ItemRow
-                        key={item.id ?? `${section.id}-${i}`}
-                        item={item}
-                        itemKey={item.id ?? `${section.id}-${i}`}
-                        onJump={onJump}
-                      />
-                    ))}
-                  </ul>
-                </DetailsDisclosure>
-              )}
-            </section>
-          )
-        })}
-      </div>
-
-      {showChecklist && checklist && (
-        <ChecklistSection
-          checklist={checklist}
-          onJump={onJump}
-          onToggleChecklistItem={onToggleChecklistItem}
-        />
+          <Tab id="checklist" title="Strategic checklist">
+            <StrategicChecklistTab
+              phases={brief.phases}
+              executiveBrief={brief.executiveBrief}
+              onJump={onJump}
+              onToggle={onToggleChecklistItem}
+            />
+          </Tab>
+          <Tab id="activity" title={`${PREPARER_NAME.split(' ')[0]}'s activity log`}>
+            <ActivityLogTab categories={brief.activityLog} />
+          </Tab>
+        </Tabs>
+      ) : brief.viewMode === 'preparer-summary' ? (
+        <PreparerSummaryTab categories={brief.activityLog} actorLabel={snapshot.actorLabel} />
+      ) : (
+        <ActivityLogTab categories={brief.activityLog} />
       )}
     </div>
   )
 
+  const panelTitle = brief.header.title
+  const panelSubtitle = brief.header.pass1Line
+
   if (variant === 'embedded') {
     return (
       <div className={styles.embedded} role="region" aria-labelledby="handoff-title">
-        <h2 id="handoff-title" className={styles.embeddedTitle}>{title}</h2>
-        {subtitle ? <p className={styles.embeddedSubtitle}>{subtitle}</p> : null}
         {briefContent}
         {!hideFooter && footerActions && (
           <footer className={styles.embeddedFooter}>{footerActions}</footer>
@@ -573,8 +479,8 @@ export default function HandoffSummary({
     if (!onClose) return null
     return (
       <ReviewSidePanel
-        title={title}
-        subtitle={subtitle || undefined}
+        title={panelTitle}
+        subtitle={panelSubtitle}
         titleId="handoff-title"
         onClose={onClose}
         closeLabel="Close summary"
@@ -591,8 +497,8 @@ export default function HandoffSummary({
       <div className={styles.panel}>
         <header className={styles.overlayHeader}>
           <div>
-            <h2 id="handoff-title" className={styles.embeddedTitle}>{title}</h2>
-            {subtitle ? <p className={styles.embeddedSubtitle}>{subtitle}</p> : null}
+            <h2 id="handoff-title" className={styles.embeddedTitle}>{panelTitle}</h2>
+            <p className={styles.embeddedSubtitle}>{panelSubtitle}</p>
           </div>
           {onClose && (
             <button type="button" className={styles.overlayClose} onClick={onClose} aria-label="Close summary">

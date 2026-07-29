@@ -153,7 +153,7 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
       id: 'reviewed-inputs',
       label: 'Reviewed inputs',
       description: importComplete
-        ? 'Import accuracy cleared. Source docs and Phase 1 flags resolved.'
+        ? 'Import accuracy cleared — source docs and Phase 1 flags resolved.'
         : `${openImportFlags.length} import flag${openImportFlags.length === 1 ? '' : 's'} still open.`,
       kind: 'auto',
       required: true,
@@ -191,7 +191,7 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
       id: 'law-compliance',
       label: 'Checked law compliance application',
       description: lawComplianceManual
-        ? 'No AI diagnostics on this return. Attest compliance review manually.'
+        ? 'No AI diagnostics on this return — attest compliance review manually.'
         : aiComplete
           ? 'All active AI diagnostics have been reviewed.'
           : `${diagsOpen.length} diagnostic${diagsOpen.length === 1 ? '' : 's'} still open.`,
