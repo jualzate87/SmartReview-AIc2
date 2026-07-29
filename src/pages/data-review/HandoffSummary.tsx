@@ -8,7 +8,7 @@ import PageMessage from '@ids-ts/page-message'
 import '@ids-ts/page-message/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
 import '@ids-ts/tabs/dist/main.css'
-import { CircleCheck, CircleCheckFill } from '@design-systems/icons'
+import { ChevronRight, CircleCheck, CircleCheckFill } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import type { LiveAmounts } from '../../data/liveReturn'
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
@@ -61,6 +61,7 @@ function JumpLink({
   return (
     <button type="button" className={styles.jumpLink} onClick={() => onJump(jump)}>
       {label}
+      <ChevronRight size="small" className={styles.jumpLinkIcon} aria-hidden />
     </button>
   )
 }

@@ -148,7 +148,7 @@ function checklistToStrategicItem(item: ReviewChecklistItem): StrategicChecklist
     checked: item.complete,
     locked: item.kind === 'auto',
     jump: item.jump,
-    jumpLabel: item.jumpLabel ? `${item.jumpLabel} ↗` : undefined,
+    jumpLabel: item.jumpLabel,
     required: item.required,
   }
 }
@@ -161,7 +161,7 @@ function openGroupToItems(group: HandoffItemGroup): StrategicChecklistItem[] {
     checked: false,
     locked: true,
     jump: item.jump,
-    jumpLabel: item.jumpLabel ? `${item.jumpLabel} ↗` : item.jump ? 'View ↗' : undefined,
+    jumpLabel: item.jumpLabel ?? (item.jump ? 'View' : undefined),
     required: true,
   }))
 }
@@ -256,7 +256,7 @@ function seedDemoPhaseItems(
           checked: true,
           locked: true,
           jump: { type: 'doc', docId: 'techCircle' },
-          jumpLabel: 'W-2 Tech Circle ↗',
+          jumpLabel: 'W-2 Tech Circle',
           required: true,
         },
         {
@@ -265,7 +265,7 @@ function seedDemoPhaseItems(
           note: `${fmtUsd(live.qualifiedDivs)} qualified dividends on return — spot-check Box 1b against the detail panel.`,
           checked: false,
           jump: { type: 'doc', docId: '1099-div-tokenFinancial' },
-          jumpLabel: '1099-DIV ↗',
+          jumpLabel: '1099-DIV',
           required: true,
         },
       ]
@@ -277,7 +277,7 @@ function seedDemoPhaseItems(
           note: `Sara note: Confirm Form 8960 safe harbor applying after AGI increase to ${fmtUsd(live.totalIncome)}.`,
           checked: false,
           jump: { type: 'diagnostic', issueKey: 'niitForm8960' },
-          jumpLabel: 'Form 8960 ↗',
+          jumpLabel: 'Form 8960',
           required: true,
         },
         {
@@ -286,7 +286,7 @@ function seedDemoPhaseItems(
           note: `Sara flagged: ${fmtUsd(live.qualifiedDivs)} qualified dividend gain pushes taxpayer into 20% capital gains bracket.`,
           checked: false,
           jump: { type: 'field', field: 'qualifiedDivs' },
-          jumpLabel: 'Qualified divs ↗',
+          jumpLabel: 'Qualified divs',
           required: true,
         },
       ]
@@ -298,7 +298,7 @@ function seedDemoPhaseItems(
           note: 'Sara note: Client confirmed mortgage interest — itemized may beat the standard deduction once 1098 is entered.',
           checked: false,
           jump: { type: 'field', field: 'stdDeduction' },
-          jumpLabel: 'Schedule A ↗',
+          jumpLabel: 'Schedule A',
           required: true,
         },
       ]
@@ -310,7 +310,7 @@ function seedDemoPhaseItems(
           note: `Confirm wages ${fmtUsd(live.wages)}, dividends ${fmtUsd(live.ordinaryDivs)}, deductions ${fmtUsd(live.deductionTaken)}, tax liability ${fmtUsd(live.totalTax)}, and ${live.oweAmount > 0 ? `balance due ${fmtUsd(live.oweAmount)}` : 'refund position'}.`,
           checked: false,
           jump: { type: 'field', field: 'wages' },
-          jumpLabel: 'Form 1040 ↗',
+          jumpLabel: 'Open Form 1040',
           required: true,
         },
         {
@@ -319,7 +319,7 @@ function seedDemoPhaseItems(
           note: `Total income ${fmtUsd(live.totalIncome)} vs prior year. Explain material moves in wages and investment income before sign-off.`,
           checked: false,
           jump: { type: 'field', field: 'totalIncome' },
-          jumpLabel: '1040 summary ↗',
+          jumpLabel: 'View summary',
           required: true,
         },
       ]
@@ -365,7 +365,7 @@ function buildPhases(
         note,
         checked: !!manualChecklistItems[item.id],
         jump: item.jump,
-        jumpLabel: item.jumpLabel ? `${item.jumpLabel} ↗` : undefined,
+        jumpLabel: item.jumpLabel,
         required: item.required,
       })
     } else {
