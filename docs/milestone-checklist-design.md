@@ -12,14 +12,29 @@ Replace the flat reviewer checklist with a **milestone-based checklist** aligned
 
 ---
 
+## Attribution (always on)
+
+**Decision:** Milestone attribution is **never hidden** — even when one CPA completes both passes, every completed milestone shows **who** and **when** for audit trail.
+
+| Actor | Inline label | Tooltip |
+|-------|--------------|---------|
+| Sara Chen (preparer) | **SC · Jul 29** | Sara Chen · Jul 29 · 2:30 PM |
+| Jordan Lee (reviewer) | **Jordan · Jul 29** | Jordan Lee · Jul 29 · 2:30 PM |
+
+- Declaration milestones store `{ by: 'preparer' \| 'reviewer', name: string, at: timestamp }` in `completedMilestones`.
+- Linked/auto milestones derive attribution from the underlying activity entry (doc verify, Rev confirm, etc.).
+- No generic "Completed" or "You completed" copy — always SC or Jordan (or initials for other actors).
+
+---
+
 ## Single vs dual person flow
 
 ### Scenario A — One person (single-person mode)
 
 One CPA completes import accuracy, AI diagnostics, output attestation, **and** the full milestone checklist before sign-off.
 
-- Milestones accumulate under one actor — attribution shows first name only (e.g. **Jordan · Jul 29**).
-- No Pass 1 / Pass 2 split in the conversational brief.
+- Each milestone still shows **SC · Jul 29** or **Jordan · Jul 29** depending on which actor slot completed it.
+- Executive brief: single-actor rollup — e.g. *"SC completed 12 milestones"* or *"Jordan completed 12 milestones"* (not anonymous).
 - Declaration milestones can be completed whenever the actor is eligible (`any` or their role).
 - Linked/auto milestones still derive from underlying field, doc, and diagnostic state.
 
@@ -32,7 +47,7 @@ One CPA completes import accuracy, AI diagnostics, output attestation, **and** t
 | Pass 2 | Jordan Lee (reviewer) | Rev confirmations, form sign-offs, reviewer declarations, sign-off |
 
 - Each completed milestone records **who** and **when**: **SC · Jul 29** or **Jordan · Jul 29**.
-- Brief bullets split by role: *"Sara completed 8 milestones in Pass 1"* / *"Jordan completed 4 milestones in Pass 2"*.
+- Executive brief splits by role when both contributed: *"Sara completed 8 milestones in Pass 1"* / *"Jordan completed 4 milestones in Pass 2"*.
 - Reviewer sees remaining milestones; can complete any still-open `any` items.
 
 ---
@@ -64,7 +79,7 @@ interface ReviewMilestone {
 }
 
 // Session state — useSyncedReviewState
-completedMilestones: Record<milestoneId, { by, at, name }>
+completedMilestones: Record<milestoneId, { by: 'preparer' | 'reviewer', name: string, at: string }>
 ```
 
 `deriveMilestoneState()` merges catalog + live review state into resolved milestones with completion attribution.
@@ -87,7 +102,6 @@ Progress surfaces as *"12 of 20 required milestones complete"* in the executive 
 - Phase 2–5 MD items not in Jessica Drake return (K-1s, Form 8867, 1095-A, business entities)
 - Per-milestone jump from brief to exact field (partial — jump targets on subset only)
 - Configurable milestone sets by return type (1040 vs 1120-S)
-- Single-person mode without role switch (today: dual-person demo with Sara/Jordan names)
 
 ---
 

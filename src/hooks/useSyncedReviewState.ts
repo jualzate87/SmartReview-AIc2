@@ -107,6 +107,15 @@ export function actorInitials(name: string): string {
     .slice(0, 2)
 }
 
+/** Short milestone / checklist attribution — Sara Chen → SC, Jordan Lee → Jordan */
+export function milestoneActorLabel(name: string): string {
+  if (name === PREPARER_NAME) return 'SC'
+  if (name === REVIEWER_NAME) return 'Jordan'
+  const initials = actorInitials(name)
+  if (initials.length >= 2) return initials
+  return name.split(/\s+/)[0] || name
+}
+
 /** Inline dual-slot trail — preparer muted, reviewer emphasized */
 export function formatDualCheckTrail(
   preparer?: ActivityEntry | null,

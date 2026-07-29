@@ -3,7 +3,7 @@
  * Milestones map to CPA review phases from Phase 1–5 source doc (client setup → final check).
  */
 import type { ActivityEntry } from '../hooks/useSyncedReviewState'
-import { PREPARER_NAME, REVIEWER_NAME } from '../hooks/useSyncedReviewState'
+import { milestoneActorLabel, PREPARER_NAME, REVIEWER_NAME } from '../hooks/useSyncedReviewState'
 import type { HandoffJump } from './handoffSnapshot'
 import { computeLiveReturn, type LiveAmounts } from './liveReturn'
 import {
@@ -77,7 +77,7 @@ export type MilestoneInputs = {
   outstandingOpenCount: number
   currentActorName: string
   reviewPass: 1 | 2
-  /** When true, same person did both passes — collapse actor labels */
+  /** When true, one CPA did both passes (attribution labels still shown per milestone) */
   singlePersonMode: boolean
 }
 
@@ -522,24 +522,21 @@ function actorCanCompleteEligible(
   return false
 }
 
+/** Inline attribution — e.g. "SC · Jul 29" or "Jordan · Jul 29" (always shows who) */
 export function formatMilestoneAttribution(
   completion: MilestoneCompletion | undefined,
-  singlePersonMode: boolean,
 ): string | undefined {
   if (!completion) return undefined
   const datePart = completion.at.split(' · ')[0] || completion.at
-  if (singlePersonMode) {
-    const first = completion.name.split(/\s+/)[0]
-    return `${first} · ${datePart}`
-  }
-  const initials = completion.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(p => p[0]?.toUpperCase() ?? '')
-    .join('')
-    .slice(0, 2)
-  const label = initials.length >= 2 ? initials : completion.name.split(/\s+/)[0]
-  return `${label} · ${datePart}`
+  return `${milestoneActorLabel(completion.name)} · ${datePart}`
+}
+
+/** Full name + timestamp for tooltip / audit detail */
+export function formatMilestoneAttributionTooltip(
+  completion: MilestoneCompletion | undefined,
+): string | undefined {
+  if (!completion) return undefined
+  return `${completion.name} · ${completion.at}`
 }
 
 export function deriveMilestoneState(input: MilestoneInputs): MilestoneState {

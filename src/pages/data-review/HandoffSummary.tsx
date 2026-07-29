@@ -177,7 +177,12 @@ function ChecklistItemRow({
               <CompletionTypeIcon type={item.completionType} />
               <span className={styles.checklistTitle}>{item.title}</span>
               {item.attribution && isComplete && (
-                <span className={styles.checklistAttribution}>{item.attribution}</span>
+                <span
+                  className={styles.checklistAttribution}
+                  title={item.attributionTooltip}
+                >
+                  {item.attribution}
+                </span>
               )}
             </span>
             {item.note && (

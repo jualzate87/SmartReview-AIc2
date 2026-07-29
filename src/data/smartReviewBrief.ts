@@ -2,7 +2,7 @@
  * Smart Review Brief — phase checklist and activity log payloads for HandoffSummary.
  * Derives from handoffSnapshot, reviewChecklist, and live review state.
  */
-import { PREPARER_NAME, REVIEWER_NAME } from '../hooks/useSyncedReviewState'
+import { milestoneActorLabel, PREPARER_NAME, REVIEWER_NAME } from '../hooks/useSyncedReviewState'
 import type { HandoffJump, HandoffSnapshot, HandoffItemGroup, HandoffItem } from './handoffSnapshot'
 import {
   canonicalActivityKey,
@@ -17,6 +17,7 @@ import type { LiveAmounts } from './liveReturn'
 import {
   countMilestonesByRole,
   formatMilestoneAttribution,
+  formatMilestoneAttributionTooltip,
   MILESTONE_PHASE_DESCRIPTIONS,
   MILESTONE_PHASE_TITLES,
   type MilestoneCompletionType,
@@ -39,6 +40,8 @@ export type StrategicChecklistItem = {
   completionType?: MilestoneCompletionType
   /** Who completed — e.g. "Jordan · Jul 29" */
   attribution?: string
+  /** Full name + time for hover tooltip */
+  attributionTooltip?: string
   canToggle?: boolean
 }
 
@@ -135,10 +138,7 @@ function phaseStatus(items: StrategicChecklistItem[]): 'action-needed' | 'verifi
   return required.every(i => i.checked && !i.locked) ? 'verified' : 'action-needed'
 }
 
-function milestoneToStrategicItem(
-  m: ResolvedMilestone,
-  singlePersonMode: boolean,
-): StrategicChecklistItem {
+function milestoneToStrategicItem(m: ResolvedMilestone): StrategicChecklistItem {
   return {
     id: m.id,
     title: m.title,
@@ -151,7 +151,8 @@ function milestoneToStrategicItem(
     jumpLabel: m.jumpLabel,
     required: m.required,
     completionType: m.completionType,
-    attribution: formatMilestoneAttribution(m.completion, singlePersonMode),
+    attribution: formatMilestoneAttribution(m.completion),
+    attributionTooltip: formatMilestoneAttributionTooltip(m.completion),
     canToggle: m.canToggle,
   }
 }
@@ -175,10 +176,7 @@ function getDoneGroups(snapshot: HandoffSnapshot): HandoffItemGroup[] {
   return doneSection?.groups ?? []
 }
 
-function buildPhasesFromMilestones(
-  milestoneState: MilestoneState,
-  singlePersonMode: boolean,
-): BriefPhase[] {
+function buildPhasesFromMilestones(milestoneState: MilestoneState): BriefPhase[] {
   const phaseItems: Record<BriefPhaseId, StrategicChecklistItem[]> = {
     'phase-1': [],
     'phase-2': [],
@@ -189,7 +187,7 @@ function buildPhasesFromMilestones(
 
   for (const m of milestoneState.milestones) {
     const phaseId = briefPhaseId(m.phase)
-    phaseItems[phaseId].push(milestoneToStrategicItem(m, singlePersonMode))
+    phaseItems[phaseId].push(milestoneToStrategicItem(m))
   }
 
   return BRIEF_PHASE_IDS.map(id => {
@@ -404,7 +402,6 @@ function buildExecutiveBrief(
   outstandingOpenCount: number,
   reviewPass: 1 | 2,
   milestoneState?: MilestoneState,
-  singlePersonMode = false,
 ): SmartReviewBrief['executiveBrief'] {
   const reviewerFirst = firstName(REVIEWER_NAME)
   const { checks, docCount } = countPass1Baseline(snapshot)
@@ -434,23 +431,45 @@ function buildExecutiveBrief(
         { text: ' required milestones complete' },
       ]),
     )
-    if (!singlePersonMode && reviewPass === 2 && milestoneCounts.preparer > 0) {
+    const hasPreparer = milestoneCounts.preparer > 0
+    const hasReviewer = milestoneCounts.reviewer > 0
+    if (hasPreparer && hasReviewer) {
+      if (reviewPass === 2 && hasPreparer) {
+        completedItems.push(
+          briefItem('milestones-preparer', [
+            { text: preparerFirst, bold: true },
+            { text: ' completed ' },
+            { text: String(milestoneCounts.preparer), bold: true },
+            { text: ` milestone${milestoneCounts.preparer === 1 ? '' : 's'} in Pass 1` },
+          ]),
+        )
+      }
+      if (hasReviewer) {
+        completedItems.push(
+          briefItem('milestones-reviewer', [
+            { text: reviewerFirst, bold: true },
+            { text: ' completed ' },
+            { text: String(milestoneCounts.reviewer), bold: true },
+            { text: ` milestone${milestoneCounts.reviewer === 1 ? '' : 's'} in Pass 2` },
+          ]),
+        )
+      }
+    } else if (hasPreparer) {
       completedItems.push(
-        briefItem('milestones-preparer', [
-          { text: preparerFirst, bold: true },
+        briefItem('milestones-actor', [
+          { text: milestoneActorLabel(PREPARER_NAME), bold: true },
           { text: ' completed ' },
           { text: String(milestoneCounts.preparer), bold: true },
-          { text: ` milestone${milestoneCounts.preparer === 1 ? '' : 's'} in Pass 1` },
+          { text: ` milestone${milestoneCounts.preparer === 1 ? '' : 's'}` },
         ]),
       )
-    }
-    if (!singlePersonMode && milestoneCounts.reviewer > 0) {
+    } else if (hasReviewer) {
       completedItems.push(
-        briefItem('milestones-reviewer', [
-          { text: reviewerFirst, bold: true },
+        briefItem('milestones-actor', [
+          { text: milestoneActorLabel(REVIEWER_NAME), bold: true },
           { text: ' completed ' },
           { text: String(milestoneCounts.reviewer), bold: true },
-          { text: ` milestone${milestoneCounts.reviewer === 1 ? '' : 's'} in Pass 2` },
+          { text: ` milestone${milestoneCounts.reviewer === 1 ? '' : 's'}` },
         ]),
       )
     }
@@ -669,7 +688,7 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
 
   const phases =
     viewMode === 'reviewer-strategic' && milestoneState
-      ? buildPhasesFromMilestones(milestoneState, singlePersonMode)
+      ? buildPhasesFromMilestones(milestoneState)
       : []
 
   const allPhasesComplete = phases.length > 0
@@ -703,7 +722,6 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
           outstandingOpenCount,
           reviewPass,
           milestoneState,
-          singlePersonMode,
         )
         : null,
     phases,

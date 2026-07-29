@@ -3,6 +3,7 @@ import {
   REVIEW_MILESTONES,
   deriveMilestoneState,
   formatMilestoneAttribution,
+  formatMilestoneAttributionTooltip,
   canSignOffFromMilestones,
 } from '../src/data/reviewMilestones'
 import { PREPARER_NAME, REVIEWER_NAME } from '../src/hooks/useSyncedReviewState'
@@ -80,20 +81,25 @@ describe('deriveMilestoneState', () => {
 })
 
 describe('formatMilestoneAttribution', () => {
-  it('uses initials in dual-person mode', () => {
+  it('uses SC for Sara Chen', () => {
     const label = formatMilestoneAttribution(
       { by: 'preparer', at: 'Jul 29 · 2:30 PM', name: PREPARER_NAME },
-      false,
     )
     expect(label).toBe('SC · Jul 29')
   })
 
-  it('uses first name in single-person mode', () => {
+  it('uses Jordan for Jordan Lee', () => {
     const label = formatMilestoneAttribution(
       { by: 'reviewer', at: 'Jul 29 · 2:30 PM', name: REVIEWER_NAME },
-      true,
     )
     expect(label).toBe('Jordan · Jul 29')
+  })
+
+  it('returns full name tooltip', () => {
+    const tooltip = formatMilestoneAttributionTooltip(
+      { by: 'preparer', at: 'Jul 29 · 2:30 PM', name: PREPARER_NAME },
+    )
+    expect(tooltip).toBe('Sara Chen · Jul 29 · 2:30 PM')
   })
 })
 
