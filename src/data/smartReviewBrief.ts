@@ -2,7 +2,7 @@
  * Smart Review Brief — phase checklist and activity log payloads for HandoffSummary.
  * Derives from handoffSnapshot, reviewChecklist, and live review state.
  */
-import { PREPARER_NAME } from '../hooks/useSyncedReviewState'
+import { PREPARER_NAME, REVIEWER_NAME } from '../hooks/useSyncedReviewState'
 import type { HandoffJump, HandoffSnapshot, HandoffItemGroup, HandoffItem } from './handoffSnapshot'
 import {
   canonicalActivityKey,
@@ -53,6 +53,27 @@ export type ActivityLogCategory = {
 
 export type BriefViewMode = 'preparer-summary' | 'reviewer-briefing' | 'reviewer-strategic'
 
+export type BriefTextPart = { text: string; bold?: boolean }
+
+export type ConversationalBriefItem = {
+  id: string
+  parts: BriefTextPart[]
+}
+
+export type ConversationalBriefSection = {
+  label: string
+  items: ConversationalBriefItem[]
+}
+
+export type ConversationalBrief = {
+  reviewerFirstName: string
+  heading: string
+  intro: string
+  completed: ConversationalBriefSection
+  attention: ConversationalBriefSection | null
+  syncedAt: string
+}
+
 export type SmartReviewBrief = {
   viewMode: BriefViewMode
   header: {
@@ -60,12 +81,7 @@ export type SmartReviewBrief = {
     pass1Line: string
     passBadge: string | null
   }
-  executiveBrief: {
-    title: string
-    type: 'info' | 'success' | 'warn'
-    body: string
-    syncedAt: string
-  } | null
+  executiveBrief: ConversationalBrief | null
   phases: BriefPhase[]
   activityLog: ActivityLogCategory[]
   signOff: {
@@ -574,36 +590,164 @@ export function countStrategicOpenItems(phases: BriefPhase[]): number {
   return countStrategicProgress(phases).open
 }
 
+function briefItem(id: string, parts: BriefTextPart[]): ConversationalBriefItem {
+  return { id, parts }
+}
+
+function countActivityEntries(snapshot: HandoffSnapshot): {
+  docsVerified: number
+  flagsCleared: number
+  diagsCleared: number
+} {
+  const doneGroups = getDoneGroups(snapshot)
+  const byId = (id: string) => doneGroups.find(g => g.id === id)
+  return {
+    docsVerified: byId('verified-docs')?.count ?? byId('verified-docs')?.items.length ?? 0,
+    flagsCleared: byId('import-flags-cleared')?.count ?? byId('import-flags-cleared')?.items.length ?? 0,
+    diagsCleared: byId('ai-diagnostics-reviewed')?.count ?? byId('ai-diagnostics-reviewed')?.items.length ?? 0,
+  }
+}
+
 function buildExecutiveBrief(
   snapshot: HandoffSnapshot,
   preparerFirst: string,
   phases: BriefPhase[],
   allPhasesComplete: boolean,
   outstandingOpenCount: number,
+  reviewPass: 1 | 2,
 ): SmartReviewBrief['executiveBrief'] {
+  const reviewerFirst = firstName(REVIEWER_NAME)
   const { checks, docCount } = countPass1Baseline(snapshot)
   const { attested, required, open } = countStrategicProgress(phases)
   const attentionCount = Math.max(open, outstandingOpenCount)
+  const activity = countActivityEntries(snapshot)
+  const resolvedDocCount = Math.max(activity.docsVerified, docCount)
+  const resolvedFlagCount = Math.max(activity.flagsCleared, checks > 0 ? checks - resolvedDocCount : 0)
 
-  const doneLine = `${preparerFirst} completed ${checks} baseline checks across ${docCount} source documents. ${attested} of ${required} reviewer checklist items are attested.`
+  const passLabel = reviewPass === 2 ? 'Pass 2' : 'Pass 1'
+  const heading = `${reviewerFirst}, here's where ${passLabel.toLowerCase()} stands`
 
-  let body: string
-  let type: 'info' | 'success' | 'warn' = 'info'
+  const intro =
+    reviewPass === 2
+      ? `You're on ${passLabel} sign-off review. Below is what's already cleared and what still needs your attestation before you approve this return.`
+      : `${preparerFirst} finished ${passLabel} and handed this return to you. Here's what's already done and what still needs your review.`
 
-  if (allPhasesComplete && outstandingOpenCount === 0) {
-    type = 'success'
-    body = `${doneLine} Ready for sign-off once you finish your final spot-check.`
-  } else if (attentionCount > 0) {
-    type = 'warn'
-    body = `${doneLine} ${attentionCount} item${attentionCount === 1 ? '' : 's'} still need${attentionCount === 1 ? 's' : ''} your review before sign-off. Work through the phased checklist below.`
+  const completedItems: ConversationalBriefItem[] = []
+
+  if (reviewPass === 1) {
+    completedItems.push(
+      briefItem('docs-verified', [
+        { text: preparerFirst, bold: true },
+        { text: ' verified ' },
+        { text: String(resolvedDocCount), bold: true },
+        { text: ` source document${resolvedDocCount === 1 ? '' : 's'} against OCR imports` },
+      ]),
+    )
+    if (resolvedFlagCount > 0) {
+      completedItems.push(
+        briefItem('flags-cleared', [
+          { text: preparerFirst, bold: true },
+          { text: ' cleared ' },
+          { text: String(resolvedFlagCount), bold: true },
+          { text: ` import flag${resolvedFlagCount === 1 ? '' : 's'} across W-2 and 1099 forms` },
+        ]),
+      )
+    }
+    if (activity.diagsCleared > 0) {
+      completedItems.push(
+        briefItem('diags-cleared', [
+          { text: preparerFirst, bold: true },
+          { text: ' reviewed ' },
+          { text: String(activity.diagsCleared), bold: true },
+          { text: ` first-pass AI diagnostic${activity.diagsCleared === 1 ? '' : 's'}` },
+        ]),
+      )
+    }
   } else {
-    body = `${doneLine} Spot-check NIIT, capital gains rate, and executive totals, then attest the remaining checklist items.`
+    completedItems.push(
+      briefItem('pass1-handoff', [
+        { text: preparerFirst, bold: true },
+        { text: ' completed Pass 1 with ' },
+        { text: String(resolvedDocCount), bold: true },
+        { text: ` verified document${resolvedDocCount === 1 ? '' : 's'} and ` },
+        { text: String(checks), bold: true },
+        { text: ' baseline checks' },
+      ]),
+    )
+  }
+
+  if (attested > 0) {
+    completedItems.push(
+      briefItem('checklist-attested', [
+        { text: String(attested), bold: true },
+        { text: ' of ' },
+        { text: String(required), bold: true },
+        { text: ` reviewer checklist item${required === 1 ? '' : 's'} attested so far` },
+      ]),
+    )
+  }
+
+  if (completedItems.length === 0) {
+    completedItems.push(
+      briefItem('baseline', [
+        { text: preparerFirst, bold: true },
+        { text: ' completed baseline import accuracy work — start with the phased checklist below.' },
+      ]),
+    )
+  }
+
+  let attention: ConversationalBriefSection | null = null
+
+  if (attentionCount > 0) {
+    const attentionItems: ConversationalBriefItem[] = [
+      briefItem('open-checklist', [
+        { text: String(attentionCount), bold: true },
+        {
+          text: ` checklist item${attentionCount === 1 ? '' : 's'} still need${attentionCount === 1 ? 's' : ''} your review`,
+        },
+      ]),
+    ]
+
+    const unattested = required - attested
+    if (unattested > 0 && unattested !== attentionCount) {
+      attentionItems.push(
+        briefItem('unattested-outputs', [
+          { text: String(unattested), bold: true },
+          { text: ` output attestation${unattested === 1 ? '' : 's'} not yet marked complete` },
+        ]),
+      )
+    }
+
+    attentionItems.push(
+      briefItem('work-phases', [
+        { text: 'Work through the phased checklist below — start with Phase 1 source documents' },
+      ]),
+    )
+
+    attention = {
+      label: 'Needs your attention',
+      items: attentionItems,
+    }
+  } else if (!allPhasesComplete) {
+    attention = {
+      label: 'Needs your attention',
+      items: [
+        briefItem('spot-check', [
+          { text: 'Spot-check NIIT, capital gains rate, and executive totals, then attest the remaining checklist items' },
+        ]),
+      ],
+    }
   }
 
   return {
-    title: 'Pass 1 executive brief',
-    type,
-    body,
+    reviewerFirstName: reviewerFirst,
+    heading,
+    intro,
+    completed: {
+      label: 'Completed so far',
+      items: completedItems,
+    },
+    attention,
     syncedAt: 'Synced just now',
   }
 }
@@ -707,7 +851,7 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
     },
     executiveBrief:
       viewMode === 'reviewer-strategic'
-        ? buildExecutiveBrief(snapshot, preparerFirst, phases, allPhasesComplete, outstandingOpenCount)
+        ? buildExecutiveBrief(snapshot, preparerFirst, phases, allPhasesComplete, outstandingOpenCount, reviewPass)
         : null,
     phases,
     activityLog,

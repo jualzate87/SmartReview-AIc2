@@ -4,11 +4,11 @@ import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
 import { Badge } from '@ids-ts/badge'
 import '@ids-ts/badge/dist/main.css'
-import PageMessage from '@ids-ts/page-message'
-import '@ids-ts/page-message/dist/main.css'
+import { B3 } from '@ids-ts/typography'
+import '@ids-ts/typography/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
 import '@ids-ts/tabs/dist/main.css'
-import { ChevronRight, CircleCheck, CircleCheckFill } from '@design-systems/icons'
+import { AiSparkles, ChevronRight, CircleCheck, CircleCheckFill } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import type { LiveAmounts } from '../../data/liveReturn'
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
@@ -17,6 +17,8 @@ import {
   canApproveSignOff,
   type ActivityLogCategory,
   type BriefPhase,
+  type BriefTextPart,
+  type ConversationalBrief,
   type StrategicChecklistItem,
 } from '../../data/smartReviewBrief'
 import ReviewSidePanel, { sidePanelStyles } from './ReviewSidePanel'
@@ -244,6 +246,75 @@ function ActivityCategoryCard({ category }: { category: ActivityLogCategory }) {
   )
 }
 
+function BriefTextLine({ parts }: { parts: BriefTextPart[] }) {
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.bold ? (
+          <strong key={index} className={styles.briefEmphasis}>
+            {part.text}
+          </strong>
+        ) : (
+          <span key={index}>{part.text}</span>
+        ),
+      )}
+    </>
+  )
+}
+
+function ConversationalBriefCard({ brief }: { brief: ConversationalBrief }) {
+  return (
+    <section className={styles.conversationalBrief} aria-labelledby="executive-brief-heading">
+      <div className={styles.conversationalBriefHead}>
+        <span className={styles.conversationalBriefIcon} aria-hidden>
+          <AiSparkles size="small" />
+        </span>
+        <div className={styles.conversationalBriefHeadText}>
+          <h3 id="executive-brief-heading" className={styles.conversationalBriefHeading}>
+            {brief.heading}
+          </h3>
+          <B3 className={styles.conversationalBriefIntro}>{brief.intro}</B3>
+        </div>
+      </div>
+
+      <div className={styles.conversationalBriefSection}>
+        <h4 className={styles.conversationalBriefSectionLabel}>
+          <CircleCheckFill size="x-small" className={styles.conversationalBriefSectionIconDone} aria-hidden />
+          {brief.completed.label}
+        </h4>
+        <ul className={styles.conversationalBriefList}>
+          {brief.completed.items.map(item => (
+            <li key={item.id} className={styles.conversationalBriefListItem}>
+              <B3 className={styles.conversationalBriefListText}>
+                <BriefTextLine parts={item.parts} />
+              </B3>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {brief.attention && (
+        <div className={styles.conversationalBriefSection}>
+          <h4 className={styles.conversationalBriefSectionLabel}>
+            {brief.attention.label}
+          </h4>
+          <ul className={styles.conversationalBriefList}>
+            {brief.attention.items.map(item => (
+              <li key={item.id} className={styles.conversationalBriefListItem}>
+                <B3 className={styles.conversationalBriefListText}>
+                  <BriefTextLine parts={item.parts} />
+                </B3>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className={styles.conversationalBriefSynced}>{brief.syncedAt}</p>
+    </section>
+  )
+}
+
 function StrategicChecklistTab({
   phases,
   executiveBrief,
@@ -251,24 +322,13 @@ function StrategicChecklistTab({
   onToggle,
 }: {
   phases: BriefPhase[]
-  executiveBrief: { title: string; type: 'info' | 'success' | 'warn'; body: string; syncedAt: string } | null
+  executiveBrief: ConversationalBrief | null
   onJump?: (jump: HandoffJump) => void
   onToggle?: (itemId: string, checked: boolean) => void
 }) {
   return (
     <div className={styles.tabPanel}>
-      {executiveBrief && (
-        <PageMessage
-          type={executiveBrief.type}
-          title={executiveBrief.title}
-          open
-          dismissible={false}
-          className={styles.executivePageMessage}
-        >
-          <p className={styles.executiveBody}>{executiveBrief.body}</p>
-          <p className={styles.executiveSynced}>{executiveBrief.syncedAt}</p>
-        </PageMessage>
-      )}
+      {executiveBrief && <ConversationalBriefCard brief={executiveBrief} />}
       <div className={styles.phaseStack}>
         {phases.map(phase => (
           <PhaseCard

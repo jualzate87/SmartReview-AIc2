@@ -58,25 +58,115 @@
   padding-top: var(--space-component-gap-large, 12px);
 }
 
-/* AI executive brief */
-.executivePageMessage {
-  margin: 0;
+/* Conversational assist brief */
+.conversationalBrief {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-component-gap-large, 12px);
+  padding: var(--space-container-padding-medium, 16px);
+  border: 1px solid var(--color-divider-tertiary);
+  border-radius: var(--radius-medium, 8px);
+  background: var(--color-container-background-primary);
 }
 
-.executiveBody {
+.conversationalBriefHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-component-gap-medium, 8px);
+}
+
+.conversationalBriefIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-medium, 8px);
+  background: var(--color-container-background-secondary);
+  color: var(--color-action-standard);
+}
+
+.conversationalBriefHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-component-gap-small, 4px);
+  flex: 1;
+  min-width: 0;
+}
+
+.conversationalBriefHeading {
   margin: 0;
-  font-family: var(--font-family-body);
-  font-size: var(--font-size-body-3);
+  font-family: var(--font-family-heading);
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-heading);
+  color: var(--color-text-primary);
+  line-height: 1.35;
+}
+
+.conversationalBriefIntro {
+  margin: 0;
+  color: var(--color-text-secondary);
   line-height: 1.5;
+}
+
+.conversationalBriefSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-component-gap-small, 4px);
+  padding-top: var(--space-component-gap-small, 4px);
+}
+
+.conversationalBriefSectionLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-component-gap-small, 4px);
+  margin: 0;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-primary);
+  line-height: 1.35;
+}
+
+.conversationalBriefSectionIconDone {
+  flex-shrink: 0;
+  color: var(--color-ui-positive);
+}
+
+.conversationalBriefList {
+  margin: 0;
+  padding: 0 0 0 var(--space-container-padding-medium, 16px);
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-component-gap-small, 4px);
+}
+
+.conversationalBriefListItem {
+  padding-left: var(--space-component-gap-small, 4px);
+}
+
+.conversationalBriefListText {
+  margin: 0;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+.briefEmphasis {
+  font-weight: var(--font-weight-body-bold);
   color: var(--color-text-primary);
 }
 
-.executiveSynced {
-  margin: var(--space-component-gap-small, 4px) 0 0;
+.conversationalBriefSynced {
+  margin: 0;
   font-family: var(--font-family-component);
   font-size: var(--font-size-component-small);
   color: var(--color-text-secondary);
+  line-height: 1.4;
 }
+
+/* Legacy executive brief (removed PageMessage) */
 
 /* Phase cards */
 .phaseStack {
