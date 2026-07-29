@@ -27,6 +27,11 @@ import {
   signOffBlockerFromMilestones,
 } from '../data/reviewMilestones'
 import {
+  buildSmartReviewBrief,
+  canApproveSignOff,
+  countStrategicOpenItems,
+} from '../data/smartReviewBrief'
+import {
   PREPARER_NAME,
   REVIEWER_NAME,
   setReviewActor,
