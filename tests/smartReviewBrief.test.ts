@@ -126,7 +126,7 @@ describe('buildSmartReviewBrief strategic checklist', () => {
 })
 
 describe('buildSmartReviewBrief activity log rollups', () => {
-  it('rolls box12 sub-row edits into one reconciliation entry', () => {
+  it('uses five plain-language categories with no form-reconciliations bucket', () => {
     const snapshot = buildHandoffSnapshot('signoff-review', 1, 'Sara Chen', {
       reviewedFields: new Map([
         ['ssn-techCircle', meta()],
@@ -160,18 +160,67 @@ describe('buildSmartReviewBrief activity log rollups', () => {
       isPreparer: false,
     })
 
-    const sourceCat = brief.activityLog.find(c => c.id === 'source-docs-ocr')!
-    const reconcileCat = brief.activityLog.find(c => c.id === 'form-reconciliations')!
+    expect(brief.activityLog.map(c => c.id)).toEqual([
+      'documents-verified',
+      'import-flags-cleared',
+      'amount-edits-no-flag',
+      'return-summary-reviewed',
+      'first-pass-diags',
+    ])
+    expect(brief.activityLog.some(c => c.id === 'form-reconciliations')).toBe(false)
+  })
 
-    expect(sourceCat.entries).toHaveLength(1)
-    expect(sourceCat.entries[0].label).toBe('W-2 · Tech Circle')
-    expect(sourceCat.entries[0].detail).toContain('Cleared 4 import flags')
-    expect(sourceCat.entries[0].detail).toContain('W-2 SSN')
-    expect(sourceCat.entries[0].detail).toContain('W-2 Box 12 codes')
+  it('lists verified docs and cleared flags separately without duplicating flag edits', () => {
+    const snapshot = buildHandoffSnapshot('signoff-review', 1, 'Sara Chen', {
+      reviewedFields: new Map([
+        ['ssn-techCircle', meta()],
+        ['wages-techCircle', meta()],
+        ['ein-techCircle', meta()],
+        ['box12', meta()],
+      ]),
+      verifiedDocs: new Set(['techCircle']),
+      verifiedDocsMeta: new Map([['techCircle', meta()]]),
+      editedFields: new Map([
+        ['box12a-techCircle', meta()],
+        ['box12a-amt-techCircle', meta()],
+        ['box12b-techCircle', meta()],
+        ['box12b-amt-techCircle', meta()],
+        ['wages-techCircle', meta()],
+      ]),
+      summaryChecked: new Map(),
+      summaryFlagged: new Map(),
+      summaryFlagNotes: {},
+      notes: [],
+      amounts,
+    })
 
-    const box12Rows = reconcileCat.entries.filter(e => e.label.includes('Box 12'))
-    expect(box12Rows).toHaveLength(0)
-    expect(sourceCat.entries[0].detail).toContain('Updated W-2 Box 12 codes')
+    const brief = buildSmartReviewBrief({
+      snapshot,
+      checklist: emptyChecklist,
+      outstandingOpenCount: 0,
+      manualChecklistItems: {},
+      reviewPass: 1,
+      showStrategicChecklist: false,
+      isPreparer: false,
+    })
+
+    const docsCat = brief.activityLog.find(c => c.id === 'documents-verified')!
+    const flagsCat = brief.activityLog.find(c => c.id === 'import-flags-cleared')!
+    const editsCat = brief.activityLog.find(c => c.id === 'amount-edits-no-flag')!
+
+    expect(docsCat.title).toBe('Documents verified')
+    expect(docsCat.badge).toBe('All verified')
+    expect(docsCat.entries).toHaveLength(1)
+    expect(docsCat.entries[0].label).toBe('W-2 · Tech Circle')
+
+    expect(flagsCat.title).toBe('Import flags cleared')
+    expect(flagsCat.badge).toBe('All cleared')
+    expect(flagsCat.entries.map(e => e.label)).toEqual(
+      expect.arrayContaining(['W-2 SSN', 'W-2 wages', 'W-2 EIN', 'W-2 Box 12 codes']),
+    )
+    expect(flagsCat.entries.find(e => e.label === 'W-2 wages')?.detail).toContain('amount edit')
+
+    expect(editsCat.entries).toHaveLength(0)
 
     const rawBox12Keys = brief.activityLog.flatMap(c => c.entries.map(e => e.label))
     expect(rawBox12Keys.some(l => l.includes('box12a-techCircle'))).toBe(false)
@@ -204,15 +253,20 @@ describe('buildSmartReviewBrief activity log rollups', () => {
       isPreparer: false,
     })
 
+    const flagsCat = brief.activityLog.find(c => c.id === 'import-flags-cleared')!
+    const editsCat = brief.activityLog.find(c => c.id === 'amount-edits-no-flag')!
+
+    expect(flagsCat.entries.some(e => e.label === 'Federal tax withheld')).toBe(true)
+    expect(editsCat.entries.some(e => e.label === 'US bonds (Unwavering Financial)')).toBe(true)
+    expect(editsCat.entries.some(e => e.label === '1099-R taxable amount')).toBe(true)
+    expect(editsCat.entries.some(e => e.label === 'Qualified dividends')).toBe(true)
+
     const allLabels = brief.activityLog.flatMap(c => c.entries.map(e => e.label))
-    expect(allLabels).toContain('Qualified dividends')
-    expect(allLabels).toContain('US bonds (Unwavering Financial)')
-    expect(allLabels).toContain('1099-R taxable amount')
     expect(allLabels.some(l => l === 'qualifiedDivs')).toBe(false)
     expect(allLabels.some(l => l === 'r-taxableAmt')).toBe(false)
   })
 
-  it('does not duplicate cleared flags in source docs and reconciliations', () => {
+  it('does not duplicate cleared flags across categories', () => {
     const snapshot = buildHandoffSnapshot('signoff-review', 1, 'Sara Chen', {
       reviewedFields: new Map([
         ['ssn-techCircle', meta()],
@@ -240,8 +294,12 @@ describe('buildSmartReviewBrief activity log rollups', () => {
     })
 
     const allEntries = brief.activityLog.flatMap(c => c.entries)
-    const wagesRows = allEntries.filter(e => e.label.includes('W-2 wages') || e.detail?.includes('W-2 wages'))
-    expect(wagesRows.length).toBeLessThanOrEqual(1)
-    expect(allEntries.filter(e => e.label === 'W-2 SSN')).toHaveLength(0)
+    const wagesRows = allEntries.filter(e => e.label === 'W-2 wages')
+    expect(wagesRows).toHaveLength(1)
+    expect(wagesRows[0].detail).toContain('amount edit')
+
+    const ssnRows = allEntries.filter(e => e.label === 'W-2 SSN')
+    expect(ssnRows).toHaveLength(1)
+    expect(brief.activityLog.find(c => c.id === 'amount-edits-no-flag')!.entries).toHaveLength(0)
   })
 })

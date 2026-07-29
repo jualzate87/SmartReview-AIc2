@@ -302,13 +302,18 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-component-gap-medium, 8px);
+  gap: 0;
 }
 
 .activityEntry {
   display: flex;
   align-items: flex-start;
   gap: var(--space-component-gap-medium, 8px);
+}
+
+.activityEntryDivider {
+  padding-top: var(--space-component-gap-medium, 8px);
+  border-top: 1px solid var(--color-divider-tertiary);
 }
 
 .activityCheckIcon {

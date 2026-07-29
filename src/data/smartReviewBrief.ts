@@ -5,14 +5,13 @@
 import { PREPARER_NAME } from '../hooks/useSyncedReviewState'
 import type { HandoffJump, HandoffSnapshot, HandoffItemGroup, HandoffItem } from './handoffSnapshot'
 import {
-  box12RollupKey,
   canonicalActivityKey,
   getFieldDisplayLabel,
   isBox12FieldKey,
-  listPhrase,
   parseHandoffItemKey,
 } from './handoffSnapshot'
-import { normalizeVerifiedDocKey, verifiedDocLabel, PHASE1_FLAG_TO_VERIFY_DOC, PACKET_VERIFY_DOC_KEYS } from './verifiedDocKeys'
+import { normalizeVerifiedDocKey, verifiedDocLabel, PACKET_VERIFY_DOC_KEYS } from './verifiedDocKeys'
+import { PHASE1_FLAG_KEYS } from '../pages/data-review/phase1FieldSync'
 import type { ReviewChecklistState, ReviewChecklistItem } from './reviewChecklist'
 import { computeLiveReturn, type LiveAmounts } from './liveReturn'
 import { FROZEN_RETURN } from './frozenReturn'
@@ -403,120 +402,37 @@ function buildPhases(
 }
 
 
-const SUMMARY_FIELD_KEYS = new Set([
-  'wages',
-  'taxableInterest',
-  'taxExemptInterest',
-  'ordinaryDivs',
-  'qualifiedDivs',
-  'withholding',
-  'iraDistrib',
-  'otherIncome',
-  'stdDeduction',
-  'totalIncome',
-  'totalTax',
-])
+const PHASE1_FLAG_KEY_SET = new Set<string>(PHASE1_FLAG_KEYS)
 
-function isSummaryFieldKey(key: string): boolean {
-  const base = key.split('-')[0]
-  return SUMMARY_FIELD_KEYS.has(key) || SUMMARY_FIELD_KEYS.has(base)
+function isPhase1ImportFlag(key: string): boolean {
+  return PHASE1_FLAG_KEY_SET.has(key)
 }
 
-function editClearsImportFlag(editKey: string, clearedFlagKeys: string[]): boolean {
+function docVerificationDetail(docItem: HandoffItem): string | undefined {
+  if (!docItem.detail) return 'Marked verified against source document'
+  const metaOnly = docItem.detail.split(' · ')[0]
+  if (metaOnly && !metaOnly.startsWith('Cleared')) return metaOnly
+  return 'Marked verified against source document'
+}
+
+function editTouchesClearedFlag(editKey: string, clearedFlagKeys: string[]): boolean {
   return clearedFlagKeys.some(flag => {
     if (editKey === flag) return true
+    if (isBox12FieldKey(editKey) && (flag === 'box12' || isBox12FieldKey(flag))) return true
     const base = flag.split('-')[0]
     return editKey === base || editKey.startsWith(`${base}-`) || flag.startsWith(`${editKey}-`)
   })
 }
 
-function docIdForFlag(flagKey: string): string | null {
-  const mapped = PHASE1_FLAG_TO_VERIFY_DOC[flagKey]
-  return mapped ? normalizeVerifiedDocKey(mapped) : null
-}
-
-function editRelatesToDoc(editKey: string, docId: string): boolean {
-  const canonical = normalizeVerifiedDocKey(docId)
-  const mapped = PHASE1_FLAG_TO_VERIFY_DOC[editKey]
-  if (mapped && normalizeVerifiedDocKey(mapped) === canonical) return true
-  if (canonical === 'techCircle' && (editKey.startsWith('wages') || editKey === 'ssn' || editKey === 'ein' || isBox12FieldKey(editKey))) {
-    return true
-  }
-  if (canonical.startsWith('1099-div-') && (editKey.includes('Div') || editKey.includes('div') || editKey === 'fedTaxWithheld')) {
-    return true
-  }
-  if (canonical.startsWith('1099-int-') && (editKey.includes('Interest') || editKey.includes('interest') || editKey.includes('taxExempt') || editKey.startsWith('usBonds'))) {
-    return true
-  }
-  if (canonical === '1099-r' && (editKey.includes('grossDistrib') || editKey.includes('r-') || editKey.includes('ira'))) {
-    return true
-  }
-  if (canonical === '1099-nec' && (editKey.includes('nec') || editKey.includes('otherIncome'))) {
-    return true
-  }
-  return false
-}
-
-function flagRelatesToDoc(flagKey: string, docId: string): boolean {
-  const mapped = docIdForFlag(flagKey)
-  return mapped === normalizeVerifiedDocKey(docId)
-}
-
-function uniqueFlagLabels(flagKeys: string[]): string[] {
-  const seen = new Set<string>()
-  const labels: string[] = []
-  for (const key of flagKeys) {
-    const canonical = key === 'box12' || isBox12FieldKey(key) ? box12RollupKey(key) : key
-    if (seen.has(canonical)) continue
-    seen.add(canonical)
-    labels.push(getFieldDisplayLabel(key))
-  }
-  return labels
-}
-
-function buildVerifiedDocDetail(
-  docItem: HandoffItem,
-  flagKeys: string[],
-  editCount: number,
-  box12Edited: boolean,
-): string | undefined {
-  const parts: string[] = []
-  if (docItem.detail) {
-    const metaOnly = docItem.detail.split(' · ')[0]
-    if (metaOnly && !metaOnly.startsWith('Cleared')) parts.push(metaOnly)
-  }
-  const labels = uniqueFlagLabels(flagKeys)
-  if (labels.length) {
-    parts.push(`Cleared ${labels.length} import flag${labels.length === 1 ? '' : 's'}: ${listPhrase(labels)}`)
-  }
-  if (box12Edited) {
-    parts.push('Updated W-2 Box 12 codes')
-  } else if (editCount > 0) {
-    parts.push(`${editCount} related amount edit${editCount === 1 ? '' : 's'}`)
-  }
-  return parts.length ? parts.join(' · ') : undefined
-}
-
-function buildReconciliationDetail(item: HandoffItem, fieldKey: string): string | undefined {
-  if (item.detail && !item.detail.startsWith('Resolved with') && !item.detail.startsWith('Marked correct')) {
+function summaryReviewDetail(item: HandoffItem): string | undefined {
+  if (item.detail && !item.detail.includes('awaiting your confirmation')) {
     return item.detail
   }
-  if (fieldKey === 'wages' || fieldKey === 'wages-techCircle') {
-    return 'Verified Box 1 against W-2 source'
-  }
-  if (fieldKey === 'qualifiedDivs' || fieldKey.startsWith('qualifiedDivs')) {
-    return 'Reconciled qualified dividends on return'
-  }
-  if (fieldKey === 'r-taxableAmt' || fieldKey === 'iraDistrib') {
-    return 'Reconciled 1099-R taxable amount on return'
-  }
-  if (fieldKey === 'taxableInterest') {
-    return 'Reconciled taxable interest on Schedule B'
-  }
-  if (fieldKey === 'stdDeduction') {
-    return 'Confirmed standard deduction on Schedule A'
-  }
-  return item.detail
+  return 'Attested as reviewed on the 1040 summary'
+}
+
+function categoryCompleteBadge(entries: ActivityLogEntry[], label: string): string | null {
+  return entries.length > 0 ? label : null
 }
 
 function buildActivityLog(_snapshot: HandoffSnapshot, _preparerFirstName: string): ActivityLogCategory[] {
@@ -529,133 +445,111 @@ function buildActivityLog(_snapshot: HandoffSnapshot, _preparerFirstName: string
   const editItems = byId('amount-edits')?.items ?? []
   const diagItems = byId('ai-diagnostics-reviewed')?.items ?? []
 
-  const consumed = new Set<string>()
-  const sourceEntries: ActivityLogEntry[] = []
+  const clearedFlagKeys = clearedFlagItems
+    .map(item => parseHandoffItemKey(item))
+    .filter((fk): fk is string => !!fk)
 
-  // ── Category 1: Source documents & OCR flags (document-centric) ────────
+  const consumed = new Set<string>()
+
+  // ── 1. Documents verified ───────────────────────────────────────────────
+  const docEntries: ActivityLogEntry[] = []
   for (const docItem of verifiedDocItems) {
     const docId = docItem.jump?.type === 'doc' ? docItem.jump.docId : parseHandoffItemKey(docItem)
     if (!docId) continue
     const canonicalDoc = normalizeVerifiedDocKey(docId)
-
-    const relatedFlags = clearedFlagItems
-      .map(item => parseHandoffItemKey(item))
-      .filter((fk): fk is string => !!fk && flagRelatesToDoc(fk, canonicalDoc))
-
-    relatedFlags.forEach(fk => consumed.add(canonicalActivityKey(fk)))
-
-    const relatedEdits = editItems.filter(item => {
-      const ek = parseHandoffItemKey(item)
-      return ek && editRelatesToDoc(ek, canonicalDoc)
-    })
-    const docLevelEdits = relatedEdits.filter(item => {
-      const ek = parseHandoffItemKey(item)!
-      if (isBox12FieldKey(ek)) return true
-      if (editClearsImportFlag(ek, relatedFlags)) return true
-      return !isSummaryFieldKey(ek)
-    })
-    const box12Edited = docLevelEdits.some(item => {
-      const ek = parseHandoffItemKey(item)
-      return ek && isBox12FieldKey(ek)
-    })
-    const nonBox12EditCount = docLevelEdits.filter(item => {
-      const ek = parseHandoffItemKey(item)
-      return ek && !isBox12FieldKey(ek)
-    }).length
-    docLevelEdits.forEach(item => {
-      const ek = parseHandoffItemKey(item)
-      if (ek) consumed.add(canonicalActivityKey(ek))
-    })
-
-    sourceEntries.push({
+    docEntries.push({
       id: docItem.id ?? `activity-doc-${canonicalDoc}`,
       label: verifiedDocLabel(canonicalDoc),
-      detail: buildVerifiedDocDetail(docItem, relatedFlags, nonBox12EditCount, box12Edited),
+      detail: docVerificationDetail(docItem),
     })
   }
 
-  // Cleared flags for docs not in verified list — one row per document
-  const flagsByDoc = new Map<string, string[]>()
+  // ── 2. Import flags cleared ───────────────────────────────────────────
+  const flagEntries: ActivityLogEntry[] = []
   for (const item of clearedFlagItems) {
     const fk = parseHandoffItemKey(item)
-    if (!fk || consumed.has(canonicalActivityKey(fk))) continue
-    const docId = docIdForFlag(fk) ?? 'misc'
-    const list = flagsByDoc.get(docId) ?? []
-    list.push(fk)
-    flagsByDoc.set(docId, list)
-  }
-  for (const [docId, flagKeys] of flagsByDoc) {
-    if (docId === 'misc') {
-      const labels = uniqueFlagLabels(flagKeys)
-      sourceEntries.push({
-        id: `activity-flags-misc`,
-        label: 'Import flags cleared',
-        detail: `Cleared ${labels.length} import flag${labels.length === 1 ? '' : 's'}: ${listPhrase(labels)}`,
-      })
-    } else {
-      const labels = uniqueFlagLabels(flagKeys)
-      sourceEntries.push({
-        id: `activity-doc-flags-${docId}`,
-        label: verifiedDocLabel(docId),
-        detail: `Cleared ${labels.length} import flag${labels.length === 1 ? '' : 's'}: ${listPhrase(labels)}`,
-      })
-    }
-    flagKeys.forEach(fk => consumed.add(canonicalActivityKey(fk)))
-  }
-
-  // ── Category 2: Form & schedule line reconciliations ───────────────────
-  const reconcileEntries: ActivityLogEntry[] = []
-
-  for (const item of summaryItems) {
-    const fk = parseHandoffItemKey(item)
-    if (!fk || consumed.has(canonicalActivityKey(fk))) continue
-    reconcileEntries.push({
-      id: item.id ?? `activity-summary-${fk}`,
-      label: getFieldDisplayLabel(fk),
-      detail: buildReconciliationDetail(item, fk),
+    if (!fk) continue
+    flagEntries.push({
+      id: item.id ?? `activity-flag-${fk}`,
+      label: item.label || getFieldDisplayLabel(fk),
+      detail: item.detail,
     })
     consumed.add(canonicalActivityKey(fk))
   }
 
+  // Edits tied to cleared import flags belong with the flag action, not amount edits.
+  for (const item of editItems) {
+    const fk = parseHandoffItemKey(item)
+    if (!fk) continue
+    if (editTouchesClearedFlag(fk, clearedFlagKeys)) {
+      consumed.add(canonicalActivityKey(fk))
+    }
+  }
+
+  // ── 3. Amount edits (no flag) ─────────────────────────────────────────
+  const editEntries: ActivityLogEntry[] = []
   for (const item of editItems) {
     const fk = parseHandoffItemKey(item)
     if (!fk || consumed.has(canonicalActivityKey(fk))) continue
-    reconcileEntries.push({
+    if (isPhase1ImportFlag(fk)) continue
+    editEntries.push({
       id: item.id ?? `activity-edit-${fk}`,
       label: item.label || getFieldDisplayLabel(fk),
-      detail: item.detail?.replace(/^SC · /, '') ?? buildReconciliationDetail(item, fk),
+      detail: item.detail,
     })
     consumed.add(canonicalActivityKey(fk))
   }
 
-  // ── Category 3: First-pass diagnostics ───────────────────────────────
-  const diagsReviewed = diagItems.map((item, i) => ({
+  // ── 4. Return summary reviewed ────────────────────────────────────────
+  const summaryEntries: ActivityLogEntry[] = []
+  for (const item of summaryItems) {
+    const fk = parseHandoffItemKey(item)
+    if (!fk || consumed.has(canonicalActivityKey(fk))) continue
+    summaryEntries.push({
+      id: item.id ?? `activity-summary-${fk}`,
+      label: getFieldDisplayLabel(fk),
+      detail: summaryReviewDetail(item),
+    })
+    consumed.add(canonicalActivityKey(fk))
+  }
+
+  // ── 5. First-pass diagnostics cleared ─────────────────────────────────
+  const diagEntries: ActivityLogEntry[] = diagItems.map((item, i) => ({
     id: item.id ?? `activity-diag-${i}`,
     label: item.label,
-    detail: item.detail ?? 'Reviewed and cleared in AI diagnostics',
+    detail: item.detail ?? 'Reviewed and cleared in first-pass diagnostics',
   }))
-
-  const allCleared = (entries: ActivityLogEntry[]) =>
-    entries.length > 0 ? 'All cleared' : null
 
   return [
     {
-      id: 'source-docs-ocr',
-      title: 'Source documents & OCR flags',
-      badge: allCleared(sourceEntries) ?? (sourceEntries.length === 0 ? null : 'In progress'),
-      entries: sourceEntries,
+      id: 'documents-verified',
+      title: 'Documents verified',
+      badge: categoryCompleteBadge(docEntries, 'All verified'),
+      entries: docEntries,
     },
     {
-      id: 'form-reconciliations',
-      title: 'Form & schedule line reconciliations',
-      badge: reconcileEntries.length > 0 ? 'All confirmed' : null,
-      entries: reconcileEntries,
+      id: 'import-flags-cleared',
+      title: 'Import flags cleared',
+      badge: categoryCompleteBadge(flagEntries, 'All cleared'),
+      entries: flagEntries,
+    },
+    {
+      id: 'amount-edits-no-flag',
+      title: 'Amount edits (no flag)',
+      badge: categoryCompleteBadge(editEntries, 'All recorded'),
+      entries: editEntries,
+    },
+    {
+      id: 'return-summary-reviewed',
+      title: 'Return summary reviewed',
+      badge: categoryCompleteBadge(summaryEntries, 'All verified'),
+      entries: summaryEntries,
     },
     {
       id: 'first-pass-diags',
-      title: 'First-pass diagnostics & null checks',
-      badge: diagsReviewed.length > 0 ? 'All cleared' : null,
-      entries: diagsReviewed,
+      title: 'First-pass diagnostics cleared',
+      badge: categoryCompleteBadge(diagEntries, 'All cleared'),
+      entries: diagEntries,
     },
   ]
 }

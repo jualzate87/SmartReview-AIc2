@@ -200,8 +200,14 @@ function ActivityCategoryCard({ category }: { category: ActivityLogCategory }) {
         <p className={styles.activityEmpty}>Nothing recorded yet.</p>
       ) : (
         <ul className={styles.activityList}>
-          {category.entries.map(entry => (
-            <li key={entry.id} className={styles.activityEntry}>
+          {category.entries.map((entry, index) => (
+            <li
+              key={entry.id}
+              className={[
+                styles.activityEntry,
+                index > 0 ? styles.activityEntryDivider : '',
+              ].filter(Boolean).join(' ')}
+            >
               <span className={styles.activityCheckIcon} aria-hidden>
                 <CircleCheckFill size="small" />
               </span>
