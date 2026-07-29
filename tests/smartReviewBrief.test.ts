@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildHandoffSnapshot } from '../src/data/handoffSnapshot'
-import { buildSmartReviewBrief } from '../src/data/smartReviewBrief'
+import { buildSmartReviewBrief, countStrategicOpenItems } from '../src/data/smartReviewBrief'
 import { computeLiveReturn, SEED_AMOUNTS } from '../src/data/liveReturn'
 import type { ActivityEntry } from '../src/hooks/useSyncedReviewState'
 import type { ReviewChecklistState } from '../src/data/reviewChecklist'
@@ -96,6 +96,32 @@ describe('buildSmartReviewBrief strategic checklist', () => {
     expect(brief.viewMode).toBe('reviewer-briefing')
     expect(brief.phases).toHaveLength(0)
     expect(brief.executiveBrief).toBeNull()
+  })
+
+  it('counts open strategic checklist items for toolbar badge', () => {
+    const snapshot = buildHandoffSnapshot('signoff-review', 2, 'Jordan Lee', {
+      reviewedFields: new Map(),
+      verifiedDocs: new Set(),
+      editedFields: new Map(),
+      summaryChecked: new Map(),
+      summaryFlagged: new Map(),
+      summaryFlagNotes: {},
+      notes: [],
+      amounts,
+    })
+
+    const brief = buildSmartReviewBrief({
+      snapshot,
+      checklist: emptyChecklist,
+      outstandingOpenCount: 0,
+      manualChecklistItems: {},
+      reviewPass: 2,
+      showStrategicChecklist: true,
+      isPreparer: false,
+      amounts,
+    })
+
+    expect(countStrategicOpenItems(brief.phases)).toBeGreaterThan(0)
   })
 })
 

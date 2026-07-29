@@ -22,7 +22,11 @@ import {
   canSignOff,
   signOffBlockerText,
 } from '../data/reviewChecklist'
-import { buildSmartReviewBrief, canApproveSignOff } from '../data/smartReviewBrief'
+import {
+  buildSmartReviewBrief,
+  canApproveSignOff,
+  countStrategicOpenItems,
+} from '../data/smartReviewBrief'
 import {
   PREPARER_NAME,
   REVIEWER_NAME,
@@ -812,8 +816,12 @@ export default function DataReviewPage() {
     if (rightPanelMode === 'summary') closeRightPanel()
   }
 
-  /** Sign-off CTA (Phase 2 header) → summary panel, then Finish & file / Pass to reviewer */
+  /** Sign-off CTA (Phase 2 banner, preparer) → Smart review brief panel */
   const handleWrapUpPass = () => {
+    if (reviewRole === 'reviewer') {
+      openSummaryPanel('signoff-review', { pass: 2, actor: REVIEWER_NAME, voice: 'self' })
+      return
+    }
     openSummaryPanel('signoff-review')
   }
 
@@ -883,14 +891,22 @@ export default function DataReviewPage() {
     openRightPanel,
   ])
 
-  /** History icon / pass-bar — open dedicated summary panel (not AI Review) */
+  /** Canonical chrome entry — Smart review brief (pass-aware content, single drawer shell) */
   const handleOpenSummaryReport = () => {
     if (reviewRole === 'reviewer') {
-      openSummaryPanel('signoff-review', {
-        pass: 1,
-        actor: pass1ActorLabel,
-        voice: 'reviewer-briefing',
-      })
+      if (reviewPass === 1) {
+        openSummaryPanel('signoff-review', {
+          pass: 1,
+          actor: pass1ActorLabel,
+          voice: 'reviewer-briefing',
+        })
+      } else {
+        openSummaryPanel('signoff-review', {
+          pass: 2,
+          actor: REVIEWER_NAME,
+          voice: 'self',
+        })
+      }
       return
     }
     openSummaryPanel('signoff-review')
@@ -940,10 +956,6 @@ export default function DataReviewPage() {
         replies: [],
       }]
     })
-  }
-
-  const handleFinishReviewerPass = () => {
-    openSummaryPanel('signoff-review', { pass: 2, actor: REVIEWER_NAME })
   }
 
   /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
@@ -1092,6 +1104,25 @@ export default function DataReviewPage() {
     manualChecklistItems,
     outstandingOpenCount,
   })
+
+  /** Summary toolbar badge — Pass 2 checklist open items; preparer uses granular open count */
+  const summaryBadgeCount = (() => {
+    if (reviewRole === 'reviewer' && reviewPass === 2) {
+      const pass2Brief = buildSmartReviewBrief({
+        snapshot: buildSnapshot('signoff-review', 2, REVIEWER_NAME, 'self'),
+        checklist: reviewChecklist,
+        outstandingOpenCount,
+        manualChecklistItems,
+        reviewPass: 2,
+        showStrategicChecklist: true,
+        isPreparer: false,
+        amounts,
+      })
+      return countStrategicOpenItems(pass2Brief.phases)
+    }
+    if (reviewRole === 'preparer') return outstandingOpenCount
+    return 0
+  })()
 
   const showChecklist =
     reviewRole === 'reviewer' &&
@@ -1296,28 +1327,11 @@ export default function DataReviewPage() {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className={handoffStyles.passBarLink}
-            onClick={handleOpenSummaryReport}
-          >
-            Review summary
-          </button>
-          <button type="button" className={handoffStyles.passBarLink} onClick={handleFinishReviewerPass}>
-            Finish reviewer pass
-          </button>
         </div>
       ) : (
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Preparer mode</span>
           <span>· Pass {reviewPass} · {PREPARER_NAME}</span>
-          <button
-            type="button"
-            className={handoffStyles.passBarLink}
-            onClick={handleOpenSummaryReport}
-          >
-            Review summary
-          </button>
         </div>
       )}
       {/* Header — title + peer icon controls (Sign-off lives on Step 2 banner) */}
@@ -1364,9 +1378,9 @@ export default function DataReviewPage() {
                   size="medium"
                   selected={summaryPanelOpen}
                   aria-label={
-                    outstandingOpenCount > 0
-                      ? `Review summary, ${outstandingOpenCount} outstanding items`
-                      : 'Review summary'
+                    summaryBadgeCount > 0
+                      ? `Smart review brief, ${summaryBadgeCount} checklist item${summaryBadgeCount === 1 ? '' : 's'} remaining`
+                      : 'Smart review brief'
                   }
                   onClick={
                     summaryPanelOpen ? handleCloseSummaryPanel : handleOpenSummaryReport
@@ -1374,8 +1388,8 @@ export default function DataReviewPage() {
                 >
                   <ClockCounterclockwise size="medium" />
                 </IconControl>
-                {outstandingOpenCount > 0 && (
-                  <span className={styles.notesBadge}>{outstandingOpenCount}</span>
+                {summaryBadgeCount > 0 && (
+                  <span className={styles.notesBadge}>{summaryBadgeCount}</span>
                 )}
               </span>
             </div>
@@ -1453,17 +1467,19 @@ export default function DataReviewPage() {
               ? { complete: reviewChecklist.requiredCompleteCount, total: reviewChecklist.requiredTotal }
               : undefined
           }
-          signOffSlot={(
-            <Button
-              priority="primary"
-              size="medium"
-              onClick={handleWrapUpPass}
-              automationId="phase2-sign-off"
-              disabled={signOffGatingActive && !signOffReady}
-            >
-              Sign-off
-            </Button>
-          )}
+          signOffSlot={
+            reviewRole === 'preparer' ? (
+              <Button
+                priority="primary"
+                size="medium"
+                onClick={handleWrapUpPass}
+                automationId="phase2-sign-off"
+                disabled={signOffGatingActive && !signOffReady}
+              >
+                Sign-off
+              </Button>
+            ) : undefined
+          }
         />
       )}
 

@@ -675,6 +675,11 @@ function countStrategicProgress(phases: BriefPhase[]): {
   return { attested, required: requiredItems.length, open }
 }
 
+/** Open strategic checklist items (for Summary toolbar badge in Pass 2). */
+export function countStrategicOpenItems(phases: BriefPhase[]): number {
+  return countStrategicProgress(phases).open
+}
+
 function buildExecutiveBrief(
   snapshot: HandoffSnapshot,
   preparerFirst: string,
