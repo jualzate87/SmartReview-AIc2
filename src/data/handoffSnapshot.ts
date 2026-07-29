@@ -128,20 +128,175 @@ const DIAG_LABELS: Record<Phase2IssueKey, string> = {
   optItemize: 'Itemize opportunity',
 }
 
-const FLAG_LABELS: Record<string, string> = {
+const W2_EMPLOYER_NAMES: Record<string, string> = {
+  techCircle: 'Tech Circle',
+  bingEquipment: 'Bing Equipment',
+}
+
+const INT_PAYER_NAMES: Record<string, string> = {
+  unwaverIngFinancial: 'Unwavering Financial',
+  harborlineCredit: 'Harborline Credit Union',
+  cascadeFederal: 'Cascade Federal Savings',
+}
+
+const DIV_PAYER_NAMES: Record<string, string> = {
+  tokenFinancial: 'Token Financial',
+  northmarkIndex: 'Northmark Index Funds',
+  beaconDividend: 'Beacon Dividend Trust',
+}
+
+/** Plain-language labels for import flags, detail fields, and summary rows. */
+export const FIELD_LABELS: Record<string, string> = {
   'ssn-techCircle': 'W-2 SSN',
   'wages-techCircle': 'W-2 wages',
-  box12: 'W-2 Box 12',
+  box12: 'W-2 Box 12 codes',
   'ein-techCircle': 'W-2 EIN',
   divCollectibles: '1099-DIV collectibles',
-  divNonDiv: '1099-DIV non-dividend',
+  divNonDiv: '1099-DIV non-dividend distributions',
   fedTaxWithheld: 'Federal tax withheld',
   taxableInterest: 'Taxable interest',
   'grossDistrib-meridian': '1099-R gross distribution',
   'ordinaryDivs-northmark': 'Ordinary dividends (Northmark)',
+  qualifiedDivs: 'Qualified dividends',
+  'r-taxableAmt': '1099-R taxable amount',
+  'r-fedTaxWithheld': '1099-R federal withholding',
+  withholding: 'W-2 federal withholding',
+  wages: '1040 line 1a — W-2 wages',
+  taxExemptInterest: '1040 line 2a — Tax-exempt interest',
+  ordinaryDivs: '1040 line 3b — Ordinary dividends',
+  withholding1099: '1099-R federal withholding',
+  iraDistrib: '1040 line 4b — IRA distributions',
+  otherIncome: '1040 line 8 — Other income',
+  stdDeduction: 'Standard deduction',
+  totalIncome: '1040 line 9 — Total income',
+  totalTax: '1040 line 24 — Total tax',
 }
 
 const FLAG_TO_DOC = PHASE1_FLAG_TO_VERIFY_DOC
+
+/** True for W-2 Box 12 flag or sub-row edit keys (box12a-techCircle, box12a-amt-techCircle, …). */
+export function isBox12FieldKey(key: string): boolean {
+  return key === 'box12' || /^box12[a-d](?:-amt)?-/i.test(key)
+}
+
+/** Roll up box12* keys to one canonical id per employer. */
+export function box12RollupKey(key: string): string {
+  if (key === 'box12') return 'box12:techCircle'
+  const match = key.match(/^box12[a-d](?:-amt)?-(.+)$/i)
+  return match ? `box12:${match[1]}` : `box12:${key}`
+}
+
+function payerSuffixLabel(suffix: string): string {
+  return (
+    W2_EMPLOYER_NAMES[suffix]
+    ?? INT_PAYER_NAMES[suffix]
+    ?? DIV_PAYER_NAMES[suffix]
+    ?? suffix.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())
+  )
+}
+
+/** User-facing label for any field / flag / edit key. */
+export function getFieldDisplayLabel(key: string): string {
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key]
+
+  if (isBox12FieldKey(key)) {
+    const employerKey = key === 'box12' ? 'techCircle' : key.split('-').pop() ?? 'techCircle'
+    const employer = W2_EMPLOYER_NAMES[employerKey] ?? payerSuffixLabel(employerKey)
+    return `W-2 Box 12 codes (${employer})`
+  }
+
+  if (key.startsWith('usBonds-')) {
+    return `US bonds (${payerSuffixLabel(key.slice('usBonds-'.length))})`
+  }
+  if (key.startsWith('taxExempt-')) {
+    return `Tax-exempt interest (${payerSuffixLabel(key.slice('taxExempt-'.length))})`
+  }
+  if (key.startsWith('taxableInterest-')) {
+    return `Taxable interest (${payerSuffixLabel(key.slice('taxableInterest-'.length))})`
+  }
+  if (key.startsWith('qualifiedDivs-')) {
+    return `Qualified dividends (${payerSuffixLabel(key.slice('qualifiedDivs-'.length))})`
+  }
+  if (key.startsWith('ordinaryDivs-')) {
+    return `Ordinary dividends (${payerSuffixLabel(key.slice('ordinaryDivs-'.length))})`
+  }
+  if (key.startsWith('fedTaxWithheld-')) {
+    return `Federal tax withheld (${payerSuffixLabel(key.slice('fedTaxWithheld-'.length))})`
+  }
+  if (key.startsWith('wages-')) {
+    return `W-2 wages (${payerSuffixLabel(key.slice('wages-'.length))})`
+  }
+  if (key.startsWith('ssn-')) {
+    return `W-2 SSN (${payerSuffixLabel(key.slice('ssn-'.length))})`
+  }
+  if (key.startsWith('ein-')) {
+    return `W-2 EIN (${payerSuffixLabel(key.slice('ein-'.length))})`
+  }
+
+  return key
+}
+
+/** Extract underlying field/doc/diagnostic key from a handoff done/open item. */
+export function parseHandoffItemKey(item: HandoffItem): string | null {
+  if (item.jump?.type === 'field') return item.jump.field
+  if (item.jump?.type === 'diagnostic') return item.jump.issueKey
+  if (item.jump?.type === 'doc') return item.jump.docId
+  const m = item.id?.match(/(?:done|import|confirm|flag|note)-(?:flag|edit|summary|doc|diag)?-?(.+)/)
+  return m?.[1] ?? null
+}
+
+/** Dedupe key — box12 sub-rows share one slot; phase-1 flags stay distinct for doc mapping. */
+export function canonicalActivityKey(fieldKey: string): string {
+  if (isBox12FieldKey(fieldKey)) return box12RollupKey(fieldKey)
+  return fieldKey
+}
+
+function buildFlagClearDetail(flagKey: string, wasEdited: boolean): string {
+  if (flagKey === 'ssn-techCircle') {
+    return wasEdited
+      ? 'Corrected SSN after OCR mismatch on W-2'
+      : 'Marked correct after OCR mismatch on SSN'
+  }
+  if (flagKey === 'wages-techCircle') {
+    return wasEdited
+      ? 'Verified Box 1 against W-2 source after amount edit'
+      : 'Verified Box 1 against W-2 source'
+  }
+  if (flagKey === 'ein-techCircle') {
+    return wasEdited
+      ? 'Corrected EIN after OCR mismatch on W-2'
+      : 'Marked correct after OCR mismatch on EIN'
+  }
+  if (flagKey === 'box12' || isBox12FieldKey(flagKey)) {
+    return wasEdited
+      ? 'Updated Box 12 codes to match W-2 source'
+      : 'Confirmed Box 12 codes match W-2 source'
+  }
+  if (flagKey === 'taxableInterest') {
+    return wasEdited
+      ? 'Reconciled taxable interest against 1099-INT source'
+      : 'Verified taxable interest against 1099-INT source'
+  }
+  if (flagKey === 'fedTaxWithheld' || flagKey.startsWith('fedTaxWithheld')) {
+    return wasEdited
+      ? 'Reconciled federal withholding against 1099-DIV source'
+      : 'Verified federal withholding against source document'
+  }
+  if (flagKey === 'qualifiedDivs' || flagKey.startsWith('qualifiedDivs')) {
+    return wasEdited
+      ? 'Reconciled qualified dividends against 1099-DIV source'
+      : 'Verified qualified dividends against source document'
+  }
+  if (flagKey === 'r-taxableAmt' || flagKey === 'grossDistrib-meridian') {
+    return wasEdited
+      ? 'Reconciled 1099-R taxable amount against source'
+      : 'Verified 1099-R distribution against source document'
+  }
+  const label = getFieldDisplayLabel(flagKey)
+  return wasEdited
+    ? `Resolved ${label.toLowerCase()} with an amount edit`
+    : `Marked ${label.toLowerCase()} correct without changing amounts`
+}
 
 const KNOWN_DOCS = PACKET_VERIFY_DOC_KEYS
 
@@ -159,7 +314,7 @@ export function formatCheckMeta(entry: ActivityEntry): string {
 }
 
 function fieldLabel(key: string): string {
-  return FLAG_LABELS[key] ?? key
+  return getFieldDisplayLabel(key)
 }
 
 function docLabel(docId: string): string {
@@ -186,7 +341,7 @@ function docRelatedEdits(docId: string, editKeys: string[]): string[] {
   })
 }
 
-function listPhrase(parts: string[], max = 3): string {
+export function listPhrase(parts: string[], max = 3): string {
   if (parts.length === 0) return ''
   if (parts.length === 1) return parts[0]
   if (parts.length === 2) return `${parts[0]} and ${parts[1]}`
@@ -596,7 +751,7 @@ export function buildHandoffSnapshot(
         return {
           id: `done-flag-${flag}`,
           label: fieldLabel(flag),
-          detail: wasEdited ? 'Resolved with an amount edit' : 'Marked correct without changing amounts',
+          detail: buildFlagClearDetail(flag, wasEdited),
           status: 'done' as const,
           jump: { type: 'field' as const, field: flag },
           jumpLabel: 'View field',
@@ -631,19 +786,43 @@ export function buildHandoffSnapshot(
   }
 
   if (edits.length) {
+    const box12Rollups = new Map<string, { fields: string[]; meta: ActivityEntry }>()
+    const nonBox12Edits: [string, ActivityEntry][] = []
+    for (const [field, meta] of edits) {
+      if (isBox12FieldKey(field)) {
+        const rollup = box12RollupKey(field)
+        const existing = box12Rollups.get(rollup)
+        if (existing) existing.fields.push(field)
+        else box12Rollups.set(rollup, { fields: [field], meta })
+      } else {
+        nonBox12Edits.push([field, meta])
+      }
+    }
+    const editItems: HandoffItem[] = nonBox12Edits.map(([field, meta]) => ({
+      id: `done-edit-${field}`,
+      label: getFieldDisplayLabel(field),
+      detail: formatCheckMeta(meta),
+      status: 'done' as const,
+      jump: { type: 'field' as const, field },
+      jumpLabel: 'View field',
+    }))
+    for (const [rollup, { fields, meta }] of box12Rollups) {
+      const employerKey = rollup.split(':')[1] ?? 'techCircle'
+      editItems.push({
+        id: `done-edit-${rollup}`,
+        label: getFieldDisplayLabel(`box12-${employerKey}`),
+        detail: `Updated ${fields.length} Box 12 code${fields.length === 1 ? '' : 's'} · ${formatCheckMeta(meta)}`,
+        status: 'done' as const,
+        jump: { type: 'field' as const, field: fields[0] ?? 'box12' },
+        jumpLabel: 'View field',
+      })
+    }
     preparerDoneGroups.push({
       id: 'amount-edits',
       title: 'Amount edits',
-      count: edits.length,
-      countLabel: `${edits.length} edit${edits.length === 1 ? '' : 's'}`,
-      items: edits.map(([field, meta]) => ({
-        id: `done-edit-${field}`,
-        label: fieldLabel(field) !== field ? fieldLabel(field) : field,
-        detail: formatCheckMeta(meta),
-        status: 'done' as const,
-        jump: { type: 'field' as const, field },
-        jumpLabel: 'View field',
-      })),
+      count: editItems.length,
+      countLabel: `${editItems.length} edit${editItems.length === 1 ? '' : 's'}`,
+      items: editItems,
     })
   }
 
