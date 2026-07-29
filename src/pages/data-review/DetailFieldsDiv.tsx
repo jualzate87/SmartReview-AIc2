@@ -146,7 +146,6 @@ interface DetailFieldsDivProps {
   onVerifyDoc?: (docKey: string) => void
   flaggedFields?: Record<string, string>
   onAddFieldNote?: (text: string, context: string) => void
-  importReadOnly?: boolean
 }
 
 export default function DetailFieldsDiv({
@@ -171,7 +170,6 @@ export default function DetailFieldsDiv({
   onVerifyDoc,
   flaggedFields = {},
   onAddFieldNote,
-  importReadOnly = false,
 }: DetailFieldsDivProps) {
 
   const highlightedRef = useRef<HTMLDivElement>(null)
@@ -194,7 +192,6 @@ export default function DetailFieldsDiv({
   }, [selectedField])
 
   const startEdit = (field: string, currentValue: string) => {
-    if (importReadOnly) return
     const clean = currentValue.replace(/,/g, '')
     setEditingField(field)
     setDraftValue(clean)
@@ -393,7 +390,7 @@ export default function DetailFieldsDiv({
             onChange={e => setDraftValue(e.target.value)}
             placeholder={!isEditing && flaggedFields[fieldKey] ? 'Not imported' : placeholder}
             autoFocus={isEditing}
-            onClick={e => { e.stopPropagation(); if (!importReadOnly && !isEditing) startEdit(fieldKey, currentVal) }}
+            onClick={e => { e.stopPropagation(); if (!isEditing) startEdit(fieldKey, currentVal) }}
             onBlur={commitStatic}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitStatic() } if (e.key === 'Escape') cancelEdit() }}
           />
@@ -519,7 +516,7 @@ export default function DetailFieldsDiv({
                 value={editingField === 'qualifiedDivs' ? draftValue : (fieldValues?.qualifiedDivs !== undefined ? fieldValues.qualifiedDivs.toLocaleString() : form.box1b_qualifiedDivs)}
                 onChange={e => setDraftValue(e.target.value)}
                 autoFocus={editingField === 'qualifiedDivs'}
-                onClick={e => { e.stopPropagation(); if (!importReadOnly && editingField !== 'qualifiedDivs') startEdit('qualifiedDivs', fieldValues?.qualifiedDivs?.toString() ?? form.box1b_qualifiedDivs) }}
+                onClick={e => { e.stopPropagation(); if (editingField !== 'qualifiedDivs') startEdit('qualifiedDivs', fieldValues?.qualifiedDivs?.toString() ?? form.box1b_qualifiedDivs) }}
                 onBlur={() => commitEdit('qualifiedDivs')}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit('qualifiedDivs') } if (e.key === 'Escape') cancelEdit() }}
               />

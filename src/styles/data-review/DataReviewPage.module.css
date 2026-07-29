@@ -267,20 +267,6 @@
   border-bottom: 1px solid var(--color-divider-tertiary, #e8edf0);
 }
 
-.sourcePanelTitleGroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-component-gap-x-small, 4px);
-  min-width: 0;
-}
-
-.sourcePanelLayerBadge {
-  font-family: var(--font-family-component);
-  font-size: var(--font-size-component-x-small, 12px);
-  font-weight: var(--font-weight-component, 400);
-  color: var(--color-text-secondary, #6b6c72);
-}
-
 .sourcePanelTitle {
   font-family: var(--font-family-component) !important;
   font-size: var(--font-size-component-medium, 16px);

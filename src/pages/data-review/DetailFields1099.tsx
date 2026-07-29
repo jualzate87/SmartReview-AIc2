@@ -148,7 +148,6 @@ interface DetailFields1099Props {
   onVerifyDoc?: (docKey: string) => void
   flaggedFields?: Record<string, string>
   onAddFieldNote?: (text: string, context: string) => void
-  importReadOnly?: boolean
 }
 
 export default function DetailFields1099({
@@ -174,7 +173,6 @@ export default function DetailFields1099({
   onVerifyDoc,
   flaggedFields = {},
   onAddFieldNote,
-  importReadOnly = false,
 }: DetailFields1099Props) {
   const highlightedRef = useRef<HTMLDivElement>(null)
   const [editingField, setEditingField] = useState<string | null>(null)
@@ -205,7 +203,6 @@ export default function DetailFields1099({
   }, [selectedField])
 
   const startEdit = (field: string, currentValue: string) => {
-    if (importReadOnly) return
     const clean = currentValue.replace(/,/g, '')
     setEditingField(field)
     setDraftValue(clean)
@@ -391,7 +388,7 @@ export default function DetailFields1099({
           onChange={e => setDraftValue(e.target.value)}
           placeholder={placeholder}
           autoFocus={isEditing}
-          onClick={e => { e.stopPropagation(); if (!importReadOnly && !isEditing) startEdit(fieldKey, currentVal) }}
+          onClick={e => { e.stopPropagation(); if (!isEditing) startEdit(fieldKey, currentVal) }}
           onBlur={commitStatic}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitStatic() } if (e.key === 'Escape') cancelEdit() }}
         />

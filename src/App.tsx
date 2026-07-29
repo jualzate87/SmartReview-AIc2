@@ -4,9 +4,9 @@ import ErrorBoundary from './ErrorBoundary'
 import { FusionProvider } from './contexts/fusion'
 import FusionShell from './components/FusionShell'
 import { FUSION_CONFIG } from './navigation'
-import OpenReturnPage from './pages/OpenReturnPage'
 import DataReviewPage from './pages/DataReviewPage'
 import SmartReturnPage from './pages/SmartReturnPage'
+import CheckReturnPage from './pages/CheckReturnPage'
 import WorkspacePage from './pages/WorkspacePage'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -34,10 +34,11 @@ export default function App() {
         <FusionProvider pathPrefix={FUSION_CONFIG.pathPrefix || ''}>
           <Routes>
             {/* SmartReview prototype — outside the QBO Fusion shell */}
-            <Route path="/" element={<Navigate to="/data-review" replace />} />
-            <Route path="/import-hub" element={<OpenReturnPage />} />
+            <Route path="/" element={<Navigate to="/smart-return" replace />} />
+            <Route path="/import-hub" element={<Navigate to="/smart-return" replace />} />
             <Route path="/smart-return" element={<SmartReturnPage />} />
             <Route path="/data-review" element={<DataReviewPage />} />
+            <Route path="/check-return" element={<CheckReturnPage />} />
 
             <Route element={<AppLayout />}>
               <Route path="/home" element={<HomePage />} />
@@ -48,8 +49,8 @@ export default function App() {
               <Route path="/app/*" element={<NotFoundPage />} />
             </Route>
 
-            {/* Unknown paths → Data Review (not the IDS shell NotFound) */}
-            <Route path="*" element={<Navigate to="/data-review" replace />} />
+            {/* Unknown paths → SmartReturn landing */}
+            <Route path="*" element={<Navigate to="/smart-return" replace />} />
           </Routes>
         </FusionProvider>
       </HashRouter>

@@ -8,12 +8,25 @@ import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
 import styles from '../styles/SmartReturnHeader.module.css'
 
+export type ReturnHeaderTab = 'profile' | 'smartreturn' | 'inputreturn' | 'checkreturns' | 'filereturn'
+
 interface SmartReturnHeaderProps {
-  activeTab?: 'smartreturn' | 'checkreturns'
+  activeTab?: ReturnHeaderTab
+  /** Show Review return CTA in tab row (reviewer on SmartReturn landing) */
+  showReviewReturn?: boolean
+  /** Primary styling after review has started */
+  reviewReturnStarted?: boolean
+  onReviewReturn?: () => void
 }
 
-export default function SmartReturnHeader({ activeTab = 'smartreturn' }: SmartReturnHeaderProps) {
+export default function SmartReturnHeader({
+  activeTab = 'smartreturn',
+  showReviewReturn = false,
+  reviewReturnStarted = false,
+  onReviewReturn,
+}: SmartReturnHeaderProps) {
   const navigate = useNavigate()
+
   return (
     <div className={styles.header}>
 
@@ -21,15 +34,15 @@ export default function SmartReturnHeader({ activeTab = 'smartreturn' }: SmartRe
       <div className={styles.row1}>
         <span className={styles.businessName}>Honey Tax Accounting</span>
         <div className={styles.row1Right}>
-          <button className={styles.navBtn}>
+          <button type="button" className={styles.navBtn}>
             <Question size="small" />
             <span className={styles.navBtnLabel}>Help</span>
           </button>
-          <button className={styles.navBtn}>
+          <button type="button" className={styles.navBtn}>
             <Notification size="small" />
             <span className={styles.navBtnLabel}>Notifications</span>
           </button>
-          <button className={styles.navBtn}>
+          <button type="button" className={styles.navBtn}>
             <Settings size="small" />
             <span className={styles.navBtnLabel}>Settings</span>
           </button>
@@ -41,9 +54,9 @@ export default function SmartReturnHeader({ activeTab = 'smartreturn' }: SmartRe
       {/* ── Row 2: Client sub-header 63px ── */}
       <div className={styles.row2}>
         <div className={styles.row2Left}>
-          <div className={styles.clientName}>Jessica<br />Drake</div>
+          <div className={styles.clientName}>Jordan<br />Wells</div>
           <Lock size="small" className={styles.lockIcon} />
-          <button className={styles.clientProfileBtn}>
+          <button type="button" className={styles.clientProfileBtn}>
             <PersonThree size="small" />
             <span className={styles.clientProfileLabel}>Client profile</span>
           </button>
@@ -65,27 +78,18 @@ export default function SmartReturnHeader({ activeTab = 'smartreturn' }: SmartRe
         </div>
 
         <div className={styles.row2Right}>
-          {/* Avatar stack — D, H, +1 */}
           <div className={styles.avatarStack}>
             <div className={styles.avatarD}>D</div>
             <div className={styles.avatarH}>H</div>
             <div className={styles.avatarPlus}>+1</div>
           </div>
-
-          {/* Select Assignee — ghost dropdown */}
-          <button className={styles.ghostBtn}>
+          <button type="button" className={styles.ghostBtn}>
             Select Asignee <ChevronDown size="small" />
           </button>
-
-          {/* Select Status — ghost dropdown */}
-          <button className={styles.ghostBtn}>
+          <button type="button" className={styles.ghostBtn}>
             Select Status <ChevronDown size="small" />
           </button>
-
-          {/* Notes — IDS secondary button */}
           <Button priority="secondary">Notes</Button>
-
-          {/* Return actions — IDS primary button */}
           <Button priority="primary">
             Return actions <ChevronDown size="small" />
           </Button>
@@ -95,25 +99,31 @@ export default function SmartReturnHeader({ activeTab = 'smartreturn' }: SmartRe
       {/* ── Row 3: Tab bar 46px ── */}
       <div className={styles.row3}>
         <div className={styles.tabsLeft}>
-          <button className={styles.tab}>
+          <button type="button" className={styles.tab}>
             <List size="small" /> Profile
           </button>
           <button
+            type="button"
             className={`${styles.tab} ${activeTab === 'smartreturn' ? styles.tabActive : ''}`}
             onClick={() => navigate('/smart-return')}
           >
             <Rocket size="small" /> SmartReturn
           </button>
-          <button className={styles.tab}>
+          <button
+            type="button"
+            className={`${styles.tab} ${activeTab === 'inputreturn' ? styles.tabActive : ''}`}
+            onClick={() => navigate('/data-review?entry=input-return&role=preparer')}
+          >
             <Edit size="small" /> Input return
           </button>
           <button
+            type="button"
             className={`${styles.tab} ${activeTab === 'checkreturns' ? styles.tabActive : ''}`}
             onClick={() => navigate('/check-return')}
           >
             <Checklist size="small" /> Check return
           </button>
-          <button className={styles.tab}>
+          <button type="button" className={styles.tab}>
             <Send size="small" /> File return
           </button>
         </div>
@@ -124,7 +134,15 @@ export default function SmartReturnHeader({ activeTab = 'smartreturn' }: SmartRe
           <span className={styles.tabMeta}>
             <AlarmClock size="small" /> Prep time: 0 mins
           </span>
-          {/* Refresh forms — IDS secondary button */}
+          {showReviewReturn && (
+            <Button
+              priority={reviewReturnStarted ? 'primary' : 'secondary'}
+              onClick={onReviewReturn}
+              automationId="review-return-header-cta"
+            >
+              Review return
+            </Button>
+          )}
           <Button priority="secondary">Refresh forms</Button>
         </div>
       </div>

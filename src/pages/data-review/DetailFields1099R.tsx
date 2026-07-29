@@ -89,7 +89,6 @@ export default function DetailFields1099R({
   onVerifyDoc,
   onAddFieldNote,
   flaggedFields = {},
-  importReadOnly = false,
 }: DetailFields1099RProps) {
   const highlightedRef = useRef<HTMLDivElement>(null)
   const [editingField, setEditingField] = useState<string | null>(null)

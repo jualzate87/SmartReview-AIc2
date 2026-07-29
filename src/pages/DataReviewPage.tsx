@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
 import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close, ClockCounterclockwise } from '@design-systems/icons'
 import { Button } from '@ids-ts/button'
@@ -107,6 +108,7 @@ import img1040PriorPage1 from '../assets/jessica-1040-2024-variant-1.png'
 import img1040PriorPage2 from '../assets/jessica-1040-2024-variant-2.png'
 import styles from '../styles/data-review/DataReviewPage.module.css'
 import dragStyles from '../styles/data-review/DragHandle.module.css'
+import SmartReturnHeader from './SmartReturnHeader'
 
 function VerticalGripIcon() {
   return (
@@ -139,6 +141,19 @@ const PANEL_DRAG_HANDLE_WIDTH = 16
 type RightPanelMode = 'closed' | 'sources' | 'ai' | 'comments' | 'summary'
 
 export default function DataReviewPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const entry = searchParams.get('entry')
+  const roleParam = searchParams.get('role')
+  const startReviewParam = searchParams.get('startReview') === 'true'
+
+  // Valid entries: input-return (preparer) or review-return (reviewer). Otherwise redirect to SmartReturn.
+  useEffect(() => {
+    if (!entry) {
+      navigate('/smart-return', { replace: true })
+    }
+  }, [entry, navigate])
+
   // Source-doc review state — flags, reviewed fields, active tab, editable field
   // values — persisted in sessionStorage via useSyncedReviewState.
   const {
@@ -233,7 +248,9 @@ export default function DataReviewPage() {
   })
   // C2: multi-pass handoff — summary content when rightPanelMode === 'summary'
   const [reviewPass, setReviewPass] = useState<1 | 2>(1)
-  const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>('preparer')
+  const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>(() =>
+    roleParam === 'reviewer' || entry === 'review-return' ? 'reviewer' : 'preparer',
+  )
   const [summaryMode, setSummaryMode] = useState<HandoffMode>('signoff-review')
   const [summaryOpts, setSummaryOpts] = useState<{
     pass?: 1 | 2
@@ -244,8 +261,10 @@ export default function DataReviewPage() {
   const [preparerHandoffChoice, setPreparerHandoffChoice] = useState<
     'none' | 'awaiting-reviewer' | 'finish-and-file'
   >('none')
-  /** Reviewer has clicked "Review return" and entered Pass 2 workflow */
-  const [reviewerReviewStarted, setReviewerReviewStarted] = useState(false)
+  /** Reviewer has clicked "Review return" in return header and entered review workflow */
+  const [reviewerReviewStarted, setReviewerReviewStarted] = useState(
+    () => entry === 'review-return' && startReviewParam,
+  )
   /** Pass 2 open-items filter */
   type Pass2Filter = 'all' | 'flags' | 'notes' | 'confirm'
   const [pass2Filter, setPass2Filter] = useState<Pass2Filter>('all')
@@ -268,11 +287,12 @@ export default function DataReviewPage() {
   // 'import'      → Phase 1: Import Accuracy (source-doc experience)
   // 'diagnostics' → Phase 2: AI Diagnostics (agent panel primary)
   type ReviewPhase = 'welcome' | 'import' | 'diagnostics'
-  // Preparer lands directly in import phase with source docs open (welcome bypassed)
-  const [phase, setPhase] = useState<ReviewPhase>('import')
+  const [phase, setPhase] = useState<ReviewPhase>(() =>
+    entry === 'review-return' ? 'diagnostics' : 'import',
+  )
   const [show1040, setShow1040] = useState(true)
   const [outputFormId, setOutputFormId] = useState<OutputFormId>('summary')
-  const [importsStarted, setImportsStarted] = useState(true)
+  const [importsStarted, setImportsStarted] = useState(() => entry === 'input-return')
   /** First-run coach tip: hide summary */
   const [coachTip, setCoachTip] = useState<CoachTipId | null>(null)
   /** One-shot nudge when Phase 1 is fully complete (flags + docs) */
@@ -1006,19 +1026,9 @@ export default function DataReviewPage() {
     })
   }
 
-  /** Switch demo chrome to reviewer — does not start review (header CTA does). */
+  /** Switch demo chrome to reviewer — returns to SmartReturn landing */
   const handleSwitchToReviewerRole = () => {
-    setReviewRole('reviewer')
-    setReviewActor(REVIEWER_NAME)
-    setReviewPass(1)
-    setReviewerReviewStarted(false)
-    setPhase('diagnostics')
-    setShow1040(true)
-    setOutputFormId('summary')
-    setPass2Filter('all')
-    setFocusNoteId(null)
-    setRightPanelMode('closed')
-    if (summaryPanelOpen) handleCloseSummaryPanel()
+    navigate('/smart-return?role=reviewer')
   }
 
   /** Header CTA — reviewer begins Pass 2 workflow via Pass 1 briefing */
@@ -1051,6 +1061,15 @@ export default function DataReviewPage() {
     })
   }
 
+  // Auto-start review when navigated from SmartReturn header CTA
+  const startReviewHandled = useRef(false)
+  useEffect(() => {
+    if (!startReviewParam || startReviewHandled.current || !entry) return
+    startReviewHandled.current = true
+    handleReviewReturn()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on entry from SmartReturn
+  }, [startReviewParam, entry])
+
   /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
   const handleSwitchRole = (role: 'preparer' | 'reviewer') => {
     if (role === 'reviewer') {
@@ -1067,6 +1086,7 @@ export default function DataReviewPage() {
     setPass2Filter('all')
     setFocusNoteId(null)
     openRightPanel('sources')
+    navigate('/data-review?entry=input-return&role=preparer', { replace: true })
     if (summaryPanelOpen) handleCloseSummaryPanel()
   }
 
@@ -1387,10 +1407,13 @@ export default function DataReviewPage() {
     <div
       className={styles.page}
       style={{
-        /* Product header only — Sign-off lives on the Step 2 banner row now */
         ['--app-header-offset' as string]: '68px',
       }}
     >
+      <SmartReturnHeader
+        activeTab="inputreturn"
+        showReviewReturn={false}
+      />
       {reviewRole === 'reviewer' && reviewerReviewStarted ? (
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
@@ -1446,7 +1469,7 @@ export default function DataReviewPage() {
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
           <span>· {REVIEWER_NAME}</span>
-          <span>· Click Review return in the header to begin</span>
+          <span>· Use Review return in the return header on SmartReturn to begin</span>
         </div>
       ) : (
         <div className={handoffStyles.passBar} role="status">
@@ -1483,16 +1506,6 @@ export default function DataReviewPage() {
             </span>
           </div>
           <div className={styles.headerRight}>
-            {reviewRole === 'reviewer' && !reviewerReviewStarted && (
-              <Button
-                priority="primary"
-                size="medium"
-                onClick={handleReviewReturn}
-                automationId="review-return-cta"
-              >
-                Review return
-              </Button>
-            )}
             <div className={styles.headerIconGroup}>
               <span className={styles.headerIconWrap}>
                 <IconControl
