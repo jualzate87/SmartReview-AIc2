@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PREPARER_NAME } from '../../hooks/useSyncedReviewState'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
@@ -8,8 +8,9 @@ import { Checkbox } from '@ids-ts/checkbox'
 import '@ids-ts/checkbox/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
 import '@ids-ts/tabs/dist/main.css'
-import { CircleCheckFill } from '@design-systems/icons'
+import { CircleCheckFill, Lightning } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
+import type { LiveAmounts } from '../../data/liveReturn'
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
 import {
   buildSmartReviewBrief,
@@ -44,6 +45,7 @@ type Props = {
   manualChecklistItems?: Record<string, boolean>
   reviewPass?: 1 | 2
   isPreparer?: boolean
+  amounts?: LiveAmounts
 }
 
 function JumpLink({
@@ -142,7 +144,10 @@ function PhaseCard({
   return (
     <article className={styles.phaseCard}>
       <header className={styles.phaseCardHead}>
-        <h3 className={styles.phaseCardTitle}>{phase.title}</h3>
+        <div className={styles.phaseCardHeadText}>
+          <h3 className={styles.phaseCardTitle}>{phase.title}</h3>
+          <p className={styles.phaseCardDescription}>{phase.description}</p>
+        </div>
         <PhaseStatusPill status={phase.status} />
       </header>
       <ul className={styles.phaseItemList}>
@@ -210,9 +215,14 @@ function StrategicChecklistTab({
       {executiveBrief && (
         <section className={styles.executiveCard} aria-labelledby="executive-brief-title">
           <div className={styles.executiveCardHead}>
-            <h3 id="executive-brief-title" className={styles.executiveCardTitle}>
-              AI executive brief
-            </h3>
+            <div className={styles.executiveCardTitleRow}>
+              <span className={styles.executiveCardIcon} aria-hidden>
+                <Lightning size="small" />
+              </span>
+              <h3 id="executive-brief-title" className={styles.executiveCardTitle}>
+                Pass 1 executive brief
+              </h3>
+            </div>
             <span className={styles.syncedTime}>{executiveBrief.syncedAt}</span>
           </div>
           {executiveBrief.paragraphs.map((para, i) => (
@@ -314,6 +324,7 @@ export default function HandoffSummary({
   manualChecklistItems = {},
   reviewPass = snapshot.pass,
   isPreparer = false,
+  amounts,
 }: Props) {
   const brief = useMemo(
     () =>
@@ -325,8 +336,9 @@ export default function HandoffSummary({
         reviewPass,
         showStrategicChecklist: showChecklist,
         isPreparer,
+        amounts,
       }),
-    [snapshot, checklist, outstandingOpenCount, manualChecklistItems, reviewPass, showChecklist, isPreparer],
+    [snapshot, checklist, outstandingOpenCount, manualChecklistItems, reviewPass, showChecklist, isPreparer, amounts],
   )
 
   const signOffReady = canApproveSignOff(brief)
@@ -335,6 +347,12 @@ export default function HandoffSummary({
   const [activeTab, setActiveTab] = useState(
     brief.viewMode === 'reviewer-strategic' ? 'checklist' : 'activity',
   )
+
+  useEffect(() => {
+    if (brief.viewMode === 'reviewer-strategic') {
+      setActiveTab('checklist')
+    }
+  }, [brief.viewMode])
 
   const showTabs = brief.viewMode === 'reviewer-strategic'
 

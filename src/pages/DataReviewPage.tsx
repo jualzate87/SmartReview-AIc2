@@ -896,6 +896,22 @@ export default function DataReviewPage() {
     openSummaryPanel('signoff-review')
   }
 
+  /** Transition from Pass 1 briefing into Pass 2 strategic checklist (Tab 1 default). */
+  const handleBeginPass2Review = () => {
+    setReviewPass(2)
+    setReviewRole('reviewer')
+    setReviewActor(REVIEWER_NAME)
+    setPhase('diagnostics')
+    setShow1040(true)
+    setOutputFormId('summary')
+    setPass2Filter('flags')
+    openSummaryPanel('signoff-review', {
+      pass: 2,
+      actor: REVIEWER_NAME,
+      voice: 'self',
+    })
+  }
+
   const handleOpenAsReviewer = () => {
     setReviewPass(2)
     setReviewRole('reviewer')
@@ -904,11 +920,11 @@ export default function DataReviewPage() {
     setShow1040(true)
     setOutputFormId('summary')
     setPass2Filter('flags')
-    // Summary owns the right rail — do not also open AI Review (mutual exclusion)
+    // Pass 2 sign-off opens on Strategic checklist (Tab 1), not Pass 1 briefing
     openSummaryPanel('signoff-review', {
-      pass: 1,
-      actor: pass1ActorLabel,
-      voice: 'reviewer-briefing',
+      pass: 2,
+      actor: REVIEWER_NAME,
+      voice: 'self',
     })
     // Seed a preparer note if none exist so Pass 2 has something to resolve
     setNotes(prev => {
@@ -1080,6 +1096,7 @@ export default function DataReviewPage() {
   const showChecklist =
     reviewRole === 'reviewer' &&
     reviewPass === 2 &&
+    summaryMode === 'signoff-review' &&
     (summaryOpts.voice ?? 'self') !== 'reviewer-briefing'
 
   const signOffGatingActive = !inImportPhase && reviewRole === 'reviewer'
@@ -1091,6 +1108,7 @@ export default function DataReviewPage() {
     reviewPass,
     showStrategicChecklist: showChecklist,
     isPreparer: reviewRole === 'preparer',
+    amounts,
   })
   const signOffReady = !signOffGatingActive || (
     showChecklist
@@ -2194,6 +2212,7 @@ export default function DataReviewPage() {
                   manualChecklistItems={manualChecklistItems}
                   reviewPass={reviewPass}
                   isPreparer={reviewRole === 'preparer'}
+                  amounts={amounts}
                   closing={panelClosing}
                   onClose={handleCloseSummaryPanel}
                   onContinue={() => {
@@ -2207,7 +2226,7 @@ export default function DataReviewPage() {
                   onFinishAndFile={handlePreviewFinishAndFile}
                   onPassToReviewer={handlePreviewPassToReviewer}
                   onConfirmSend={handleConfirmHandoffSend}
-                  onOpenAsReviewer={handleOpenAsReviewer}
+                  onOpenAsReviewer={handleBeginPass2Review}
                 />
               )}
             </div>

@@ -66,14 +66,27 @@
   padding: var(--space-container-padding-medium, 16px);
   border: 1px solid var(--color-divider-tertiary);
   border-radius: var(--radius-medium, 8px);
-  background: var(--color-container-background-secondary);
+  background: var(--color-container-background-info);
 }
 
 .executiveCardHead {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-component-gap-medium, 8px);
+}
+
+.executiveCardTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-component-gap-small, 4px);
+  min-width: 0;
+}
+
+.executiveCardIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-action-standard);
 }
 
 .executiveCardTitle {
@@ -123,14 +136,29 @@
   gap: var(--space-component-gap-medium, 8px);
 }
 
+.phaseCardHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-component-gap-small, 4px);
+  flex: 1;
+  min-width: 0;
+}
+
 .phaseCardTitle {
   margin: 0;
-  flex: 1;
   font-family: var(--font-family-heading);
   font-size: var(--font-size-component-small);
   font-weight: var(--font-weight-heading);
   color: var(--color-text-primary);
   line-height: 1.35;
+}
+
+.phaseCardDescription {
+  margin: 0;
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-4);
+  line-height: 1.45;
+  color: var(--color-text-secondary);
 }
 
 .phasePill {

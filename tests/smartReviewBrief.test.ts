@@ -21,6 +21,83 @@ const emptyChecklist: ReviewChecklistState = {
   blockers: [],
 }
 
+describe('buildSmartReviewBrief strategic checklist', () => {
+  it('shows reviewer-strategic view with phased checklist and executive brief', () => {
+    const snapshot = buildHandoffSnapshot('signoff-review', 2, 'Jordan Lee', {
+      reviewedFields: new Map([['ssn-techCircle', meta()]]),
+      verifiedDocs: new Set(['techCircle']),
+      verifiedDocsMeta: new Map([['techCircle', meta()]]),
+      editedFields: new Map(),
+      summaryChecked: new Map([['qualifiedDivs', meta()]]),
+      summaryFlagged: new Map(),
+      summaryFlagNotes: {},
+      notes: [{
+        id: 'note-8960',
+        text: 'Please confirm NIIT Form 8960 still applies after AGI tweak.',
+        author: 'Sara Chen',
+        at: 'Jun 1 · 2:30 PM',
+        context: 'Form 8960',
+        status: 'open',
+        role: 'preparer',
+        replies: [],
+      }],
+      amounts,
+    })
+
+    const brief = buildSmartReviewBrief({
+      snapshot,
+      checklist: emptyChecklist,
+      outstandingOpenCount: 1,
+      manualChecklistItems: {},
+      reviewPass: 2,
+      showStrategicChecklist: true,
+      isPreparer: false,
+      amounts,
+    })
+
+    expect(brief.viewMode).toBe('reviewer-strategic')
+    expect(brief.executiveBrief?.paragraphs[0]).toContain('Sara completed')
+    expect(brief.phases).toHaveLength(4)
+    expect(brief.phases[0].description).toContain('packet documents')
+    const phase2Items = brief.phases.find(p => p.id === 'phase-2')?.items ?? []
+    expect(phase2Items.some(i => i.note?.includes('8960') || i.note?.includes('capital gains'))).toBe(true)
+  })
+
+  it('hides strategic checklist in reviewer-briefing mode', () => {
+    const snapshot = buildHandoffSnapshot(
+      'signoff-review',
+      1,
+      'Sara Chen',
+      {
+        reviewedFields: new Map(),
+        verifiedDocs: new Set(),
+        editedFields: new Map(),
+        summaryChecked: new Map(),
+        summaryFlagged: new Map(),
+        summaryFlagNotes: {},
+        notes: [],
+        amounts,
+      },
+      { voice: 'reviewer-briefing' },
+    )
+
+    const brief = buildSmartReviewBrief({
+      snapshot,
+      checklist: emptyChecklist,
+      outstandingOpenCount: 0,
+      manualChecklistItems: {},
+      reviewPass: 2,
+      showStrategicChecklist: false,
+      isPreparer: false,
+      amounts,
+    })
+
+    expect(brief.viewMode).toBe('reviewer-briefing')
+    expect(brief.phases).toHaveLength(0)
+    expect(brief.executiveBrief).toBeNull()
+  })
+})
+
 describe('buildSmartReviewBrief activity log rollups', () => {
   it('rolls box12 sub-row edits into one reconciliation entry', () => {
     const snapshot = buildHandoffSnapshot('signoff-review', 1, 'Sara Chen', {
