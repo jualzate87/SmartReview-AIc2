@@ -11,7 +11,10 @@ import WorkspacePage from './pages/WorkspacePage'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
 
-const ROUTER_BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/'
+// HashRouter paths live in the URL fragment (#/…), not under the static asset base
+// (e.g. /SmartReview-AIc2/). Using BASE_URL here breaks GitHub Pages — routes like
+// #/data-review never match when basename is the repo subpath.
+const ROUTER_BASENAME = '/'
 
 function AppLayout() {
   return (
