@@ -163,13 +163,13 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
     },
     {
       id: 'reviewed-outputs',
-      label: 'Reviewed outputs',
-      description: 'I reviewed output forms and return summary.',
+      label: 'Form 1040, Schedule B, Schedule D, and Form 8960 reviewed',
+      description: 'Confirm wages, dividends, deductions, total tax liability, and refund or balance due match verified inputs.',
       kind: 'manual',
       required: true,
       complete: !!manual['output-forms-signoff'],
       jump: { type: 'field', field: 'wages' },
-      jumpLabel: 'View summary',
+      jumpLabel: 'Open Form 1040',
     },
     {
       id: 'reviewed-notes',
@@ -213,9 +213,9 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
     },
     {
       id: 'summary-lines',
-      label: 'Return summary lines confirmed',
+      label: '1040 summary totals confirmed (wages, dividends, tax, refund/balance due)',
       description: summaryComplete
-        ? 'Summary lines are confirmed for sign-off.'
+        ? 'Executive summary totals are confirmed for sign-off.'
         : input.reviewerConfirmStaleFields.size > 0
           ? `${input.reviewerConfirmStaleFields.size} line${input.reviewerConfirmStaleFields.size === 1 ? '' : 's'} edited since verify. Confirm again.`
           : `${needsConfirm.length} verified line${needsConfirm.length === 1 ? '' : 's'} awaiting your confirmation.`,
@@ -223,25 +223,25 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
       required: true,
       complete: summaryComplete,
       jump: firstSummaryGap ? { type: 'field', field: firstSummaryGap } : undefined,
-      jumpLabel: 'View summary',
+      jumpLabel: 'View 1040 totals',
     },
     {
       id: 'final-walkthrough',
-      label: 'Final 1040 walkthrough complete',
-      description: 'I walked the return summary and key outputs one last time.',
+      label: 'Executive 1040 totals walkthrough complete',
+      description: 'Walk wages, total income, tax liability, and refund or balance due one last time.',
       kind: 'manual',
       required: true,
       complete: !!manual['final-walkthrough'],
     },
     {
       id: 'yoy-variances',
-      label: 'Year-over-year variances reviewed',
-      description: 'Material YoY changes make sense for this client (optional).',
+      label: 'Executive 1040 totals and YoY variance walkthrough',
+      description: 'Material YoY changes in wages, dividends, total income, and tax liability make sense for this client (optional).',
       kind: 'manual',
       required: false,
       complete: !!manual['yoy-variances'],
       jump: { type: 'field', field: 'wages' },
-      jumpLabel: 'View summary',
+      jumpLabel: 'View YoY totals',
     },
   ]
 

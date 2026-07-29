@@ -56,7 +56,8 @@ describe('buildSmartReviewBrief strategic checklist', () => {
     })
 
     expect(brief.viewMode).toBe('reviewer-strategic')
-    expect(brief.executiveBrief?.paragraphs[0]).toContain('Sara completed')
+    expect(brief.executiveBrief?.body).toContain('Sara completed')
+    expect(brief.executiveBrief?.body).toContain('still need')
     expect(brief.phases).toHaveLength(4)
     expect(brief.phases[0].description).toContain('packet documents')
     const phase2Items = brief.phases.find(p => p.id === 'phase-2')?.items ?? []

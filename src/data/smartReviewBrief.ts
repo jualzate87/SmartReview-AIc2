@@ -62,7 +62,9 @@ export type SmartReviewBrief = {
     passBadge: string | null
   }
   executiveBrief: {
-    paragraphs: string[]
+    title: string
+    type: 'info' | 'success' | 'warn'
+    body: string
     syncedAt: string
   } | null
   phases: BriefPhase[]
@@ -231,11 +233,11 @@ function enrichChecklistItemNote(
         ? `${prep} confirmed executive summary lines for handoff.`
         : item.description
     case 'reviewed-outputs':
-      return 'Open output forms (1040, 8960, schedules) and confirm they match the verified inputs.'
+      return `Open Form 1040, Schedule B, Schedule D, and Form 8960. Confirm wages ${fmtUsd(live.wages)}, dividends ${fmtUsd(live.ordinaryDivs)}, deductions ${fmtUsd(live.deductionTaken)}, total tax ${fmtUsd(live.totalTax)}, and ${live.oweAmount > 0 ? `balance due ${fmtUsd(live.oweAmount)}` : 'refund position'} match verified inputs.`
     case 'final-walkthrough':
-      return 'Walk the 1040 summary one last time — wages, investment income, and tax lines should tell a coherent story.'
+      return `Walk executive 1040 totals: wages ${fmtUsd(live.wages)}, total income ${fmtUsd(live.totalIncome)}, tax liability ${fmtUsd(live.totalTax)}, and ${live.oweAmount > 0 ? `balance due ${fmtUsd(live.oweAmount)}` : 'expected refund'}.`
     case 'yoy-variances':
-      return `Material YoY moves to watch: wages ${fmtUsd(live.wages)}, dividends ${fmtUsd(live.ordinaryDivs)}, total income ${fmtUsd(live.totalIncome)}.`
+      return `YoY variance walkthrough: wages ${fmtUsd(live.wages)}, dividends ${fmtUsd(live.ordinaryDivs)}, total income ${fmtUsd(live.totalIncome)}, tax ${fmtUsd(live.totalTax)} vs prior year.`
     default:
       return item.description
   }
@@ -304,9 +306,18 @@ function seedDemoPhaseItems(
     case 'phase-4':
       return [
         {
-          id: 'demo-summary',
-          title: 'Executive 1040 totals walkthrough',
-          note: `Total income ${fmtUsd(live.totalIncome)}, tax ${fmtUsd(live.totalTax)} — confirm the story matches Jessica Drake's prior year.`,
+          id: 'demo-1040-outputs',
+          title: 'Review Form 1040, Schedule B, and Schedule D outputs',
+          note: `Confirm wages ${fmtUsd(live.wages)}, dividends ${fmtUsd(live.ordinaryDivs)}, deductions ${fmtUsd(live.deductionTaken)}, tax liability ${fmtUsd(live.totalTax)}, and ${live.oweAmount > 0 ? `balance due ${fmtUsd(live.oweAmount)}` : 'refund position'}.`,
+          checked: false,
+          jump: { type: 'field', field: 'wages' },
+          jumpLabel: 'Form 1040 ↗',
+          required: true,
+        },
+        {
+          id: 'demo-yoy-walkthrough',
+          title: 'Executive 1040 totals and YoY variance walkthrough',
+          note: `Total income ${fmtUsd(live.totalIncome)} vs prior year. Explain material moves in wages and investment income before sign-off.`,
           checked: false,
           jump: { type: 'field', field: 'totalIncome' },
           jumpLabel: '1040 summary ↗',
@@ -653,35 +664,47 @@ function buildPreparerActivityLog(snapshot: HandoffSnapshot): ActivityLogCategor
   return buildActivityLog(snapshot, firstName(snapshot.actorLabel))
 }
 
+function countStrategicProgress(phases: BriefPhase[]): {
+  attested: number
+  required: number
+  open: number
+} {
+  const requiredItems = phases.flatMap(p => p.items).filter(i => i.required)
+  const attested = requiredItems.filter(i => i.checked && !i.locked).length
+  const open = requiredItems.filter(i => !i.checked || i.locked).length
+  return { attested, required: requiredItems.length, open }
+}
+
 function buildExecutiveBrief(
   snapshot: HandoffSnapshot,
   preparerFirst: string,
-): { paragraphs: string[]; syncedAt: string } {
+  phases: BriefPhase[],
+  allPhasesComplete: boolean,
+  outstandingOpenCount: number,
+): SmartReviewBrief['executiveBrief'] {
   const { checks, docCount } = countPass1Baseline(snapshot)
-  const openCount = getOpenGroups(snapshot).reduce((sum, g) => sum + g.count, 0)
-  const paragraphs: string[] = [
-    `${preparerFirst} completed ${checks} baseline checks across ${docCount} source docs. Import accuracy is cleared and the return is ready for your strategic Pass 2 review.`,
-  ]
+  const { attested, required, open } = countStrategicProgress(phases)
+  const attentionCount = Math.max(open, outstandingOpenCount)
 
-  if (openCount > 0) {
-    paragraphs.push(
-      openCount === 1
-        ? `One item still needs your attention before sign-off — start with the open note or diagnostic flagged below.`
-        : `${openCount} items still need your attention — work through the phased checklist, then attest each section.`,
-    )
+  const doneLine = `${preparerFirst} completed ${checks} baseline checks across ${docCount} source documents. ${attested} of ${required} strategic checklist items are attested.`
+
+  let body: string
+  let type: 'info' | 'success' | 'warn' = 'info'
+
+  if (allPhasesComplete && outstandingOpenCount === 0) {
+    type = 'success'
+    body = `${doneLine} Ready for sign-off once you finish your final spot-check.`
+  } else if (attentionCount > 0) {
+    type = 'warn'
+    body = `${doneLine} ${attentionCount} item${attentionCount === 1 ? '' : 's'} still need${attentionCount === 1 ? 's' : ''} your review before sign-off. Work through the phased checklist below.`
   } else {
-    paragraphs.push(
-      `Nothing is blocking sign-off in this snapshot. Spot-check NIIT, capital gains rate, and executive totals, then attest the checklist.`,
-    )
-  }
-
-  if (snapshot.story.length > 0 && snapshot.story[0] !== paragraphs[0]) {
-    const extra = snapshot.story.find(s => !paragraphs.includes(s))
-    if (extra) paragraphs.push(extra)
+    body = `${doneLine} Spot-check NIIT, capital gains rate, and executive totals, then attest the remaining checklist items.`
   }
 
   return {
-    paragraphs,
+    title: 'Pass 1 executive brief',
+    type,
+    body,
     syncedAt: 'Synced just now',
   }
 }
@@ -743,9 +766,9 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
     checklist,
     outstandingOpenCount,
     manualChecklistItems,
-    syncedAt,
     reviewPass,
     showStrategicChecklist,
+    isPreparer,
     amounts,
   } = input
 
@@ -785,7 +808,7 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
     },
     executiveBrief:
       viewMode === 'reviewer-strategic'
-        ? buildExecutiveBrief(snapshot, preparerFirst)
+        ? buildExecutiveBrief(snapshot, preparerFirst, phases, allPhasesComplete, outstandingOpenCount)
         : null,
     phases,
     activityLog,

@@ -6,9 +6,11 @@ import { Badge } from '@ids-ts/badge'
 import '@ids-ts/badge/dist/main.css'
 import { Checkbox } from '@ids-ts/checkbox'
 import '@ids-ts/checkbox/dist/main.css'
+import PageMessage from '@ids-ts/page-message'
+import '@ids-ts/page-message/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
 import '@ids-ts/tabs/dist/main.css'
-import { CircleCheckFill, Lightning } from '@design-systems/icons'
+import { CircleCheckFill } from '@design-systems/icons'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import type { LiveAmounts } from '../../data/liveReturn'
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
@@ -65,18 +67,43 @@ function JumpLink({
   )
 }
 
-function PhaseStatusPill({ status }: { status: 'action-needed' | 'verified' }) {
-  if (status === 'verified') {
+function PhaseVerifiedBadge({ status }: { status: 'action-needed' | 'verified' }) {
+  if (status !== 'verified') return null
+  return (
+    <Badge status="success" priority="secondary" capitalization="sentence" className={styles.phasePill}>
+      Verified
+    </Badge>
+  )
+}
+
+function ChecklistStatusIcon({
+  item,
+  onToggle,
+}: {
+  item: StrategicChecklistItem
+  onToggle?: (itemId: string, checked: boolean) => void
+}) {
+  const isComplete = item.checked
+  const canToggle = !!onToggle && !item.locked
+
+  if (item.locked && isComplete) {
     return (
-      <Badge status="success" priority="secondary" capitalization="sentence" className={styles.phasePill}>
-        Verified
-      </Badge>
+      <span className={styles.checklistIconSlot} aria-hidden>
+        <CircleCheckFill size="small" className={styles.checklistSuccessIcon} />
+      </span>
     )
   }
+
   return (
-    <Badge status="warning" priority="secondary" capitalization="sentence" className={styles.phasePill}>
-      Action needed
-    </Badge>
+    <span className={styles.checklistIconSlot}>
+      <Checkbox
+        checked={isComplete}
+        disabled={!canToggle}
+        onChange={canToggle ? e => onToggle!(item.id, e.target.checked) : undefined}
+        size="small"
+        aria-label={canToggle ? `Mark ${item.title} complete` : `${item.title} pending`}
+      />
+    </span>
   )
 }
 
@@ -84,34 +111,26 @@ function ChecklistItemRow({
   item,
   onJump,
   onToggle,
+  showDivider,
 }: {
   item: StrategicChecklistItem
   onJump?: (jump: HandoffJump) => void
   onToggle?: (itemId: string, checked: boolean) => void
+  showDivider?: boolean
 }) {
   const isComplete = item.checked
-  const canToggle = !!onToggle && !item.locked
 
   return (
-    <li className={`${styles.checklistRow} ${isComplete ? styles.checklistRowComplete : ''}`}>
+    <li
+      className={[
+        styles.checklistRow,
+        isComplete ? styles.checklistRowComplete : '',
+        showDivider ? styles.checklistRowDivider : '',
+      ].filter(Boolean).join(' ')}
+    >
       <div className={styles.checklistRowMain}>
         <div className={styles.checklistCheck}>
-          {item.locked ? (
-            <span className={styles.checklistSuccessIcon} aria-hidden>
-              {isComplete ? (
-                <CircleCheckFill size="small" />
-              ) : (
-                <span className={styles.checklistLockedBox} aria-hidden />
-              )}
-            </span>
-          ) : (
-            <Checkbox
-              checked={isComplete}
-              disabled={false}
-              onChange={canToggle ? e => onToggle!(item.id, e.target.checked) : undefined}
-              size="small"
-            />
-          )}
+          <ChecklistStatusIcon item={item} onToggle={onToggle} />
           <div className={styles.checklistText}>
             <span className={`${styles.checklistTitle} ${isComplete ? styles.checklistTitleDone : ''}`}>
               {item.title}
@@ -148,15 +167,16 @@ function PhaseCard({
           <h3 className={styles.phaseCardTitle}>{phase.title}</h3>
           <p className={styles.phaseCardDescription}>{phase.description}</p>
         </div>
-        <PhaseStatusPill status={phase.status} />
+        <PhaseVerifiedBadge status={phase.status} />
       </header>
       <ul className={styles.phaseItemList}>
-        {phase.items.map(item => (
+        {phase.items.map((item, index) => (
           <ChecklistItemRow
             key={item.id}
             item={item}
             onJump={onJump}
             onToggle={onToggle}
+            showDivider={index > 0}
           />
         ))}
       </ul>
@@ -206,29 +226,23 @@ function StrategicChecklistTab({
   onToggle,
 }: {
   phases: BriefPhase[]
-  executiveBrief: { paragraphs: string[]; syncedAt: string } | null
+  executiveBrief: { title: string; type: 'info' | 'success' | 'warn'; body: string; syncedAt: string } | null
   onJump?: (jump: HandoffJump) => void
   onToggle?: (itemId: string, checked: boolean) => void
 }) {
   return (
     <div className={styles.tabPanel}>
       {executiveBrief && (
-        <section className={styles.executiveCard} aria-labelledby="executive-brief-title">
-          <div className={styles.executiveCardHead}>
-            <div className={styles.executiveCardTitleRow}>
-              <span className={styles.executiveCardIcon} aria-hidden>
-                <Lightning size="small" />
-              </span>
-              <h3 id="executive-brief-title" className={styles.executiveCardTitle}>
-                Pass 1 executive brief
-              </h3>
-            </div>
-            <span className={styles.syncedTime}>{executiveBrief.syncedAt}</span>
-          </div>
-          {executiveBrief.paragraphs.map((para, i) => (
-            <p key={i} className={styles.executivePara}>{para}</p>
-          ))}
-        </section>
+        <PageMessage
+          type={executiveBrief.type}
+          title={executiveBrief.title}
+          open
+          dismissible={false}
+          className={styles.executivePageMessage}
+        >
+          <p className={styles.executiveBody}>{executiveBrief.body}</p>
+          <p className={styles.executiveSynced}>{executiveBrief.syncedAt}</p>
+        </PageMessage>
       )}
       <div className={styles.phaseStack}>
         {phases.map(phase => (
@@ -319,7 +333,7 @@ export default function HandoffSummary({
   showChecklist = false,
   onToggleChecklistItem,
   signOffReady: _signOffReadyProp,
-  signOffBlockerText,
+  signOffBlockerText: _signOffBlockerText,
   outstandingOpenCount = 0,
   manualChecklistItems = {},
   reviewPass = snapshot.pass,
@@ -342,7 +356,6 @@ export default function HandoffSummary({
   )
 
   const signOffReady = canApproveSignOff(brief)
-  const blockerText = signOffBlockerText ?? brief.signOff.blockerText
 
   const [activeTab, setActiveTab] = useState(
     brief.viewMode === 'reviewer-strategic' ? 'checklist' : 'activity',
@@ -359,32 +372,14 @@ export default function HandoffSummary({
   const footerActions = !hideFooter ? (
     <div className={styles.footerWrap}>
       {snapshot.mode === 'signoff-review' && brief.viewMode === 'reviewer-strategic' && (
-        <>
-          <div className={styles.signOffStatusRow}>
-            <span
-              className={`${styles.signOffStatus} ${signOffReady ? styles.signOffStatusReady : styles.signOffStatusPending}`}
-              aria-live="polite"
-            >
-              {brief.signOff.statusText}
-            </span>
-            {!signOffReady && blockerText && (
-              <p className={styles.signOffBlocker}>{blockerText}</p>
-            )}
-          </div>
-          <div className={styles.footerActionsRow}>
-            {onContinue && (
-              <Button priority="tertiary" size="medium" onClick={onContinue}>
-                Keep reviewing
-              </Button>
-            )}
-            <div className={sidePanelStyles.footerSpacer} />
-            {onFinishAndFile && (
-              <Button priority="primary" size="medium" onClick={onFinishAndFile} disabled={!signOffReady}>
-                Approve &amp; sign off return
-              </Button>
-            )}
-          </div>
-        </>
+        <div className={styles.footerActionsRow}>
+          <div className={sidePanelStyles.footerSpacer} />
+          {onFinishAndFile && (
+            <Button priority="primary" size="medium" onClick={onFinishAndFile} disabled={!signOffReady}>
+              Approve &amp; sign off return
+            </Button>
+          )}
+        </div>
       )}
       {snapshot.mode === 'signoff-review' && brief.viewMode !== 'reviewer-strategic' && (
         <div className={styles.footerActionsRow}>

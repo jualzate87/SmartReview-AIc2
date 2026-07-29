@@ -58,58 +58,24 @@
   padding-top: var(--space-component-gap-large, 12px);
 }
 
-/* AI executive brief card */
-.executiveCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-component-gap-medium, 8px);
-  padding: var(--space-container-padding-medium, 16px);
-  border: 1px solid var(--color-divider-tertiary);
-  border-radius: var(--radius-medium, 8px);
-  background: var(--color-container-background-info);
-}
-
-.executiveCardHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-component-gap-medium, 8px);
-}
-
-.executiveCardTitleRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-component-gap-small, 4px);
-  min-width: 0;
-}
-
-.executiveCardIcon {
-  display: inline-flex;
-  flex-shrink: 0;
-  color: var(--color-action-standard);
-}
-
-.executiveCardTitle {
+/* AI executive brief */
+.executivePageMessage {
   margin: 0;
-  font-family: var(--font-family-heading);
-  font-size: var(--font-size-component-medium);
-  font-weight: var(--font-weight-heading);
-  color: var(--color-text-primary);
 }
 
-.syncedTime {
-  flex-shrink: 0;
-  font-family: var(--font-family-component);
-  font-size: var(--font-size-component-x-small);
-  color: var(--color-text-secondary);
-}
-
-.executivePara {
+.executiveBody {
   margin: 0;
   font-family: var(--font-family-body);
   font-size: var(--font-size-body-3);
   line-height: 1.5;
   color: var(--color-text-primary);
+}
+
+.executiveSynced {
+  margin: var(--space-component-gap-small, 4px) 0 0;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  color: var(--color-text-secondary);
 }
 
 /* Phase cards */
@@ -171,13 +137,25 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-component-gap-large, 12px);
 }
 
 .checklistRow {
   display: flex;
   flex-direction: column;
   gap: var(--space-component-gap-small, 4px);
+  padding: var(--space-component-gap-large, 12px) 0;
+}
+
+.checklistRow:first-child {
+  padding-top: 0;
+}
+
+.checklistRow:last-child {
+  padding-bottom: 0;
+}
+
+.checklistRowDivider {
+  border-top: 1px solid var(--color-divider-tertiary);
 }
 
 .checklistRowMain {
@@ -193,6 +171,20 @@
   gap: var(--space-component-gap-medium, 8px);
   flex: 1;
   min-width: 0;
+}
+
+.checklistIconSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--size-action-icon-small, 16px);
+  min-height: var(--size-action-icon-small, 16px);
+  margin-top: 1px;
+}
+
+.checklistIconSlot :global(.ids-checkbox) {
+  margin: 0;
 }
 
 .checklistText {
@@ -231,17 +223,7 @@
 .checklistSuccessIcon {
   display: inline-flex;
   flex-shrink: 0;
-  margin-top: 2px;
   color: var(--color-ui-positive);
-}
-
-.checklistLockedBox {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--color-divider-secondary);
-  border-radius: 2px;
-  background: var(--color-input-background-disabled);
 }
 
 .jumpLink {
