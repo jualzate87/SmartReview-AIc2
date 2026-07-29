@@ -108,6 +108,15 @@
   line-height: 1.5;
 }
 
+.conversationalBriefSubheading {
+  margin: 0;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
 .conversationalBriefSection {
   display: flex;
   flex-direction: column;

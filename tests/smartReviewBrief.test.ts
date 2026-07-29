@@ -77,7 +77,12 @@ describe('buildSmartReviewBrief reviewer checklist', () => {
     })
 
     expect(brief.viewMode).toBe('reviewer-strategic')
-    expect(brief.executiveBrief?.intro).toContain('completed the first pass')
+    expect(brief.executiveBrief?.heading).toBe("Here's what you need to know, Jordan")
+    expect(brief.executiveBrief?.intro).toBe('Sara completed the first pass:')
+    expect(brief.executiveBrief?.completed.items).toHaveLength(4)
+    expect(brief.executiveBrief?.completed.items.some(i =>
+      i.parts.some(p => p.text === 'Left notes for your review'),
+    )).toBe(true)
     expect(brief.executiveBrief?.attention?.items.some(i =>
       i.parts.some(p => p.text.includes('milestone')),
     )).toBe(true)

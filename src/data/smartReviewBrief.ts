@@ -425,47 +425,49 @@ function buildExecutiveBrief(
     const completedItems: ConversationalBriefItem[] = []
 
     if (stats.openImportFlags === 0) {
-      completedItems.push(briefItem('flags', [{ text: 'She cleared all import flags.' }]))
+      completedItems.push(briefItem('flags', [{ text: 'Cleared all import flags' }]))
     } else {
       completedItems.push(
         briefItem('flags', [
-          { text: 'She left ' },
+          { text: 'Left ' },
           { text: String(stats.openImportFlags), bold: true },
-          { text: ` import flag${stats.openImportFlags === 1 ? '' : 's'} still open.` },
+          { text: ` import flag${stats.openImportFlags === 1 ? '' : 's'} open` },
         ]),
       )
     }
 
     if (stats.unverifiedDocs === 0) {
       completedItems.push(
-        briefItem('docs', [{ text: 'She marked all source documents as reviewed.' }]),
+        briefItem('docs', [{ text: 'Marked all source documents as reviewed' }]),
       )
     } else {
       completedItems.push(
         briefItem('docs', [
-          { text: 'She left ' },
+          { text: 'Left ' },
           { text: String(stats.unverifiedDocs), bold: true },
-          { text: ` document${stats.unverifiedDocs === 1 ? '' : 's'} unverified.` },
+          { text: ` source document${stats.unverifiedDocs === 1 ? '' : 's'} unreviewed` },
         ]),
       )
     }
 
     if (stats.openDiags === 0) {
       completedItems.push(
-        briefItem('diags', [{ text: 'She cleared all first-pass diagnostics.' }]),
+        briefItem('diags', [{ text: 'Cleared all first-pass diagnostics' }]),
       )
     } else {
       completedItems.push(
         briefItem('diags', [
-          { text: 'She left ' },
+          { text: 'Left ' },
           { text: String(stats.openDiags), bold: true },
-          { text: ` diagnostic${stats.openDiags === 1 ? '' : 's'} for your review.` },
+          { text: ` diagnostic${stats.openDiags === 1 ? '' : 's'} for your review` },
         ]),
       )
     }
 
     if (stats.openNotes > 0) {
-      completedItems.push(briefItem('notes', [{ text: 'She left notes for your review.' }]))
+      completedItems.push(briefItem('notes', [{ text: 'Left notes for your review' }]))
+    } else {
+      completedItems.push(briefItem('notes', [{ text: 'No open preparer notes' }]))
     }
 
     const remainingMilestones = milestoneState
@@ -498,8 +500,8 @@ function buildExecutiveBrief(
 
     return {
       reviewerFirstName: reviewerFirst,
-      heading: `${reviewerFirst}, Pass 2 review`,
-      intro: `${preparerFirst} completed the first pass.`,
+      heading: `Here's what you need to know, ${reviewerFirst}`,
+      intro: `${preparerFirst} completed the first pass:`,
       completed: {
         label: '',
         items: completedItems,

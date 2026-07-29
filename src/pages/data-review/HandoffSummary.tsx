@@ -279,7 +279,7 @@ function ConversationalBriefCard({ brief }: { brief: ConversationalBrief }) {
       <h3 id="executive-brief-heading" className={styles.conversationalBriefHeading}>
         {brief.heading}
       </h3>
-      <B3 className={styles.conversationalBriefIntro}>{brief.intro}</B3>
+      <h4 className={styles.conversationalBriefSubheading}>{brief.intro}</h4>
 
       {brief.completed.items.length > 0 && (
         <div className={styles.conversationalBriefSection}>
