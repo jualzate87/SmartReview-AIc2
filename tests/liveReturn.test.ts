@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildTaxCreditsPopoverContent,
   computeEffectiveTaxRate,
   computeLiveReturn,
   formatEffectiveTaxRate,
@@ -7,6 +8,7 @@ import {
   SEED_AMOUNTS,
 } from '../src/data/liveReturn'
 import { FROZEN_RETURN } from '../src/data/frozenReturn'
+import { PRIOR_YEAR_1040_VALUES } from '../src/pages/data-review/priorYear1040Data'
 import { PHASE1_TO_PHASE2_ISSUES } from '../src/pages/data-review/phase2FlagSync'
 import { detailTo1040Field, field1040ToDetail } from '../src/pages/data-review/phase1FieldSync'
 
@@ -120,6 +122,26 @@ describe('effective tax rate', () => {
 
   it('returns null when taxable income is zero', () => {
     expect(computeEffectiveTaxRate(10_000, 0)).toBeNull()
+  })
+
+  it('builds Tax & Credits popover with Jessica Drake seed values', () => {
+    const live = computeLiveReturn(SEED_AMOUNTS)
+    const { items, footnote } = buildTaxCreditsPopoverContent({
+      totalTax: live.totalTax,
+      taxableIncome: live.taxableIncome,
+      priorTotalTax: PRIOR_YEAR_1040_VALUES.totalTax,
+      priorTaxableIncome: PRIOR_YEAR_1040_VALUES.taxableIncome,
+      incomeTax: live.incomeTax,
+      priorIncomeTax: PRIOR_YEAR_1040_VALUES.incomeTax,
+      stdDeduction: live.stdDeduction,
+      priorStdDeduction: PRIOR_YEAR_1040_VALUES.stdDeduction,
+      credits: 0,
+    })
+    expect(items.find(i => i.id === 'total-tax')?.amount).toBe(live.totalTax)
+    expect(items.find(i => i.id === 'taxable-income')?.amount).toBe(live.taxableIncome)
+    expect(items.find(i => i.id === 'eff-rate')?.note).toContain('26.8%')
+    expect(items.find(i => i.id === 'credits')?.note).toBe('None on this return')
+    expect(footnote.length).toBeGreaterThan(20)
   })
 })
 

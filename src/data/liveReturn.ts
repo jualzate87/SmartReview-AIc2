@@ -350,6 +350,57 @@ export function buildEffectiveTaxRateExplanation(ctx: EffectiveTaxRateContext): 
   return parts.join(' ')
 }
 
+export type TaxCreditsPopoverItem = {
+  id: string
+  label: string
+  amount?: number
+  note?: string
+}
+
+export type TaxCreditsPopoverContext = EffectiveTaxRateContext & {
+  /** Line 20 credits applied; omit or 0 when none on return. */
+  credits?: number
+}
+
+/** Summary flyout lines for Tax & Credits — total tax, rate math, YoY narrative. */
+export function buildTaxCreditsPopoverContent(ctx: TaxCreditsPopoverContext): {
+  items: TaxCreditsPopoverItem[]
+  footnote: string
+} {
+  const rate = computeEffectiveTaxRate(ctx.totalTax, ctx.taxableIncome)
+  const priorRate = computeEffectiveTaxRate(ctx.priorTotalTax, ctx.priorTaxableIncome)
+  const credits = ctx.credits ?? 0
+
+  const items: TaxCreditsPopoverItem[] = [
+    { id: 'total-tax', label: 'Total tax · Line 24', amount: ctx.totalTax },
+    { id: 'taxable-income', label: 'Taxable income · Line 15', amount: ctx.taxableIncome },
+    {
+      id: 'eff-rate',
+      label: 'Effective tax rate',
+      note:
+        rate !== null
+          ? `${formatEffectiveTaxRate(rate)} (Line 24 ÷ Line 15)`
+          : 'Not applicable when taxable income is zero.',
+    },
+    {
+      id: 'prior-rate',
+      label: 'Prior year effective rate',
+      note: priorRate !== null ? formatEffectiveTaxRate(priorRate) : '—',
+    },
+  ]
+
+  if (credits > 0) {
+    items.push({ id: 'credits', label: 'Credits applied · Line 20', amount: credits })
+  } else {
+    items.push({ id: 'credits', label: 'Credits applied · Line 20', note: 'None on this return' })
+  }
+
+  return {
+    items,
+    footnote: buildEffectiveTaxRateExplanation(ctx),
+  }
+}
+
 /** Parse a currency draft (commas / $) into a number; empty → 0. */
 export function parseAmountDraft(raw: string): number {
   if (!raw || !raw.trim()) return 0

@@ -14,9 +14,7 @@ import type { LiveAmounts, LiveReturnTotals } from '../../data/liveReturn'
 import {
   SAFE_HARBOR_2210,
   SEED_AMOUNTS,
-  buildEffectiveTaxRateExplanation,
-  computeEffectiveTaxRate,
-  formatEffectiveTaxRate,
+  buildTaxCreditsPopoverContent,
 } from '../../data/liveReturn'
 import Tooltip from './Tooltip'
 import CoachTip from './CoachTip'
@@ -209,6 +207,9 @@ function fmt(n: number) {
 const SUMMARY_INFO_DISCOVERY_TOOLTIP =
   'Explore which source documents feed this line.'
 
+const TAX_CREDITS_INFO_TOOLTIP =
+  'View tax breakdown, effective rate, and year-over-year change.'
+
 export default function LeftPanel1040({
   selectedField,
   highlightField,
@@ -346,11 +347,6 @@ export default function LeftPanel1040({
   const incomeTax           = incomeTaxBase
   const estimatedPayments   = 0
   const oweAmount           = liveTotals?.oweAmount ?? Math.max(0, totalTax - withholding1040)
-  const effectiveTaxRate    = computeEffectiveTaxRate(totalTax, taxableIncome)
-  const priorEffectiveRate  = computeEffectiveTaxRate(
-    PRIOR_YEAR.totalTax,
-    PRIOR_YEAR.taxableIncome,
-  )
   const displaySsn          = liveTotals?.employeeSsn?.trim()
     ? liveTotals.employeeSsn
     : '987-65-4321'
@@ -576,6 +572,34 @@ export default function LeftPanel1040({
     setPopoverRect(null)
 
     const rect = el.getBoundingClientRect()
+
+    // Tax & Credits — total tax flyout includes effective rate and YoY narrative
+    if (field === 'totalTax') {
+      const { items, footnote } = buildTaxCreditsPopoverContent({
+        totalTax,
+        taxableIncome,
+        priorTotalTax: PRIOR_YEAR.totalTax,
+        priorTaxableIncome: PRIOR_YEAR.taxableIncome,
+        niitTax,
+        stdDeduction,
+        priorStdDeduction: PRIOR_YEAR.stdDeduction,
+        incomeTax,
+        priorIncomeTax: PRIOR_YEAR.incomeTax,
+        credits: 0,
+      })
+      setSummaryFlyout({
+        field,
+        label: 'Tax & Credits',
+        mode: 'calc',
+        items,
+        subtitle: 'Total tax, taxable income, and effective rate.',
+        sumLabel: 'Total tax · Line 24',
+        sumValue: totalTax,
+        footnote,
+      })
+      setSummaryFlyoutRect(rect)
+      return
+    }
     const controlId = SUMMARY_TO_CONTROL[field]
     const cfg = controlId ? TAX_CONTROL_ROWS.find(r => r.id === controlId) : undefined
     const breakdown = controlId ? getTaxControlBreakdown(controlId, controlSystemVals) : null
@@ -1099,22 +1123,31 @@ export default function LeftPanel1040({
                         const pct = p !== null && p !== 0 ? Math.round((cat.totalCurr - p) / Math.abs(p) * 100) : null
                         const pos = d !== null && d > 0
                         const neg = d !== null && d < 0
-                        const totalHasBreakdown = !!cat.totalField && !!SUMMARY_TO_CONTROL[cat.totalField]
-                          && getTaxControlBreakdown(SUMMARY_TO_CONTROL[cat.totalField], controlSystemVals)?.kind === 'calc'
+                        const totalHasBreakdown =
+                          cat.key === 'tax' ||
+                          (!!cat.totalField &&
+                            !!SUMMARY_TO_CONTROL[cat.totalField] &&
+                            getTaxControlBreakdown(SUMMARY_TO_CONTROL[cat.totalField], controlSystemVals)?.kind === 'calc')
+                        const sectionInfoTooltip =
+                          cat.key === 'tax' ? TAX_CREDITS_INFO_TOOLTIP : SUMMARY_INFO_DISCOVERY_TOOLTIP
                         return (
                           <div className={styles.summaryRowRight}>
                             <div className={styles.summaryCurrVal}>
                               <span className={styles.summaryCurrValText}>${fmt(cat.totalCurr)}</span>
                               {totalHasBreakdown && (
                                 <Tooltip
-                                  text={SUMMARY_INFO_DISCOVERY_TOOLTIP}
+                                  text={sectionInfoTooltip}
                                   placement="top"
                                   disabled={summaryFlyout?.field === cat.totalField}
                                 >
                                   <button
                                     type="button"
                                     className={`${styles.summaryInfoBtn} ${summaryFlyout?.field === cat.totalField ? styles.summaryInfoBtnActive : ''}`}
-                                    aria-label={`View subtotals for ${cat.label}`}
+                                    aria-label={
+                                      cat.key === 'tax'
+                                        ? 'View tax breakdown and effective rate'
+                                        : `View subtotals for ${cat.label}`
+                                    }
                                     onClick={e => {
                                       e.stopPropagation()
                                       openSummaryInfo(cat.totalField!, e.currentTarget)
@@ -1381,72 +1414,6 @@ export default function LeftPanel1040({
                   </div>
                 )
               })}
-
-              {/* Effective tax rate — adjacent to total tax / amount owed */}
-              {(() => {
-                const rateDiff =
-                  effectiveTaxRate !== null && priorEffectiveRate !== null
-                    ? effectiveTaxRate - priorEffectiveRate
-                    : null
-                const ratePctChg =
-                  effectiveTaxRate !== null && priorEffectiveRate !== null && priorEffectiveRate !== 0
-                    ? yoyPercent(effectiveTaxRate, priorEffectiveRate)
-                    : null
-                const diffPos = rateDiff !== null && rateDiff > 0
-                const diffNeg = rateDiff !== null && rateDiff < 0
-                const rateExplanation = buildEffectiveTaxRateExplanation({
-                  totalTax,
-                  taxableIncome,
-                  priorTotalTax: PRIOR_YEAR.totalTax,
-                  priorTaxableIncome: PRIOR_YEAR.taxableIncome,
-                  niitTax,
-                  stdDeduction,
-                  priorStdDeduction: PRIOR_YEAR.stdDeduction,
-                  incomeTax,
-                  priorIncomeTax: PRIOR_YEAR.incomeTax,
-                })
-                return (
-                  <div className={`${styles.summarySubRow} ${styles.summaryRateRow}`}>
-                    <div className={styles.summaryRowLeft}>
-                      <span className={styles.summaryRateLabelRow}>
-                        <span className={styles.summaryRateLabel}>Effective tax rate</span>
-                        <Tooltip text={rateExplanation} placement="top">
-                          <button
-                            type="button"
-                            className={styles.summaryInfoBtn}
-                            aria-label="Why did the effective tax rate change?"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <CircleInfo size="small" aria-hidden />
-                          </button>
-                        </Tooltip>
-                      </span>
-                      <span className={styles.summaryRateSub}>Line 24 ÷ Line 15</span>
-                    </div>
-                    <div className={styles.summaryRowRight}>
-                      <div className={styles.summaryCurrVal}>
-                        <span className={styles.summaryCurrValText}>
-                          {formatEffectiveTaxRate(effectiveTaxRate)}
-                        </span>
-                      </div>
-                      <span className={styles.summaryPriorVal}>
-                        {priorEffectiveRate !== null ? formatEffectiveTaxRate(priorEffectiveRate) : ''}
-                      </span>
-                      <span className={`${styles.summaryDiffVal} ${diffPos ? styles.summaryDiffPos : ''} ${diffNeg ? styles.summaryDiffNeg : ''}`}>
-                        {rateDiff !== null
-                          ? `${rateDiff >= 0 ? '+' : '−'}${Math.abs(rateDiff).toFixed(1)} pts`
-                          : ''}
-                      </span>
-                      <span className={`${styles.summaryPctVal} ${diffPos ? styles.summaryDiffPos : ''} ${diffNeg ? styles.summaryDiffNeg : ''}`}>
-                        {ratePctChg !== null
-                          ? `${ratePctChg < 0 ? '−' : ''}${Math.abs(ratePctChg)}%`
-                          : ''}
-                      </span>
-                      <div className={styles.summaryRowEndActions} aria-hidden="true" />
-                    </div>
-                  </div>
-                )
-              })()}
 
               {/* Amount owed row */}
               {(() => {
