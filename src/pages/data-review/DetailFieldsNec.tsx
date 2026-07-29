@@ -69,6 +69,7 @@ interface DetailFieldsNecProps {
   reviewerConfirmedDocsMeta?: Map<string, { by: string; at: string }>
   onVerifyDoc?: (docKey: string) => void
   onAddFieldNote?: (text: string, context?: string) => void
+  importReadOnly?: boolean
 }
 
 export default function DetailFieldsNec({
@@ -89,6 +90,7 @@ export default function DetailFieldsNec({
   reviewerConfirmedDocsMeta,
   onVerifyDoc,
   onAddFieldNote,
+  importReadOnly = false,
 }: DetailFieldsNecProps) {
   const highlightedRef = useRef<HTMLDivElement>(null)
   const [editingField, setEditingField] = useState<string | null>(null)
@@ -109,6 +111,7 @@ export default function DetailFieldsNec({
   }, [selectedField])
 
   const startEdit = (field: string, currentValue: string) => {
+    if (importReadOnly) return
     const clean = currentValue.replace(/,/g, '')
     setEditingField(field)
     setDraftValue(clean)
@@ -243,7 +246,7 @@ export default function DetailFieldsNec({
           value={isEditing ? draftValue : currentVal}
           onChange={e => setDraftValue(e.target.value)}
           autoFocus={isEditing}
-          onClick={e => { e.stopPropagation(); if (!isEditing) startEdit(fieldKey, currentVal) }}
+          onClick={e => { e.stopPropagation(); if (!importReadOnly && !isEditing) startEdit(fieldKey, currentVal) }}
           onBlur={commitStatic}
           onKeyDown={e => {
             if (e.key === 'Enter') { e.preventDefault(); commitStatic() }

@@ -76,6 +76,8 @@ interface DetailFieldsProps {
   onVerifyDoc?: (docKey: string) => void
   /** Called when user posts a note from a field popover: (text, contextLabel) */
   onAddFieldNote?: (text: string, context: string) => void
+  /** Reviewer confirm mode — preparer attestations read-only; no import/OCR edit actions */
+  importReadOnly?: boolean
 }
 
 // Static non-wages fields per employer
@@ -143,6 +145,7 @@ export default function DetailFields({
   reviewerConfirmedDocsMeta,
   onVerifyDoc,
   onAddFieldNote,
+  importReadOnly = false,
 }: DetailFieldsProps) {
   const employer = EMPLOYER_DATA[activeSubTab]
   const currentWages = wages[activeSubTab]
@@ -184,6 +187,7 @@ export default function DetailFields({
   }, [selectedField])
 
   const startEdit = (field: string, currentValue: string) => {
+    if (importReadOnly) return
     const clean = currentValue.replace(/,/g, '')
     setEditingField(field)
     setDraftValue(clean)
@@ -410,7 +414,7 @@ export default function DetailFields({
           value={isEditing ? draftValue : currentVal}
           onChange={e => setDraftValue(e.target.value)}
           autoFocus={isEditing}
-          onClick={e => { e.stopPropagation(); if (!isEditing) startEdit(key, currentVal) }}
+          onClick={e => { e.stopPropagation(); if (!importReadOnly && !isEditing) startEdit(key, currentVal) }}
           onBlur={commitStatic}
           onKeyDown={e => {
             if (e.key === 'Enter') { e.preventDefault(); commitStatic() }
@@ -430,9 +434,13 @@ export default function DetailFields({
           </div>
         ) : isReviewed ? (
           <Tooltip text={reviewedTip(key, true)} placement="top">
-            <button className={styles.reviewedBadge} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }} onClick={e => { e.stopPropagation(); onMarkReviewed?.(key) }}><CircleCheck size="small" /></button>
+            {importReadOnly ? (
+              <span className={styles.reviewedBadge} style={{ display: 'inline-flex', alignItems: 'center' }}><CircleCheck size="small" /></span>
+            ) : (
+              <button className={styles.reviewedBadge} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }} onClick={e => { e.stopPropagation(); onMarkReviewed?.(key) }}><CircleCheck size="small" /></button>
+            )}
           </Tooltip>
-        ) : (
+        ) : importReadOnly ? null : (
           <div className={styles.fieldActions}>
             <Tooltip text={reviewedTip(key, false)} placement="top"><button className={styles.markCorrectBtn} onClick={e => { e.stopPropagation(); onMarkReviewed?.(key) }}><CircleCheck size="small" /></button></Tooltip>
             {renderCommentBtn(key, label, employer.name)}
@@ -523,7 +531,7 @@ export default function DetailFields({
             value={editingField === 'wages' ? draftValue : currentWages.toLocaleString()}
             onChange={e => setDraftValue(e.target.value)}
             autoFocus={editingField === 'wages'}
-            onClick={e => { e.stopPropagation(); if (editingField !== 'wages') startEdit('wages', currentWages.toString()) }}
+            onClick={e => { e.stopPropagation(); if (!importReadOnly && editingField !== 'wages') startEdit('wages', currentWages.toString()) }}
             onBlur={commitWagesEdit}
             onKeyDown={e => {
               if (e.key === 'Enter') { e.preventDefault(); commitWagesEdit() }
@@ -569,7 +577,7 @@ export default function DetailFields({
             value={editingField === 'withholding' ? draftValue : (fieldValues?.withholding !== undefined ? fieldValues.withholding.toLocaleString() : employer.federalTax)}
             onChange={e => setDraftValue(e.target.value)}
             autoFocus={editingField === 'withholding'}
-            onClick={e => { e.stopPropagation(); if (editingField !== 'withholding') startEdit('withholding', fieldValues?.withholding?.toString() ?? employer.federalTax) }}
+            onClick={e => { e.stopPropagation(); if (!importReadOnly && editingField !== 'withholding') startEdit('withholding', fieldValues?.withholding?.toString() ?? employer.federalTax) }}
             onBlur={() => commitEdit('withholding')}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit('withholding') } if (e.key === 'Escape') cancelEdit() }}
           />
@@ -689,7 +697,7 @@ export default function DetailFields({
                         if (e.key === 'Escape') cancelEdit()
                       }}
                       style={{ width: 120, fontSize: 13, height: 32, padding: '5px 8px', boxSizing: 'border-box', border: `${isEditingAmt ? '2px' : '1px'} solid ${isEditingAmt ? '#205ea3' : isFlagged ? '#ff6a00' : '#c3ced5'}`, borderRadius: 4, background: isEditingAmt ? '#fff' : isFlagged ? 'rgba(255,187,0,0.25)' : '#fff', color: '#21262a', fontFamily: 'var(--font-family-component)', outline: 'none', flexShrink: 0, cursor: 'text' }}
-                      onClick={e => { e.stopPropagation(); if (!isEditingAmt) { startEdit(amtKey, amtVal) } }}
+                      onClick={e => { e.stopPropagation(); if (!importReadOnly && !isEditingAmt) { startEdit(amtKey, amtVal) } }}
                     />
                     {isEditingAmt ? (
                       <div className={styles.editActions}>
@@ -735,7 +743,7 @@ export default function DetailFields({
                 value={editingField === 'box12' ? draftValue : (fieldValues?.box12 !== undefined && employer.box12Amount ? fieldValues.box12.toLocaleString() : (employer.box12Amount || '—'))}
                 onChange={e => setDraftValue(e.target.value)}
                 autoFocus={editingField === 'box12'}
-                onClick={e => { e.stopPropagation(); if (editingField !== 'box12') startEdit('box12', fieldValues?.box12?.toString() ?? employer.box12Amount ?? '') }}
+                onClick={e => { e.stopPropagation(); if (!importReadOnly && editingField !== 'box12') startEdit('box12', fieldValues?.box12?.toString() ?? employer.box12Amount ?? '') }}
                 onBlur={() => commitEdit('box12')}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit('box12') } if (e.key === 'Escape') cancelEdit() }}
               />

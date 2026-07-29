@@ -66,6 +66,7 @@ interface DetailFields1099RProps {
   reviewerConfirmedDocsMeta?: Map<string, { by: string; at: string }>
   onVerifyDoc?: (docKey: string) => void
   onAddFieldNote?: (text: string, context?: string) => void
+  importReadOnly?: boolean
   flaggedFields?: Record<string, string>
 }
 
@@ -88,6 +89,7 @@ export default function DetailFields1099R({
   onVerifyDoc,
   onAddFieldNote,
   flaggedFields = {},
+  importReadOnly = false,
 }: DetailFields1099RProps) {
   const highlightedRef = useRef<HTMLDivElement>(null)
   const [editingField, setEditingField] = useState<string | null>(null)
@@ -119,6 +121,7 @@ export default function DetailFields1099R({
   }, [commentField])
 
   const startEdit = (field: string, currentValue: string) => {
+    if (importReadOnly) return
     const clean = currentValue.replace(/,/g, '')
     setEditingField(field)
     setDraftValue(clean)
@@ -278,7 +281,7 @@ export default function DetailFields1099R({
             if (e.key === 'Escape') cancelEdit()
           }}
           onBlur={() => commitStaticEdit(fieldKey, resolveKey)}
-          onClick={e => { e.stopPropagation(); if (!isEditing) startEdit(fieldKey, currentVal) }}
+          onClick={e => { e.stopPropagation(); if (!importReadOnly && !isEditing) startEdit(fieldKey, currentVal) }}
         />
         {isEditing ? (
           <div className={styles.editActions}>

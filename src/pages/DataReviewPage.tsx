@@ -71,7 +71,6 @@ import { resolveOutputFormFromAction } from './data-review/outputForms'
 import AgentReportPane from './data-review/AgentReportPane'
 import CoachTip, { markCoachTipShown, readCoachTipShown, type CoachTipId } from './data-review/CoachTip'
 import AgentLoadingPane from './data-review/AgentLoadingPane'
-import WelcomePane from './data-review/WelcomePane'
 import Phase1Banner from './data-review/Phase1Banner'
 import Phase1IssueBanner from './data-review/Phase1IssueBanner'
 import Phase2Banner from './data-review/Phase2Banner'
@@ -207,7 +206,7 @@ export default function DataReviewPage() {
   // Top/bottom section height ratio in right panel (0-100, where value = preview percentage)
   const [previewHeight, setPreviewHeight] = useState(40)
   // Unified right rail — one shell, one active mode (sources | ai | comments | summary)
-  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>('closed')
+  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>('sources')
   // Whether the right panel is animating out (slide-out before mode → closed)
   const [rightPanelExiting, setRightPanelExiting] = useState(false)
   // Agent sub-state when mode === 'ai': idle → loading → report → closing
@@ -245,6 +244,8 @@ export default function DataReviewPage() {
   const [preparerHandoffChoice, setPreparerHandoffChoice] = useState<
     'none' | 'awaiting-reviewer' | 'finish-and-file'
   >('none')
+  /** Reviewer has clicked "Review return" and entered Pass 2 workflow */
+  const [reviewerReviewStarted, setReviewerReviewStarted] = useState(false)
   /** Pass 2 open-items filter */
   type Pass2Filter = 'all' | 'flags' | 'notes' | 'confirm'
   const [pass2Filter, setPass2Filter] = useState<Pass2Filter>('all')
@@ -267,11 +268,11 @@ export default function DataReviewPage() {
   // 'import'      → Phase 1: Import Accuracy (source-doc experience)
   // 'diagnostics' → Phase 2: AI Diagnostics (agent panel primary)
   type ReviewPhase = 'welcome' | 'import' | 'diagnostics'
-  const [phase, setPhase] = useState<ReviewPhase>('welcome')
-  // Phase 1: Summary visible by default; sources hidden until Start reviewing imports
+  // Preparer lands directly in import phase with source docs open (welcome bypassed)
+  const [phase, setPhase] = useState<ReviewPhase>('import')
   const [show1040, setShow1040] = useState(true)
   const [outputFormId, setOutputFormId] = useState<OutputFormId>('summary')
-  const [importsStarted, setImportsStarted] = useState(false)
+  const [importsStarted, setImportsStarted] = useState(true)
   /** First-run coach tip: hide summary */
   const [coachTip, setCoachTip] = useState<CoachTipId | null>(null)
   /** One-shot nudge when Phase 1 is fully complete (flags + docs) */
@@ -448,6 +449,19 @@ export default function DataReviewPage() {
     hideOutputsForSourceFocusRef.current()
   }, [openRightPanel])
 
+  /** Preparer import-first: size source panel on mount when landing with sources open */
+  useEffect(() => {
+    if (reviewRole !== 'preparer' || phase !== 'import' || !importsStarted) return
+    const body = bodyRef.current
+    if (!body) return
+    const bodyW = body.clientWidth || body.getBoundingClientRect().width
+    setBodyWidth(bodyW)
+    const preferred = Math.round(bodyW * 0.65)
+    const maxRight = Math.max(0, bodyW - LEFT_PANEL_MIN_WIDTH - PANEL_DRAG_HANDLE_WIDTH)
+    const floor = Math.min(RIGHT_PANEL_MIN_WIDTH, maxRight)
+    setRightPanelWidth(w => Math.max(floor, Math.min(preferred, maxRight, w)))
+  }, [phase, importsStarted, reviewRole])
+
   const dismissCoachTip = useCallback((id: CoachTipId) => {
     markCoachTipShown(id)
     setCoachTip(null)
@@ -548,23 +562,32 @@ export default function DataReviewPage() {
       if (nav.intPayer) setActiveIntPayer(nav.intPayer)
     }
     setSelectedField(field)
-    if (!importsStarted) startReviewingImports()
-    else ensureSourcePanelVisible()
+    if (reviewRole === 'reviewer') {
+      ensureSourcePanelVisible()
+    } else if (!importsStarted) {
+      startReviewingImports()
+    } else {
+      ensureSourcePanelVisible()
+    }
   }, [
     setActiveTopTab, setActiveDivPayer, setActiveIntPayer, setSelectedField,
-    importsStarted, startReviewingImports, ensureSourcePanelVisible,
+    reviewRole, importsStarted, startReviewingImports, ensureSourcePanelVisible,
   ])
 
   const handleVerifyNext = useCallback(() => {
-    if (!importsStarted) startReviewingImports()
+    if (reviewRole !== 'reviewer' && !importsStarted) startReviewingImports()
     const next = getNextVerifyItem(reviewedFields, selectedField)
     if (!next) return
     applyVerifyNavigation(next.field)
-  }, [importsStarted, startReviewingImports, reviewedFields, selectedField, applyVerifyNavigation])
+  }, [reviewRole, importsStarted, startReviewingImports, reviewedFields, selectedField, applyVerifyNavigation])
 
   const handleReviewNextDocument = useCallback(() => {
-    if (!importsStarted) startReviewingImports()
-    else ensureSourcePanelVisible()
+    if (reviewRole !== 'reviewer') {
+      if (!importsStarted) startReviewingImports()
+      else ensureSourcePanelVisible()
+    } else {
+      ensureSourcePanelVisible()
+    }
     const next = getNextUnreviewedSourceDoc(unreviewedSourceDocs, {
       tab: activeTopTab,
       w2SubTab: activeSubTab,
@@ -581,18 +604,21 @@ export default function DataReviewPage() {
     setActiveDiagnosticKey(null)
     if (next.tab === 'questionnaire') setQuestionnaireHighlightId(null)
   }, [
-    importsStarted, startReviewingImports, ensureSourcePanelVisible,
+    reviewRole, importsStarted, startReviewingImports, ensureSourcePanelVisible,
     unreviewedSourceDocs, activeTopTab, activeSubTab, activeDivPayer, activeIntPayer,
     setActiveTopTab, setActiveSubTab, setActiveDivPayer, setActiveIntPayer, setSelectedField,
   ])
 
   const handleFieldSelect = useCallback((field: string | null) => {
     setSelectedField(field)
-    if (phase === 'import' && field) {
+    if (phase === 'import' && field && reviewRole === 'preparer') {
       if (!importsStarted) startReviewingImports()
       else ensureSourcePanelVisible()
     }
-  }, [phase, setSelectedField, importsStarted, startReviewingImports, ensureSourcePanelVisible])
+    if (reviewRole === 'reviewer' && field) {
+      ensureSourcePanelVisible()
+    }
+  }, [phase, reviewRole, setSelectedField, importsStarted, startReviewingImports, ensureSourcePanelVisible])
 
   const handleNavigateToSourceDoc = useCallback((docId: string) => {
     const nav = navigationForVerifiedDocKey(docId) ?? navigationForSourceDoc(docId)
@@ -603,7 +629,9 @@ export default function DataReviewPage() {
     if (nav.divPayer) setActiveDivPayer(nav.divPayer)
     if (nav.intPayer) setActiveIntPayer(nav.intPayer)
 
-    if (!importsStarted) {
+    if (reviewRole === 'reviewer') {
+      ensureSourcePanelVisible()
+    } else if (!importsStarted) {
       startReviewingImports()
     } else if (agentPanelActive) {
       setFromAgent(true)
@@ -615,6 +643,7 @@ export default function DataReviewPage() {
       hideOutputsForSourceFocusRef.current()
     }
   }, [
+    reviewRole,
     agentView,
     importsStarted,
     startReviewingImports,
@@ -962,6 +991,7 @@ export default function DataReviewPage() {
 
   /** Transition from Pass 1 briefing into Pass 2 strategic checklist (Tab 1 default). */
   const handleBeginPass2Review = () => {
+    setReviewerReviewStarted(true)
     setReviewPass(2)
     setReviewRole('reviewer')
     setReviewActor(REVIEWER_NAME)
@@ -976,21 +1006,36 @@ export default function DataReviewPage() {
     })
   }
 
-  const handleOpenAsReviewer = () => {
-    setReviewPass(2)
+  /** Switch demo chrome to reviewer — does not start review (header CTA does). */
+  const handleSwitchToReviewerRole = () => {
     setReviewRole('reviewer')
     setReviewActor(REVIEWER_NAME)
+    setReviewPass(1)
+    setReviewerReviewStarted(false)
     setPhase('diagnostics')
     setShow1040(true)
     setOutputFormId('summary')
-    setPass2Filter('flags')
-    // Pass 2 sign-off opens on Reviewer checklist (Tab 1), not Pass 1 briefing
+    setPass2Filter('all')
+    setFocusNoteId(null)
+    setRightPanelMode('closed')
+    if (summaryPanelOpen) handleCloseSummaryPanel()
+  }
+
+  /** Header CTA — reviewer begins Pass 2 workflow via Pass 1 briefing */
+  const handleReviewReturn = () => {
+    setReviewerReviewStarted(true)
+    setReviewRole('reviewer')
+    setReviewActor(REVIEWER_NAME)
+    setReviewPass(1)
+    setPhase('diagnostics')
+    setShow1040(true)
+    setOutputFormId('summary')
+    setPass2Filter('all')
     openSummaryPanel('signoff-review', {
-      pass: 2,
-      actor: REVIEWER_NAME,
-      voice: 'self',
+      pass: 1,
+      actor: pass1ActorLabel,
+      voice: 'reviewer-briefing',
     })
-    // Seed a preparer note if none exist so Pass 2 has something to resolve
     setNotes(prev => {
       if (prev.length > 0) return prev
       return [{
@@ -1009,14 +1054,19 @@ export default function DataReviewPage() {
   /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
   const handleSwitchRole = (role: 'preparer' | 'reviewer') => {
     if (role === 'reviewer') {
-      handleOpenAsReviewer()
+      handleSwitchToReviewerRole()
       return
     }
     setReviewRole('preparer')
     setReviewPass(1)
     setReviewActor(PREPARER_NAME)
+    setReviewerReviewStarted(false)
+    setPhase('import')
+    setImportsStarted(true)
+    setShow1040(true)
     setPass2Filter('all')
     setFocusNoteId(null)
+    openRightPanel('sources')
     if (summaryPanelOpen) handleCloseSummaryPanel()
   }
 
@@ -1329,27 +1379,9 @@ export default function DataReviewPage() {
     }, SUMMARY_TOGGLE_MS)
   }, [])
 
-  // ProtoC: welcome/orientation screen is the entry point (no header chrome)
-  if (phase === 'welcome') {
-    return (
-      <div className={styles.page}>
-        <WelcomePane
-          clientName="Jessica Drake"
-          flagCount={phase1Total}
-          onBegin={() => {
-            setPhase('import')
-            setShow1040(true)
-            setOutputFormId('summary')
-            setRightPanelMode('closed')
-            setImportsStarted(false)
-            // Fresh review — always show the sources tip first
-            try { sessionStorage.removeItem('protoc2-coach-tip:outputSourcesFirst') } catch { /* ignore */ }
-            setOutputSourcesCoach(true)
-          }}
-        />
-      </div>
-    )
-  }
+  // ProtoC: preparer skips welcome — lands in import phase with source docs open
+  const isReviewerConfirmMode = reviewRole === 'reviewer'
+  const showImportPhaseBanner = inImportPhase && reviewRole === 'preparer'
 
   return (
     <div
@@ -1359,7 +1391,7 @@ export default function DataReviewPage() {
         ['--app-header-offset' as string]: '68px',
       }}
     >
-      {reviewRole === 'reviewer' ? (
+      {reviewRole === 'reviewer' && reviewerReviewStarted ? (
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
           <span>· Pass {reviewPass} · {REVIEWER_NAME}</span>
@@ -1410,6 +1442,12 @@ export default function DataReviewPage() {
             ))}
           </div>
         </div>
+      ) : reviewRole === 'reviewer' ? (
+        <div className={handoffStyles.passBar} role="status">
+          <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
+          <span>· {REVIEWER_NAME}</span>
+          <span>· Click Review return in the header to begin</span>
+        </div>
       ) : (
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Preparer mode</span>
@@ -1445,6 +1483,16 @@ export default function DataReviewPage() {
             </span>
           </div>
           <div className={styles.headerRight}>
+            {reviewRole === 'reviewer' && !reviewerReviewStarted && (
+              <Button
+                priority="primary"
+                size="medium"
+                onClick={handleReviewReturn}
+                automationId="review-return-cta"
+              >
+                Review return
+              </Button>
+            )}
             <div className={styles.headerIconGroup}>
               <span className={styles.headerIconWrap}>
                 <IconControl
@@ -1481,6 +1529,7 @@ export default function DataReviewPage() {
                 )}
               </span>
             </div>
+            {(reviewRole !== 'reviewer' || reviewerReviewStarted) && (
             <button
               className={`${styles.intuitIntelBtn} ${rightPanelVisible && !agentPanelActive ? styles.intuitIntelBtnActive : ''}`}
               aria-label="Toggle panel"
@@ -1491,7 +1540,7 @@ export default function DataReviewPage() {
                   openRightPanel('sources')
                 } else if (rightPanelMode === 'sources') {
                   closeRightPanel()
-                } else if (importsStarted) {
+                } else if (reviewRole === 'reviewer' || importsStarted) {
                   openRightPanel('sources')
                 } else {
                   startReviewingImports()
@@ -1501,6 +1550,7 @@ export default function DataReviewPage() {
               <Panel size="medium" />
               <span className={styles.intuitIntelLabel}>Source Documents</span>
             </button>
+            )}
             {/* ProtoC: AI Review is Phase 2 only — hidden during Phase 1 (import accuracy) */}
             {!inImportPhase && (
               <button
@@ -1524,8 +1574,8 @@ export default function DataReviewPage() {
         </div>
       </div>
 
-      {/* ProtoC Phase 1 — Import Accuracy banner (flags-only gate for Phase 2 CTA) */}
-      {inImportPhase && (
+      {/* ProtoC Phase 1 — Import Accuracy banner (preparer only) */}
+      {showImportPhaseBanner && (
         <Phase1Banner
           resolved={phase1Resolved}
           total={phase1Total}
@@ -1723,7 +1773,7 @@ export default function DataReviewPage() {
                 if (lc.includes('tech circle')) setActiveSubTab('techCircle')
               }
 
-              if (!importsStarted) {
+              if (!importsStarted && reviewRole === 'preparer') {
                 startReviewingImports()
               } else if (agentPanelActive) {
                 // Agent is open — close it preserving the field selection
@@ -1784,7 +1834,16 @@ export default function DataReviewPage() {
                     <ChevronLeft size="small" /> Back to agent insights
                   </button>
                 ) : (
-                  <span className={styles.sourcePanelTitle}>Imported documents</span>
+                  <div className={styles.sourcePanelTitleGroup}>
+                    <span className={styles.sourcePanelTitle}>
+                      {isReviewerConfirmMode ? 'Source documents' : 'Imported documents'}
+                    </span>
+                    {isReviewerConfirmMode && (
+                      <span className={styles.sourcePanelLayerBadge}>
+                        Reviewer confirm mode · Preparer attestation shown
+                      </span>
+                    )}
+                  </div>
                 )}
                 <div className={styles.sourcePanelActions}>
                   <IconControl
@@ -1796,14 +1855,14 @@ export default function DataReviewPage() {
                   </IconControl>
                 </div>
               </div>
-              {inImportPhase && phase1Remaining > 0 && (
+              {showImportPhaseBanner && phase1Remaining > 0 && (
                 <Phase1IssueBanner
                   mode="flags"
                   unresolvedCount={phase1Remaining}
                   onVerify={handleVerifyNext}
                 />
               )}
-              {inImportPhase && flagsCleared && unreviewedDocCount > 0 && !phase1FullyComplete && (
+              {showImportPhaseBanner && flagsCleared && unreviewedDocCount > 0 && !phase1FullyComplete && (
                 <Phase1IssueBanner
                   mode="documents"
                   unreviewedDocCount={unreviewedDocCount}
@@ -1812,11 +1871,11 @@ export default function DataReviewPage() {
               )}
               <ReviewTab
                 activeTopTab={activeTopTab}
-                flagCounts={inImportPhase ? tabFlagCounts : undefined}
-                initialFlagCounts={inImportPhase ? tabInitialFlagCounts : undefined}
+                flagCounts={showImportPhaseBanner ? tabFlagCounts : undefined}
+                initialFlagCounts={showImportPhaseBanner ? tabInitialFlagCounts : undefined}
                 verifiedDocs={verifiedDocs}
                 tabVerifiedKeys={tabVerifiedKeys}
-                typeReviewed={inImportPhase ? typeReviewed : undefined}
+                typeReviewed={showImportPhaseBanner ? typeReviewed : undefined}
                 tabConfirmStatus={reviewRole === 'reviewer' ? tabConfirmStatus : undefined}
                 onTopTabChange={(tab) => {
                   setActiveTopTab(tab)
@@ -1953,6 +2012,7 @@ export default function DataReviewPage() {
               {activeTopTab === 'w2s' && (
                 <DetailFields
                   formTitle="Details: Wages, Salaries, Tips (W-2)"
+                  importReadOnly={isReviewerConfirmMode}
                   selectedField={selectedField}
                   highlightMode={highlightMode}
                   onFieldSelect={handleFieldSelect}
@@ -2030,6 +2090,7 @@ export default function DataReviewPage() {
               )}
               {activeTopTab === '1099-divs' && (
                 <DetailFieldsDiv
+                  importReadOnly={isReviewerConfirmMode}
                   activePayer={activeDivPayer}
                   selectedField={selectedField}
                   highlightMode={highlightMode}
@@ -2066,6 +2127,7 @@ export default function DataReviewPage() {
               )}
               {activeTopTab === '1099-ints' && (
                 <DetailFields1099
+                  importReadOnly={isReviewerConfirmMode}
                   activePayer={activeIntPayer}
                   selectedField={selectedField}
                   highlightMode={highlightMode}
@@ -2100,6 +2162,7 @@ export default function DataReviewPage() {
               )}
               {activeTopTab === '1099-rs' && (
                 <DetailFields1099R
+                  importReadOnly={isReviewerConfirmMode}
                   selectedField={selectedField}
                   highlightMode={highlightMode}
                   onFieldSelect={handleFieldSelect}
@@ -2127,6 +2190,7 @@ export default function DataReviewPage() {
               )}
               {activeTopTab === '1099-necs' && (
                 <DetailFieldsNec
+                  importReadOnly={isReviewerConfirmMode}
                   selectedField={selectedField}
                   highlightMode={highlightMode}
                   onFieldSelect={handleFieldSelect}
@@ -2346,7 +2410,11 @@ export default function DataReviewPage() {
                   onFinishAndFile={handlePreviewFinishAndFile}
                   onPassToReviewer={handlePreviewPassToReviewer}
                   onConfirmSend={handleConfirmHandoffSend}
-                  onOpenAsReviewer={handleBeginPass2Review}
+                  onOpenAsReviewer={
+                    summaryMode === 'awaiting-reviewer'
+                      ? handleSwitchToReviewerRole
+                      : handleBeginPass2Review
+                  }
                 />
               )}
             </div>
