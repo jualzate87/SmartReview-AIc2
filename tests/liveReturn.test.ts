@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  computeEffectiveTaxRate,
   computeLiveReturn,
+  formatEffectiveTaxRate,
   NEC_SOURCE_AMOUNT,
   SEED_AMOUNTS,
 } from '../src/data/liveReturn'
@@ -105,6 +107,19 @@ describe('computeLiveReturn — Build Spec seed anchors', () => {
     const live = computeLiveReturn({ ...SEED_AMOUNTS, taxablePension: 150_000 })
     expect(live.taxablePension).toBe(150_000)
     expect(live.totalIncome).toBe(FROZEN_RETURN.totalIncome + 50_000)
+  })
+})
+
+describe('effective tax rate', () => {
+  it('computes Jessica Drake seed rate from total tax ÷ taxable income', () => {
+    const live = computeLiveReturn(SEED_AMOUNTS)
+    const rate = computeEffectiveTaxRate(live.totalTax, live.taxableIncome)
+    expect(rate).not.toBeNull()
+    expect(formatEffectiveTaxRate(rate)).toBe('26.8%')
+  })
+
+  it('returns null when taxable income is zero', () => {
+    expect(computeEffectiveTaxRate(10_000, 0)).toBeNull()
   })
 })
 

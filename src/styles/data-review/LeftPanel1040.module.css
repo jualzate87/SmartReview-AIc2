@@ -1552,6 +1552,26 @@
   margin-left: 4px;
 }
 
+/* Effective tax rate — sits above amount owed, same column grid */
+.summaryRateRow {
+  padding-left: 32px;
+  border-top: 1px solid var(--color-divider-tertiary);
+}
+.summaryRateLabel {
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component-bold);
+  color: var(--color-text-primary);
+}
+.summaryRateSub {
+  display: block;
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component);
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
 /* Amount owed row — neutral emphasis (no alert orange) */
 .summaryOweRow {
   background: var(--color-container-background-secondary);

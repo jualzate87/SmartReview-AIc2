@@ -11,7 +11,12 @@ import { getTaxControlBreakdown } from '../../data/taxControlBreakdowns'
 import { getFieldLiveCurrent, getFieldOrigin } from '../../data/fieldOrigins'
 import type { FieldOriginSource } from '../../data/fieldOrigins'
 import type { LiveAmounts, LiveReturnTotals } from '../../data/liveReturn'
-import { SAFE_HARBOR_2210, SEED_AMOUNTS } from '../../data/liveReturn'
+import {
+  SAFE_HARBOR_2210,
+  SEED_AMOUNTS,
+  computeEffectiveTaxRate,
+  formatEffectiveTaxRate,
+} from '../../data/liveReturn'
 import Tooltip from './Tooltip'
 import CoachTip from './CoachTip'
 import { TAX_CONTROL_ROWS, getControlSystemValues, type TaxControlDocEntry } from '../../data/sourceDocuments'
@@ -340,6 +345,11 @@ export default function LeftPanel1040({
   const incomeTax           = incomeTaxBase
   const estimatedPayments   = 0
   const oweAmount           = liveTotals?.oweAmount ?? Math.max(0, totalTax - withholding1040)
+  const effectiveTaxRate    = computeEffectiveTaxRate(totalTax, taxableIncome)
+  const priorEffectiveRate  = computeEffectiveTaxRate(
+    PRIOR_YEAR.totalTax,
+    PRIOR_YEAR.taxableIncome,
+  )
   const displaySsn          = liveTotals?.employeeSsn?.trim()
     ? liveTotals.employeeSsn
     : '987-65-4321'
@@ -1370,6 +1380,49 @@ export default function LeftPanel1040({
                   </div>
                 )
               })}
+
+              {/* Effective tax rate — adjacent to total tax / amount owed */}
+              {(() => {
+                const rateDiff =
+                  effectiveTaxRate !== null && priorEffectiveRate !== null
+                    ? effectiveTaxRate - priorEffectiveRate
+                    : null
+                const ratePctChg =
+                  effectiveTaxRate !== null && priorEffectiveRate !== null && priorEffectiveRate !== 0
+                    ? yoyPercent(effectiveTaxRate, priorEffectiveRate)
+                    : null
+                const diffPos = rateDiff !== null && rateDiff > 0
+                const diffNeg = rateDiff !== null && rateDiff < 0
+                return (
+                  <div className={`${styles.summarySubRow} ${styles.summaryRateRow}`}>
+                    <div className={styles.summaryRowLeft}>
+                      <span className={styles.summaryRateLabel}>Effective tax rate</span>
+                      <span className={styles.summaryRateSub}>Line 24 ÷ Line 15</span>
+                    </div>
+                    <div className={styles.summaryRowRight}>
+                      <div className={styles.summaryCurrVal}>
+                        <span className={styles.summaryCurrValText}>
+                          {formatEffectiveTaxRate(effectiveTaxRate)}
+                        </span>
+                      </div>
+                      <span className={styles.summaryPriorVal}>
+                        {priorEffectiveRate !== null ? formatEffectiveTaxRate(priorEffectiveRate) : ''}
+                      </span>
+                      <span className={`${styles.summaryDiffVal} ${diffPos ? styles.summaryDiffPos : ''} ${diffNeg ? styles.summaryDiffNeg : ''}`}>
+                        {rateDiff !== null
+                          ? `${rateDiff >= 0 ? '+' : '−'}${Math.abs(rateDiff).toFixed(1)} pts`
+                          : ''}
+                      </span>
+                      <span className={`${styles.summaryPctVal} ${diffPos ? styles.summaryDiffPos : ''} ${diffNeg ? styles.summaryDiffNeg : ''}`}>
+                        {ratePctChg !== null
+                          ? `${ratePctChg < 0 ? '−' : ''}${Math.abs(ratePctChg)}%`
+                          : ''}
+                      </span>
+                      <div className={styles.summaryRowEndActions} aria-hidden="true" />
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Amount owed row */}
               {(() => {

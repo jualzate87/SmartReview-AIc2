@@ -262,6 +262,24 @@ export function computeLiveReturn(amounts: LiveAmounts): LiveReturnTotals {
   }
 }
 
+/**
+ * Effective tax rate — total tax ÷ taxable income (Line 24 ÷ Line 15).
+ * Standard CPA summary metric; returns 0–100 scale or null when income is zero.
+ */
+export function computeEffectiveTaxRate(
+  totalTax: number,
+  taxableIncome: number,
+): number | null {
+  if (taxableIncome <= 0) return null
+  return (totalTax / taxableIncome) * 100
+}
+
+/** One decimal place, e.g. "26.8%". */
+export function formatEffectiveTaxRate(rate: number | null): string {
+  if (rate === null) return '—'
+  return `${rate.toFixed(1)}%`
+}
+
 /** Parse a currency draft (commas / $) into a number; empty → 0. */
 export function parseAmountDraft(raw: string): number {
   if (!raw || !raw.trim()) return 0
