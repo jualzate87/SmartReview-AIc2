@@ -228,6 +228,10 @@ export default function DataReviewPage() {
     actor?: string
     voice?: HandoffVoice
   }>({})
+  /** Preparer wrap-up choice from Smart review brief (prototype handoff paths) */
+  const [preparerHandoffChoice, setPreparerHandoffChoice] = useState<
+    'none' | 'awaiting-reviewer' | 'finish-and-file'
+  >('none')
   /** Pass 2 open-items filter */
   type Pass2Filter = 'all' | 'flags' | 'notes' | 'confirm'
   const [pass2Filter, setPass2Filter] = useState<Pass2Filter>('all')
@@ -826,6 +830,7 @@ export default function DataReviewPage() {
   }
 
   const handlePreviewFinishAndFile = () => {
+    setPreparerHandoffChoice('finish-and-file')
     openSummaryPanel('finish-and-file', summaryOpts)
   }
 
@@ -834,6 +839,7 @@ export default function DataReviewPage() {
   }
 
   const handleConfirmHandoffSend = () => {
+    setPreparerHandoffChoice('awaiting-reviewer')
     openSummaryPanel('awaiting-reviewer', summaryOpts)
   }
 
@@ -1332,6 +1338,12 @@ export default function DataReviewPage() {
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Preparer mode</span>
           <span>· Pass {reviewPass} · {PREPARER_NAME}</span>
+          {preparerHandoffChoice === 'awaiting-reviewer' && (
+            <span>· Assigned to reviewer</span>
+          )}
+          {preparerHandoffChoice === 'finish-and-file' && (
+            <span>· Moved to finish and file</span>
+          )}
         </div>
       )}
       {/* Header — title + peer icon controls (Sign-off lives on Step 2 banner) */}

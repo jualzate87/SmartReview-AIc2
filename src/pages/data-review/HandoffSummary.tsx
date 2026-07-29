@@ -476,7 +476,7 @@ export default function HandoffSummary({
           )}
         </div>
       )}
-      {snapshot.mode === 'signoff-review' && brief.viewMode !== 'reviewer-strategic' && (
+      {snapshot.mode === 'signoff-review' && brief.viewMode === 'preparer-summary' && (
         <div className={styles.footerActionsRow}>
           {onContinue && (
             <Button priority="tertiary" size="medium" onClick={onContinue}>
@@ -484,7 +484,27 @@ export default function HandoffSummary({
             </Button>
           )}
           <div className={sidePanelStyles.footerSpacer} />
-          {brief.viewMode === 'reviewer-briefing' && onOpenAsReviewer && (
+          {onFinishAndFile && (
+            <Button priority="secondary" size="medium" onClick={onFinishAndFile}>
+              Move to finish and file
+            </Button>
+          )}
+          {onPassToReviewer && (
+            <Button priority="primary" size="medium" onClick={onPassToReviewer}>
+              Sign-off and assign to reviewer
+            </Button>
+          )}
+        </div>
+      )}
+      {snapshot.mode === 'signoff-review' && brief.viewMode === 'reviewer-briefing' && (
+        <div className={styles.footerActionsRow}>
+          {onContinue && (
+            <Button priority="tertiary" size="medium" onClick={onContinue}>
+              Close
+            </Button>
+          )}
+          <div className={sidePanelStyles.footerSpacer} />
+          {onOpenAsReviewer && (
             <Button priority="primary" size="medium" onClick={onOpenAsReviewer}>
               Begin Pass 2 review
             </Button>
