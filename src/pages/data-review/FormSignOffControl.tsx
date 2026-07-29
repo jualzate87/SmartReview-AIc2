@@ -8,7 +8,8 @@ import Tooltip from './Tooltip'
 import styles from '../../styles/data-review/LeftPanel1040.module.css'
 
 type Props = {
-  formLabel: string
+  /** Full button label — e.g. "Sign off Form 1040" */
+  signOffLabel: string
   signoffKey: string
   signedOff: boolean
   signoffMeta?: ActivityEntry
@@ -18,7 +19,7 @@ type Props = {
 }
 
 export default function FormSignOffControl({
-  formLabel,
+  signOffLabel,
   signoffKey,
   signedOff,
   signoffMeta,
@@ -29,8 +30,8 @@ export default function FormSignOffControl({
   if (!isReviewerRole || !onToggle) return null
 
   const tooltip = signedOff && signoffMeta
-    ? `Review complete · ${formatActivityMeta(signoffMeta)}`
-    : `Mark ${formLabel} review complete`
+    ? `Signed off · ${formatActivityMeta(signoffMeta)}`
+    : signOffLabel
 
   if (signedOff) {
     return (
@@ -39,10 +40,10 @@ export default function FormSignOffControl({
           type="button"
           className={`${styles.formSignoffBtn} ${styles.formSignoffBtnDone} ${className ?? ''}`}
           onClick={() => onToggle(signoffKey)}
-          aria-label={`${formLabel} review complete — click to undo`}
+          aria-label={`${signOffLabel} — click to undo sign-off`}
         >
           <CircleCheckFill size="small" aria-hidden />
-          Review complete
+          Signed off
         </button>
       </Tooltip>
     )
@@ -53,10 +54,10 @@ export default function FormSignOffControl({
       type="button"
       className={`${styles.formSignoffBtn} ${className ?? ''}`}
       onClick={() => onToggle(signoffKey)}
-      aria-label={`Confirm ${formLabel}`}
+      aria-label={signOffLabel}
     >
       <CircleCheck size="small" aria-hidden />
-      Confirm {formLabel}
+      {signOffLabel}
     </button>
   )
 }

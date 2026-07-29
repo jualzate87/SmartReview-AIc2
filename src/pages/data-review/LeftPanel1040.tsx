@@ -37,7 +37,7 @@ import FormSignOffControl from './FormSignOffControl'
 import {
   OUTPUT_FORM_OPTIONS,
   outputFormSignoffKey,
-  outputFormSignoffLabel,
+  outputFormSignOffButtonLabel,
   type OutputFormId,
 } from './outputForms'
 import styles from '../../styles/data-review/LeftPanel1040.module.css'
@@ -1021,54 +1021,54 @@ export default function LeftPanel1040({
   return (
     <div className={styles.leftPanel}>
 
-      {/* ── Output form navigator ── */}
+      {/* ── Output form navigator + per-form sign-off (reviewer) ── */}
       <div className={styles.viewToggle}>
-        <label className={styles.formNavLabel} htmlFor="output-form-select">
-          View
-        </label>
-        <CoachTip
-          open={outputFormsCoachOpen}
-          title="Review output forms"
-          message="Review Schedules and Forms 8960 / 2210 before finishing."
-          onClose={() => onDismissOutputFormsCoach?.()}
-          position="bottom"
-          alignment="left"
-        >
-          <select
-            id="output-form-select"
-            className={styles.formNavSelect}
-            value={outputFormId}
-            onChange={e => {
-              const id = e.target.value as OutputFormId
-              setOutputFormId(id)
-              if (id !== 'summary') onDismissOutputFormsCoach?.()
-            }}
-            aria-label="Select return form or schedule"
+        <div className={styles.viewToggleLeft}>
+          <label className={styles.formNavLabel} htmlFor="output-form-select">
+            View
+          </label>
+          <CoachTip
+            open={outputFormsCoachOpen}
+            title="Review output forms"
+            message="Review Schedules and Forms 8960 / 2210 before finishing."
+            onClose={() => onDismissOutputFormsCoach?.()}
+            position="bottom"
+            alignment="left"
           >
-            {OUTPUT_FORM_OPTIONS.map(opt => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </CoachTip>
+            <select
+              id="output-form-select"
+              className={styles.formNavSelect}
+              value={outputFormId}
+              onChange={e => {
+                const id = e.target.value as OutputFormId
+                setOutputFormId(id)
+                if (id !== 'summary') onDismissOutputFormsCoach?.()
+              }}
+              aria-label="Select return form or schedule"
+            >
+              {OUTPUT_FORM_OPTIONS.map(opt => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </CoachTip>
+        </div>
+        {isReviewerRole && onToggleFormSignOff && (
+          <FormSignOffControl
+            signOffLabel={outputFormSignOffButtonLabel(outputFormId)}
+            signoffKey={outputFormSignoffKey(outputFormId)}
+            signedOff={reviewerSignedOffForms.has(outputFormSignoffKey(outputFormId))}
+            signoffMeta={reviewerSignedOffFormsMeta.get(outputFormSignoffKey(outputFormId))}
+            isReviewerRole={isReviewerRole}
+            onToggle={onToggleFormSignOff}
+          />
+        )}
       </div>
 
       {/* ── SUMMARY TABLE VIEW — Figma ProConnect style ── */}
       {view === 'table' && (
         <div className={styles.summaryWrapper}>
-          {isReviewerRole && onToggleFormSignOff && (
-            <div className={styles.summarySignoffRow}>
-              <FormSignOffControl
-                formLabel={outputFormSignoffLabel('summary')}
-                signoffKey={outputFormSignoffKey('summary')}
-                signedOff={reviewerSignedOffForms.has(outputFormSignoffKey('summary'))}
-                signoffMeta={reviewerSignedOffFormsMeta.get(outputFormSignoffKey('summary'))}
-                isReviewerRole={isReviewerRole}
-                onToggle={onToggleFormSignOff}
-              />
-            </div>
-          )}
           <div className={styles.summaryCard}>
             <div className={styles.summaryCardHeader}>
               <span className={styles.summaryCardLabel}>RETURN BREAKDOWN</span>
@@ -1546,25 +1546,9 @@ export default function LeftPanel1040({
             onToggleFlagged={onToggleFlagged}
             onOpenComment={openComment1040}
             onFlagClick={handleOutputFlagClick}
-            reviewerSignedOffForms={reviewerSignedOffForms}
-            reviewerSignedOffFormsMeta={reviewerSignedOffFormsMeta}
-            onToggleFormSignOff={onToggleFormSignOff}
           />
         ) : (
         <div className={styles.formDoc}>
-
-          {isReviewerRole && onToggleFormSignOff && outputFormId === '1040' && (
-            <div className={styles.formSignoffToolbar}>
-              <FormSignOffControl
-                formLabel={outputFormSignoffLabel('1040')}
-                signoffKey={outputFormSignoffKey('1040')}
-                signedOff={reviewerSignedOffForms.has(outputFormSignoffKey('1040'))}
-                signoffMeta={reviewerSignedOffFormsMeta.get(outputFormSignoffKey('1040'))}
-                isReviewerRole={isReviewerRole}
-                onToggle={onToggleFormSignOff}
-              />
-            </div>
-          )}
 
           {/* ── IRS Header ── */}
           <div className={styles.irsHeader}>

@@ -136,14 +136,13 @@ export default function SmartReturnHeader({
           </span>
           {showReviewReturn && (
             <Button
-              priority={reviewReturnStarted ? 'primary' : 'secondary'}
+              priority="standard"
               onClick={onReviewReturn}
               automationId="review-return-header-cta"
             >
               Review return
             </Button>
           )}
-          <Button priority="secondary">Refresh forms</Button>
         </div>
       </div>
 

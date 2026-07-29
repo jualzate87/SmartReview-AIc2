@@ -44,6 +44,19 @@ export function outputFormSignoffLabel(formId: OutputFormId): string {
   return opt?.shortLabel ?? formId
 }
 
+/** Reviewer sign-off button label — e.g. "Sign off Form 1040", "Sign off Schedule C". */
+export function outputFormSignOffButtonLabel(formId: OutputFormId): string {
+  if (formId === 'summary') return 'Sign off Return Summary'
+  const opt = OUTPUT_FORM_OPTIONS.find(o => o.id === formId)
+  if (!opt) return `Sign off ${formId}`
+  if (formId === '1040' || formId === 'f8960' || formId === 'f2210') {
+    return `Sign off ${opt.label.split(' — ')[0]}`
+  }
+  const scheduleMatch = opt.label.match(/^(Schedule \w+)/)
+  if (scheduleMatch) return `Sign off ${scheduleMatch[1]}`
+  return `Sign off ${opt.label.split(' — ')[0]}`
+}
+
 export function allRequiredFormsSignedOff(signedOff: Set<string>): boolean {
   return REQUIRED_REVIEWER_FORM_SIGNOFFS.every(k => signedOff.has(k))
 }

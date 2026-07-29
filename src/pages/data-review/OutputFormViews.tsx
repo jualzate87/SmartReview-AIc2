@@ -7,9 +7,8 @@ import { CLIENT_ADDRESS, formatClientCityStateZip } from '../../data/clientAddre
 import { getScheduleLineFlyout } from '../../data/scheduleFieldOrigins'
 import type { ActivityEntry } from '../../hooks/useSyncedReviewState'
 import AttestColumns from './AttestColumns'
-import FormSignOffControl from './FormSignOffControl'
 import OutputRowActions from './OutputRowActions'
-import { getOutputLineAttest, outputFormSignoffKey, outputFormSignoffLabel, type OutputFormId } from './outputForms'
+import { getOutputLineAttest, type OutputFormId } from './outputForms'
 import TaxControlDocPopover from './TaxControlDocPopover'
 import Tooltip from './Tooltip'
 import styles from '../../styles/data-review/LeftPanel1040.module.css'
@@ -21,16 +20,12 @@ function fmt(n: number) {
 function FormHeader({
   formCode,
   title,
-  signoff,
 }: {
   formCode: string
   title: string
-  signoff?: React.ReactNode
 }) {
   return (
-    <>
-      {signoff && <div className={styles.formSignoffToolbar}>{signoff}</div>}
-      <div className={styles.irsHeader}>
+    <div className={styles.irsHeader}>
       <div className={styles.irsLeft}>
         <div className={styles.irsDept}>Department of the Treasury — Internal Revenue Service</div>
         <div className={styles.irsTitle}>
@@ -42,7 +37,6 @@ function FormHeader({
         <div className={styles.irsOmb}>OMB No. 1545-0074</div>
       </div>
     </div>
-    </>
   )
 }
 
@@ -332,22 +326,20 @@ function FormTable({ children }: { children: React.ReactNode }) {
 type SharedLineProps = Omit<
   LineRowProps,
   'line' | 'label' | 'value' | 'kind' | 'bold' | 'note' | 'fieldId'
-> & {
-  formSignoff?: React.ReactNode
-}
+>
 
 function scheduleFormLabel(formId: OutputFormId): string {
   const opt = { sch1: 'Schedule 1', schC: 'Schedule C', schA: 'Schedule A', schD: 'Schedule D', f8960: 'Form 8960', f2210: 'Form 2210' } as const
   return opt[formId as keyof typeof opt] ?? formId
 }
 
-function Schedule1View({ live, ssn, formSignoff, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
+function Schedule1View({ live, ssn, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
   const blank = (line: string, label: string, fieldId: string) => (
     <LineRow {...row} live={live} line={line} label={label} value={0} fieldId={fieldId} />
   )
   return (
     <div className={styles.formDoc}>
-      <FormHeader formCode="Schedule 1" title="Additional Income and Adjustments to Income" signoff={formSignoff} />
+      <FormHeader formCode="Schedule 1" title="Additional Income and Adjustments to Income" />
       <TaxpayerStrip ssn={ssn} />
       <FormTable>
         {blank('1', 'Taxable refunds, credits, or offsets', 'sch1-1')}
@@ -404,12 +396,11 @@ function ScheduleCView({
   live,
   amounts,
   ssn,
-  formSignoff,
   ...row
 }: { live: LiveReturnTotals; amounts: LiveAmounts; ssn: string } & SharedLineProps) {
   return (
     <div className={styles.formDoc}>
-      <FormHeader formCode="Schedule C" title="Profit or Loss From Business (Sole Proprietorship)" signoff={formSignoff} />
+      <FormHeader formCode="Schedule C" title="Profit or Loss From Business (Sole Proprietorship)" />
       <TaxpayerStrip ssn={ssn} />
       <div className={styles.infoGrid}>
         <div className={styles.infoRow}>
@@ -537,12 +528,11 @@ function ScheduleAView({
   live,
   amounts,
   ssn,
-  formSignoff,
   ...row
 }: { live: LiveReturnTotals; amounts: LiveAmounts; ssn: string } & SharedLineProps) {
   return (
     <div className={styles.formDoc}>
-      <FormHeader formCode="Schedule A" title="Itemized Deductions" signoff={formSignoff} />
+      <FormHeader formCode="Schedule A" title="Itemized Deductions" />
       <TaxpayerStrip ssn={ssn} />
       <FormTable>
         <LineRow
@@ -643,10 +633,10 @@ function ScheduleAView({
   )
 }
 
-function ScheduleDView({ live, ssn, formSignoff, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
+function ScheduleDView({ live, ssn, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
   return (
     <div className={styles.formDoc}>
-      <FormHeader formCode="Schedule D" title="Capital Gains and Losses" signoff={formSignoff} />
+      <FormHeader formCode="Schedule D" title="Capital Gains and Losses" />
       <TaxpayerStrip ssn={ssn} />
       <FormTable>
         <LineRow {...row} live={live} line="1a" label="Short-term totals from Form 8949" value={0} fieldId="schD-1a" />
@@ -689,11 +679,11 @@ function ScheduleDView({ live, ssn, formSignoff, ...row }: { live: LiveReturnTot
   )
 }
 
-function Form8960View({ live, ssn, formSignoff, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
+function Form8960View({ live, ssn, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
   const overThreshold = live.totalIncome > NIIT_AGI_THRESHOLD
   return (
     <div className={styles.formDoc}>
-      <FormHeader formCode="8960" title="Net Investment Income Tax — Individuals" signoff={formSignoff} />
+      <FormHeader formCode="8960" title="Net Investment Income Tax — Individuals" />
       <TaxpayerStrip ssn={ssn} />
       <FormTable>
         <LineRow
@@ -788,10 +778,10 @@ function Form8960View({ live, ssn, formSignoff, ...row }: { live: LiveReturnTota
   )
 }
 
-function Form2210View({ live, ssn, formSignoff, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
+function Form2210View({ live, ssn, ...row }: { live: LiveReturnTotals; ssn: string } & SharedLineProps) {
   return (
     <div className={styles.formDoc}>
-      <FormHeader formCode="2210" title="Underpayment of Estimated Tax by Individuals" signoff={formSignoff} />
+      <FormHeader formCode="2210" title="Underpayment of Estimated Tax by Individuals" />
       <TaxpayerStrip ssn={ssn} />
       <FormTable>
         <LineRow
@@ -887,9 +877,6 @@ export interface OutputFormViewsProps {
   onToggleFlagged?: (fieldKey: string) => void
   onOpenComment?: (fieldKey: string, context: string, btn: HTMLElement) => void
   onFlagClick?: (fieldKey: string, btn: HTMLElement) => void
-  reviewerSignedOffForms?: Set<string>
-  reviewerSignedOffFormsMeta?: Map<string, ActivityEntry>
-  onToggleFormSignOff?: (signoffKey: string) => void
 }
 
 /** Renders non-1040 output forms. Summary and Form 1040 stay in LeftPanel1040. */
@@ -919,9 +906,6 @@ export default function OutputFormViews({
   onToggleFlagged,
   onOpenComment,
   onFlagClick,
-  reviewerSignedOffForms = new Set(),
-  reviewerSignedOffFormsMeta = new Map(),
-  onToggleFormSignOff,
 }: OutputFormViewsProps) {
   const ssn = live.employeeSsn || '—'
   const [flyoutField, setFlyoutField] = useState<string | null>(null)
@@ -950,18 +934,6 @@ export default function OutputFormViews({
 
   const flyout = flyoutField ? getScheduleLineFlyout(formId, flyoutField, live, amounts) : null
 
-  const signoffKey = outputFormSignoffKey(formId)
-  const formSignoff = (
-    <FormSignOffControl
-      formLabel={outputFormSignoffLabel(formId)}
-      signoffKey={signoffKey}
-      signedOff={reviewerSignedOffForms.has(signoffKey)}
-      signoffMeta={reviewerSignedOffFormsMeta.get(signoffKey)}
-      isReviewerRole={isReviewerRole}
-      onToggle={onToggleFormSignOff}
-    />
-  )
-
   const shared: SharedLineProps = {
     formId,
     live,
@@ -989,7 +961,6 @@ export default function OutputFormViews({
     onOpenComment,
     onFlagClick,
     formLabel: scheduleFormLabel(formId),
-    formSignoff,
   }
 
   let body: React.ReactNode = null
