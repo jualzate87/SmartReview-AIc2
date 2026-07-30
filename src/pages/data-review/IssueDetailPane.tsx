@@ -356,6 +356,8 @@ export default function IssueDetailPane({
                       buttonPriority={primary ? 'primary' : 'secondary'}
                       buttonSize="small"
                       automationId={`issue-action-menu-${action.label}`}
+                      /* Portal menu must sit above the Summary↔Sources drag gutter (z-index 1). */
+                      stylePosition={{ zIndex: 10000 }}
                       onSelect={(e: { target?: { value?: string } }) => {
                         const idx = Number(e?.target?.value)
                         const item = action.menuItems?.[idx]
