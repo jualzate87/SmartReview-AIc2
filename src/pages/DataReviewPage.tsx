@@ -717,18 +717,15 @@ export default function DataReviewPage() {
     setSelectedField(source.detailFieldId)
   }, [handleNavigateToSourceDoc, setSelectedField])
 
+  /** ProtoC: 1040 row click selects/highlights only — does not open Sources until user follows a source link or banner CTA. */
   const handle1040FieldClick = useCallback((field1040: string | null) => {
     if (!field1040) {
       setSelectedField(null)
       return
     }
     const mapped = field1040ToDetail(field1040)
-    if (mapped) {
-      applyVerifyNavigation(mapped.field)
-    } else {
-      setSelectedField(field1040)
-    }
-  }, [applyVerifyNavigation, setSelectedField])
+    setSelectedField(mapped?.field ?? field1040)
+  }, [setSelectedField])
 
   const highlightField1040 = resolveOutputFieldFromIssueField(selectedField)
 
@@ -930,6 +927,10 @@ export default function DataReviewPage() {
     setSummaryOpts(opts)
     setAgentView('idle')
     setYoyExpanded(false)
+    const body = bodyRef.current
+    if (body) {
+      setBodyWidth(body.clientWidth || body.getBoundingClientRect().width)
+    }
     setRightPanelWidth(SUMMARY_PANEL_WIDTH)
     openRightPanel('summary')
   }
@@ -1109,6 +1110,10 @@ export default function DataReviewPage() {
     setRightPanelExiting(false)
     setPanelClosing(false)
     setRightPanelMode('closed')
+    setOutputSourcesCoach(false)
+    setCoachTip(null)
+    // Fresh preparer session — replay the Summary (i) coach sequence like ProtoC welcome
+    try { sessionStorage.removeItem('protoc-coach-tip:outputSourcesFirst') } catch { /* ignore */ }
   }, [entry, roleParam, isPreparerEntry, location.key])
 
   // Auto-start review when navigated from SmartReturn header CTA
@@ -1471,7 +1476,10 @@ export default function DataReviewPage() {
   // ProtoC: preparer skips welcome — lands in import phase, Return Summary full width, panels closed
   const summaryPanelLabel = reviewRole === 'preparer' ? 'Review log' : 'Smart review brief'
   const isReviewerConfirmMode = reviewRole === 'reviewer'
-  const showImportPhaseBanner = inImportPhase && reviewRole === 'preparer' && importsStarted
+  /** ProtoC Phase 1 banner — visible for entire preparer import phase (CTA before sources open). */
+  const showPreparerImportPhase = inImportPhase && reviewRole === 'preparer'
+  /** Left outputs share row with Smart review brief — allow flex shrink (avoid 795px + 755px overflow). */
+  const outputsShareWithBrief = summaryPanelOpen && show1040
   /** Preparer input-return: Honey Tax product header. Review-return: chromeless dedicated tab. */
   const showSmartReturnHeader = isPreparerEntry
 
@@ -1559,18 +1567,6 @@ export default function DataReviewPage() {
           )}
           {preparerHandoffChoice === 'finish-and-file' && (
             <span>· Moved to finish and file</span>
-          )}
-          {!importsStarted && reviewPass === 1 && inImportPhase && (
-            <span className={handoffStyles.passBarCta}>
-              <Button
-                priority="primary"
-                size="small"
-                onClick={startReviewingImports}
-                automationId="pass-bar-review-imports"
-              >
-                Review imports
-              </Button>
-            </span>
           )}
         </div>
       )}
@@ -1680,7 +1676,7 @@ export default function DataReviewPage() {
       </div>
 
       {/* ProtoC Phase 1 — Import Accuracy banner (preparer only) */}
-      {showImportPhaseBanner && (
+      {showPreparerImportPhase && (
         <Phase1Banner
           resolved={phase1Resolved}
           total={phase1Total}
@@ -1773,14 +1769,16 @@ export default function DataReviewPage() {
                interpolate together; otherwise flex:1 grows into remaining space. */
             flex: leftAnimWidth !== null
               ? `0 0 ${leftAnimWidth}px`
-              : !show1040 ? '0 0 0px' : 1,
+              : !show1040 ? '0 0 0px'
+              : outputsShareWithBrief ? '1 1 0%'
+              : 1,
             width: leftAnimWidth !== null
               ? leftAnimWidth
               : !show1040 ? 0 : undefined,
             opacity: !show1040 ? 0 : 1,
             /* Keep Summary ≥ 795.7px so Return Breakdown labels aren’t truncated.
-               Collapse animation / Hide outputs still use minWidth 0. */
-            minWidth: leftAnimWidth !== null || !show1040
+               Collapse animation / Hide outputs / brief-open still use minWidth 0. */
+            minWidth: leftAnimWidth !== null || !show1040 || outputsShareWithBrief
               ? 0
               : LEFT_PANEL_MIN_WIDTH,
             transition: panelResizing ? 'none' : undefined,
@@ -1960,14 +1958,14 @@ export default function DataReviewPage() {
                   </IconControl>
                 </div>
               </div>
-              {showImportPhaseBanner && phase1Remaining > 0 && (
+              {showPreparerImportPhase && phase1Remaining > 0 && (
                 <Phase1IssueBanner
                   mode="flags"
                   unresolvedCount={phase1Remaining}
                   onVerify={handleVerifyNext}
                 />
               )}
-              {showImportPhaseBanner && flagsCleared && unreviewedDocCount > 0 && !phase1FullyComplete && (
+              {showPreparerImportPhase && flagsCleared && unreviewedDocCount > 0 && !phase1FullyComplete && (
                 <Phase1IssueBanner
                   mode="documents"
                   unreviewedDocCount={unreviewedDocCount}
@@ -1976,11 +1974,11 @@ export default function DataReviewPage() {
               )}
               <ReviewTab
                 activeTopTab={activeTopTab}
-                flagCounts={showImportPhaseBanner ? tabFlagCounts : undefined}
-                initialFlagCounts={showImportPhaseBanner ? tabInitialFlagCounts : undefined}
+                flagCounts={showPreparerImportPhase ? tabFlagCounts : undefined}
+                initialFlagCounts={showPreparerImportPhase ? tabInitialFlagCounts : undefined}
                 verifiedDocs={verifiedDocs}
                 tabVerifiedKeys={tabVerifiedKeys}
-                typeReviewed={showImportPhaseBanner ? typeReviewed : undefined}
+                typeReviewed={showPreparerImportPhase ? typeReviewed : undefined}
                 tabConfirmStatus={reviewRole === 'reviewer' ? tabConfirmStatus : undefined}
                 onTopTabChange={(tab) => {
                   setActiveTopTab(tab)
