@@ -5,6 +5,7 @@
   flex-direction: column;
   width: 100%;
   flex-shrink: 0;
+  font-family: var(--font-family-component);
 }
 
 /* ── Row 1: Product header 48px ── */
@@ -18,11 +19,11 @@
   flex-shrink: 0;
 }
 
-/* "JOHNSON TAX" — 14px Demi, uppercase, tracking 0.5px */
+/* Product / brand name — Honey Tax Accounting */
 .businessName {
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
+  font-family: var(--font-family-heading);
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-heading-bold);
   line-height: 20px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -36,7 +37,7 @@
   gap: 0;
 }
 
-/* Help / Notifications / Settings — icon + label, 14px Medium, #5d686f */
+/* Help / Notifications / Settings — icon + label */
 .navBtn {
   display: flex;
   align-items: center;
@@ -52,9 +53,8 @@
 .navBtn svg { color: #5d686f; }
 
 .navBtnLabel {
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component);
   line-height: 20px;
   color: #5d686f;
   white-space: nowrap;
@@ -68,16 +68,15 @@
   flex-shrink: 0;
 }
 
-/* OIAA Avatar — 30px circle, #0097e6, "S" */
+/* OIAA Avatar — 30px circle */
 .oiaaAvatar {
   width: 30px;
   height: 30px;
   border-radius: 50%;
   background: #205ea3;
   color: #ffffff;
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-component-bold);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,11 +104,10 @@
   height: 100%;
 }
 
-/* Jordan Wells — 16px Bold, 2 lines */
+/* Client name */
 .clientName {
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-component-semibold);
   line-height: 19px;
   color: #393a3d;
   white-space: nowrap;
@@ -137,9 +135,8 @@
 .clientProfileBtn svg { color: #5d686f; }
 
 .clientProfileLabel {
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-component-semibold);
   line-height: 24px;
   color: #5d686f;
   white-space: nowrap;
@@ -164,11 +161,10 @@
 }
 
 .metaLabel {
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component);
   line-height: 16px;
-  color: #6b6c72;
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
@@ -180,9 +176,8 @@
 }
 
 .metaValue {
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-component-bold);
   line-height: 24px;
   color: #393a3d;
   white-space: nowrap;
@@ -215,9 +210,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-component-bold);
   color: #ffffff;
   flex-shrink: 0;
 }
@@ -226,8 +220,8 @@
 .avatarPlus {
   background: #eceef1;
   color: #21262a;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component-semibold);
   margin-left: -6px;
 }
 
@@ -241,9 +235,8 @@
   cursor: pointer;
   padding: 6px 4px 6px 8px;
   border-radius: 4px;
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--font-size-component-medium);
+  font-weight: var(--font-weight-component-semibold);
   line-height: 24px;
   color: #21262a;
   white-space: nowrap;
@@ -283,7 +276,7 @@
   gap: 0;
 }
 
-/* Tab — 14px Demi */
+/* Tab labels */
 .tab {
   display: flex;
   align-items: center;
@@ -293,9 +286,8 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component);
   line-height: 20px;
   color: #5d686f;
   cursor: pointer;
@@ -339,14 +331,13 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-family: 'Avenir Next forINTUIT', sans-serif;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-component-small);
+  font-weight: var(--font-weight-component);
   line-height: 16px;
-  color: #393a3d;
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
-.tabMeta svg { color: #393a3d; flex-shrink: 0; }
+.tabMeta svg { color: var(--color-text-secondary); flex-shrink: 0; }
 
 /* Review return — secondary passive outline; muted slate text + border (not action blue) */
 .reviewReturnBtn {
