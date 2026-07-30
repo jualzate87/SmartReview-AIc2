@@ -6,6 +6,7 @@ import FusionShell from './components/FusionShell'
 import { FUSION_CONFIG } from './navigation'
 import DataReviewPage from './pages/DataReviewPage'
 import SmartReturnPage from './pages/SmartReturnPage'
+import ImportConfirmationPage from './pages/ImportConfirmationPage'
 import CheckReturnPage from './pages/CheckReturnPage'
 import WorkspacePage from './pages/WorkspacePage'
 import HomePage from './pages/HomePage'
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/smart-return" replace />} />
             <Route path="/import-hub" element={<Navigate to="/smart-return" replace />} />
             <Route path="/smart-return" element={<SmartReturnPage />} />
+            <Route path="/import-confirmation" element={<ImportConfirmationPage />} />
             <Route path="/data-review" element={<DataReviewPage />} />
             <Route path="/check-return" element={<CheckReturnPage />} />
 

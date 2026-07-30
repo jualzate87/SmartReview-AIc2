@@ -61,7 +61,7 @@ export default function SmartReturnDocumentHub({ readOnly = false }: SmartReturn
         if (p >= 100) {
           clearInterval(interval)
           timerRef.current = setTimeout(() => {
-            navigate('/data-review?entry=input-return&role=preparer')
+            navigate('/import-confirmation')
           }, 400)
           return 100
         }
