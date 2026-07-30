@@ -137,13 +137,16 @@ function buildImportMismatchesIssue(amounts: LiveAmounts): IssueCard {
           ]
         : []),
     ],
-    actions: first
+    actions: gaps.length > 0
       ? [
           {
             type: 'goToInput',
-            label: 'Go to first mismatch',
-            tab: first.tab as IssueAction['tab'],
-            field: first.field,
+            label: 'Go to mismatch',
+            menuItems: gaps.map(g => ({
+              label: g.label,
+              tab: g.tab,
+              field: g.field,
+            })),
           },
         ]
       : [{ type: 'goToInput', label: 'Go to wages', tab: 'w2s', field: 'wages' }],
