@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import SmartReturnHeader from './SmartReturnHeader'
 import SmartReturnDocumentHub from './SmartReturnDocumentHub'
-import handoffStyles from '../styles/data-review/HandoffSummary.module.css'
 import styles from '../styles/SmartReturnPage.module.css'
 
 const REVIEW_RETURN_PATH = '/data-review?entry=review-return&role=reviewer&startReview=true'
@@ -51,10 +50,6 @@ export default function SmartReturnPage() {
           demoRole={reviewRole}
           onDemoRoleChange={handleSwitchRole}
         />
-
-        <div className={handoffStyles.passBar} role="status">
-          <span>SmartReturn landing</span>
-        </div>
 
         <SmartReturnDocumentHub readOnly={isReviewer} />
       </div>
