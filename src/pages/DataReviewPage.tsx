@@ -564,6 +564,23 @@ export default function DataReviewPage() {
   const [activeIssueField, setActiveIssueField] = useState<string | null>(null)
   /** Phase 2 diagnostic with an open detail pane — output highlight follows this when set. */
   const [activeDiagnosticKey, setActiveDiagnosticKey] = useState<Phase2IssueKey | null>(null)
+  const activeDiagnosticKeyRef = useRef<Phase2IssueKey | null>(null)
+  activeDiagnosticKeyRef.current = activeDiagnosticKey
+
+  // Drop stale orange output highlight once every Phase 2 diagnostic is reviewed
+  useEffect(() => {
+    if (!phase2Complete) return
+    setActiveDiagnosticKey(null)
+    setActiveIssueField(null)
+  }, [phase2Complete])
+
+  const handlePhase2MarkReviewed = useCallback((fieldName: string) => {
+    handleMarkReviewed(fieldName)
+    if (activeDiagnosticKeyRef.current === fieldName) {
+      setActiveDiagnosticKey(null)
+      setActiveIssueField(null)
+    }
+  }, [handleMarkReviewed])
 
   // Maps doc-overlay field keys → 1040 field keys (when they differ)
   const DOC_FIELD_TO_1040: Record<string, string> = {
@@ -581,7 +598,7 @@ export default function DataReviewPage() {
       const raw = DOC_FIELD_TO_1040[activeIssueField] ?? activeIssueField
       return resolveOutputFieldFromIssueField(raw)
     }
-    if (activeDiagnosticKey) {
+    if (activeDiagnosticKey && !reviewedFields.has(activeDiagnosticKey)) {
       return resolveOutputFieldFromDiagnostic(activeDiagnosticKey, amounts)
     }
     return null
@@ -2340,7 +2357,7 @@ export default function DataReviewPage() {
                       onClose={handleAgentClose}
                       onSignOff={handleWrapUpPass}
                       onYoyToggle={setYoyExpanded}
-                      onMarkReviewed={handleMarkReviewed}
+                      onMarkReviewed={handlePhase2MarkReviewed}
                       reviewedFields={reviewedFields}
                       initialSubView={agentSubView}
                       onSubViewChange={(subView) => {

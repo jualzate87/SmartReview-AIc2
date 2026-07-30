@@ -422,12 +422,14 @@ export default function AgentReportPane({
     if (allReviewed && !prevAllReviewed.current) {
       const t = setTimeout(() => {
         setIssueDetailOpen(null)
+        onHighlightField?.(null, null)
+        onDiagnosticFocus?.(null)
         setShowCompletion(true)
       }, 600)
       return () => clearTimeout(t)
     }
     prevAllReviewed.current = allReviewed
-  }, [allReviewed])
+  }, [allReviewed, onHighlightField, onDiagnosticFocus])
 
   const resolveHighlightField = (key: string): string | null => {
     const issue = getIssueConfig(key)
