@@ -1093,20 +1093,25 @@ export default function DataReviewPage() {
     })
   }
 
-  // Preparer entry (Import confirmation / Input return tab): summary-first, sources closed
-  const preparerEntryHandled = useRef(false)
+  // Preparer entry (Import confirmation / Input return tab): Return Summary left, brief right, sources closed
   useEffect(() => {
-    if (!isPreparerEntry || preparerEntryHandled.current) return
-    preparerEntryHandled.current = true
+    if (!isPreparerEntry) return
+    setReviewRole('preparer')
+    setReviewPass(1)
+    setReviewActor(PREPARER_NAME)
+    setReviewerReviewStarted(false)
+    setPhase('import')
     setShow1040(true)
     setOutputFormId('summary')
     setImportsStarted(false)
+    setSelectedField(null)
     setSummaryMode('signoff-review')
     setSummaryOpts({})
     setRightPanelWidth(SUMMARY_PANEL_WIDTH)
-    openRightPanel('summary')
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on preparer entry
-  }, [isPreparerEntry])
+    setRightPanelExiting(false)
+    setPanelClosing(false)
+    setRightPanelMode('summary')
+  }, [entry, roleParam, isPreparerEntry, setSelectedField])
 
   // Auto-start review when navigated from SmartReturn header CTA
   const startReviewHandled = useRef(false)
@@ -1466,7 +1471,7 @@ export default function DataReviewPage() {
     }, SUMMARY_TOGGLE_MS)
   }, [])
 
-  // ProtoC: preparer skips welcome — lands in import phase with source docs open
+  // ProtoC: preparer skips welcome — lands in import phase, Return Summary + brief, sources closed
   const isReviewerConfirmMode = reviewRole === 'reviewer'
   const showImportPhaseBanner = inImportPhase && reviewRole === 'preparer' && importsStarted
   const isDedicatedReviewTab = entry === 'review-return' || entry === 'input-return'
