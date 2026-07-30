@@ -806,6 +806,10 @@
   margin-left: 0;
 }
 
+.passBarCta {
+  margin-left: auto;
+}
+
 .filterChips {
   display: flex;
   align-items: center;

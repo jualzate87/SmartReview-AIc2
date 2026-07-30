@@ -54,6 +54,9 @@ type Props = {
   amounts?: LiveAmounts
   /** Slide-in animation for conversational brief on reviewer welcome */
   briefEnterAnim?: boolean
+  /** Pass 1 preparer entry — imports not started yet; show Review imports CTA */
+  importsPending?: boolean
+  onReviewImports?: () => void
 }
 
 function JumpLink({
@@ -483,6 +486,8 @@ export default function HandoffSummary({
   isPreparer = false,
   amounts,
   briefEnterAnim = false,
+  importsPending = false,
+  onReviewImports,
 }: Props) {
   const brief = useMemo(
     () =>
@@ -517,7 +522,20 @@ export default function HandoffSummary({
 
   const footerActions = !hideFooter ? (
     <div className={styles.footerWrap}>
-      {snapshot.mode === 'signoff-review' && brief.viewMode === 'reviewer-strategic' && (
+      {importsPending && onReviewImports && (
+        <div className={styles.footerActionsRow}>
+          {onContinue && (
+            <Button priority="tertiary" size="medium" onClick={onContinue}>
+              Close
+            </Button>
+          )}
+          <div className={sidePanelStyles.footerSpacer} />
+          <Button priority="primary" size="medium" onClick={onReviewImports}>
+            Review imports
+          </Button>
+        </div>
+      )}
+      {!importsPending && snapshot.mode === 'signoff-review' && brief.viewMode === 'reviewer-strategic' && (
         <div className={styles.footerActionsRow}>
           <div className={sidePanelStyles.footerSpacer} />
           {onFinishAndFile && (
@@ -527,7 +545,7 @@ export default function HandoffSummary({
           )}
         </div>
       )}
-      {snapshot.mode === 'signoff-review' && brief.viewMode === 'preparer-summary' && (
+      {!importsPending && snapshot.mode === 'signoff-review' && brief.viewMode === 'preparer-summary' && (
         <div className={styles.footerActionsRow}>
           {onContinue && (
             <Button priority="tertiary" size="medium" onClick={onContinue}>

@@ -211,9 +211,10 @@ export default function DataReviewPage() {
   // Agent panel width in px when open (default 588px, user-resizable)
   const [agentPanelWidth, setAgentPanelWidth] = useState(588)
   // Right panel width in px (default ~65% viewport once imports start)
-  const [rightPanelWidth, setRightPanelWidth] = useState(() =>
-    typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.65) : 920,
-  )
+  const [rightPanelWidth, setRightPanelWidth] = useState(() => {
+    if (entry === 'input-return' && roleParam !== 'reviewer') return SUMMARY_PANEL_WIDTH
+    return typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.65) : 920
+  })
   // Body width for Sources-panel share of the row (drives auto side-by-side).
   const [bodyWidth, setBodyWidth] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1400,
@@ -223,7 +224,10 @@ export default function DataReviewPage() {
   // Top/bottom section height ratio in right panel (0-100, where value = preview percentage)
   const [previewHeight, setPreviewHeight] = useState(40)
   // Unified right rail — one shell, one active mode (sources | ai | comments | summary)
-  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>('sources')
+  const isPreparerEntry = entry === 'input-return' && roleParam !== 'reviewer'
+  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>(() =>
+    isPreparerEntry ? 'summary' : 'closed',
+  )
   // Whether the right panel is animating out (slide-out before mode → closed)
   const [rightPanelExiting, setRightPanelExiting] = useState(false)
   // Agent sub-state when mode === 'ai': idle → loading → report → closing
@@ -296,7 +300,7 @@ export default function DataReviewPage() {
   )
   const [show1040, setShow1040] = useState(true)
   const [outputFormId, setOutputFormId] = useState<OutputFormId>('summary')
-  const [importsStarted, setImportsStarted] = useState(() => entry === 'input-return')
+  const [importsStarted, setImportsStarted] = useState(false)
   /** First-run coach tip: hide summary */
   const [coachTip, setCoachTip] = useState<CoachTipId | null>(null)
   /** One-shot nudge when Phase 1 is fully complete (flags + docs) */
@@ -1068,6 +1072,21 @@ export default function DataReviewPage() {
     })
   }
 
+  // Preparer entry (Import confirmation / Input return tab): summary-first, sources closed
+  const preparerEntryHandled = useRef(false)
+  useEffect(() => {
+    if (!isPreparerEntry || preparerEntryHandled.current) return
+    preparerEntryHandled.current = true
+    setShow1040(true)
+    setOutputFormId('summary')
+    setImportsStarted(false)
+    setSummaryMode('signoff-review')
+    setSummaryOpts({})
+    setRightPanelWidth(SUMMARY_PANEL_WIDTH)
+    openRightPanel('summary')
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on preparer entry
+  }, [isPreparerEntry])
+
   // Auto-start review when navigated from SmartReturn header CTA
   const startReviewHandled = useRef(false)
   useEffect(() => {
@@ -1095,13 +1114,16 @@ export default function DataReviewPage() {
     setReviewActor(PREPARER_NAME)
     setReviewerReviewStarted(false)
     setPhase('import')
-    setImportsStarted(true)
+    setImportsStarted(false)
     setShow1040(true)
+    setOutputFormId('summary')
     setPass2Filter('all')
     setFocusNoteId(null)
-    openRightPanel('sources')
+    setSummaryMode('signoff-review')
+    setSummaryOpts({})
+    setRightPanelWidth(SUMMARY_PANEL_WIDTH)
+    openRightPanel('summary')
     navigate('/data-review?entry=input-return&role=preparer', { replace: true })
-    if (summaryPanelOpen) handleCloseSummaryPanel()
   }
 
   const handoffSnapshot: HandoffSnapshot | null =
@@ -1415,7 +1437,7 @@ export default function DataReviewPage() {
 
   // ProtoC: preparer skips welcome — lands in import phase with source docs open
   const isReviewerConfirmMode = reviewRole === 'reviewer'
-  const showImportPhaseBanner = inImportPhase && reviewRole === 'preparer'
+  const showImportPhaseBanner = inImportPhase && reviewRole === 'preparer' && importsStarted
   const isDedicatedReviewTab = entry === 'review-return' || entry === 'input-return'
 
   return (
@@ -1502,6 +1524,18 @@ export default function DataReviewPage() {
           )}
           {preparerHandoffChoice === 'finish-and-file' && (
             <span>· Moved to finish and file</span>
+          )}
+          {!importsStarted && reviewPass === 1 && inImportPhase && (
+            <span className={handoffStyles.passBarCta}>
+              <Button
+                priority="primary"
+                size="small"
+                onClick={startReviewingImports}
+                automationId="pass-bar-review-imports"
+              >
+                Review imports
+              </Button>
+            </span>
           )}
         </div>
       )}
@@ -2436,6 +2470,8 @@ export default function DataReviewPage() {
                       ? handleSwitchToReviewerRole
                       : handleBeginPass2Review
                   }
+                  importsPending={reviewRole === 'preparer' && !importsStarted && reviewPass === 1}
+                  onReviewImports={startReviewingImports}
                 />
               )}
             </div>
