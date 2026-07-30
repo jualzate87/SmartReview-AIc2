@@ -11,10 +11,6 @@ import '@ids-ts/icon-control/dist/main.css'
 import NotesPane from './data-review/NotesPane'
 import type { Note } from './data-review/NotesPane'
 import HandoffSummary from './data-review/HandoffSummary'
-import ReviewerAssistWelcome, {
-  markReviewerWelcomeShown,
-  readReviewerWelcomeShown,
-} from './data-review/ReviewerAssistWelcome'
 import handoffStyles from '../styles/data-review/HandoffSummary.module.css'
 import {
   buildHandoffSnapshot,
@@ -308,9 +304,8 @@ export default function DataReviewPage() {
   /** One-shot nudge after Phase 2 diagnostics are all reviewed */
   const [outputFormsCoach, setOutputFormsCoach] = useState(false)
   const [outputSourcesCoach, setOutputSourcesCoach] = useState(false)
-  /** One-shot Intuit Assist welcome when reviewer enters Pass 2 via Review return */
-  const [reviewerWelcomeVisible, setReviewerWelcomeVisible] = useState(false)
-  const [reviewerWelcomeExiting, setReviewerWelcomeExiting] = useState(false)
+  /** Assist-style staged reveal when reviewer lands from Review return (new tab) */
+  const [summaryBriefEnterAnim, setSummaryBriefEnterAnim] = useState(false)
   /** Explicit left-panel px width during Summary collapse/expand (null = natural flex). */
   const [leftAnimWidth, setLeftAnimWidth] = useState<number | null>(null)
   /** Keep doc|Details side-by-side during Summary toggle so flexDirection doesn't flip mid-motion. */
@@ -1042,15 +1037,6 @@ export default function DataReviewPage() {
     navigate('/smart-return?role=reviewer')
   }
 
-  const dismissReviewerWelcome = useCallback(() => {
-    markReviewerWelcomeShown()
-    setReviewerWelcomeExiting(true)
-    window.setTimeout(() => {
-      setReviewerWelcomeVisible(false)
-      setReviewerWelcomeExiting(false)
-    }, 300)
-  }, [])
-
   /** Header CTA — reviewer lands directly on Pass 2 strategic checklist */
   const handleReviewReturn = () => {
     setReviewerReviewStarted(true)
@@ -1066,10 +1052,7 @@ export default function DataReviewPage() {
       actor: REVIEWER_NAME,
       voice: 'self',
     })
-    if (!readReviewerWelcomeShown()) {
-      setReviewerWelcomeVisible(true)
-      setReviewerWelcomeExiting(false)
-    }
+    setSummaryBriefEnterAnim(true)
     setNotes(prev => {
       if (prev.length > 0) return prev
       return [{
@@ -1094,12 +1077,12 @@ export default function DataReviewPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on entry from SmartReturn
   }, [startReviewParam, entry])
 
-  // Auto-dismiss reviewer welcome toast after ~3s
+  // End staged brief reveal after animation completes
   useEffect(() => {
-    if (!reviewerWelcomeVisible || reviewerWelcomeExiting) return
-    const timer = window.setTimeout(() => dismissReviewerWelcome(), 3000)
+    if (!summaryBriefEnterAnim) return
+    const timer = window.setTimeout(() => setSummaryBriefEnterAnim(false), 2800)
     return () => window.clearTimeout(timer)
-  }, [reviewerWelcomeVisible, reviewerWelcomeExiting, dismissReviewerWelcome])
+  }, [summaryBriefEnterAnim])
 
   /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
   const handleSwitchRole = (role: 'preparer' | 'reviewer') => {
@@ -1433,20 +1416,23 @@ export default function DataReviewPage() {
   // ProtoC: preparer skips welcome — lands in import phase with source docs open
   const isReviewerConfirmMode = reviewRole === 'reviewer'
   const showImportPhaseBanner = inImportPhase && reviewRole === 'preparer'
+  const isDedicatedReviewTab = entry === 'review-return' || entry === 'input-return'
 
   return (
     <div
       className={styles.page}
       style={{
-        ['--app-header-offset' as string]: '68px',
+        ['--app-header-offset' as string]: isDedicatedReviewTab ? '0px' : '68px',
       }}
     >
-      <SmartReturnHeader
-        activeTab="inputreturn"
-        showReviewReturn={false}
-        demoRole={reviewRole}
-        onDemoRoleChange={handleSwitchRole}
-      />
+      {!isDedicatedReviewTab && (
+        <SmartReturnHeader
+          activeTab="inputreturn"
+          showReviewReturn={false}
+          demoRole={reviewRole}
+          onDemoRoleChange={handleSwitchRole}
+        />
+      )}
       {reviewRole === 'reviewer' && reviewerReviewStarted ? (
         <div className={handoffStyles.passBar} role="status">
           <span>Pass 1 completed by {PREPARER_NAME}</span>
@@ -1519,15 +1505,7 @@ export default function DataReviewPage() {
           )}
         </div>
       )}
-      {reviewRole === 'reviewer' && reviewerReviewStarted && (
-        <ReviewerAssistWelcome
-          reviewerFirstName={REVIEWER_NAME.split(' ')[0]}
-          preparerName={PREPARER_NAME}
-          visible={reviewerWelcomeVisible}
-          exiting={reviewerWelcomeExiting}
-          onDismiss={dismissReviewerWelcome}
-        />
-      )}
+
       {/* Header — title + peer icon controls (Sign-off lives on Step 2 banner) */}
       <div className={styles.headerBlock}>
         <div className={styles.header}>
@@ -2439,7 +2417,7 @@ export default function DataReviewPage() {
                   reviewPass={reviewPass}
                   isPreparer={reviewRole === 'preparer'}
                   amounts={amounts}
-                  briefEnterAnim={reviewerWelcomeVisible && !reviewerWelcomeExiting}
+                  briefEnterAnim={summaryBriefEnterAnim}
                   closing={panelClosing}
                   onClose={handleCloseSummaryPanel}
                   onContinue={() => {

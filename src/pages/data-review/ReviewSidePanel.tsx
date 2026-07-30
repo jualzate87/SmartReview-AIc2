@@ -15,6 +15,8 @@ type Props = {
   footer?: ReactNode
   /** Extra class on the shell */
   className?: string
+  /** Slide-in from right with Assist-style easing */
+  enterAnim?: boolean
 }
 
 /**
@@ -32,10 +34,11 @@ export default function ReviewSidePanel({
   children,
   footer,
   className,
+  enterAnim = false,
 }: Props) {
   return (
     <aside
-      className={`${styles.shell} ${closing ? styles.shellClosing : ''} ${className ?? ''}`}
+      className={`${styles.shell} ${enterAnim ? styles.shellEnterFromRight : ''} ${closing ? styles.shellClosing : ''} ${className ?? ''}`}
       role="complementary"
       aria-labelledby={titleId}
     >

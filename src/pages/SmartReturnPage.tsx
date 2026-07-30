@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import SmartReturnHeader from './SmartReturnHeader'
 import SmartReturnDocumentHub from './SmartReturnDocumentHub'
 import handoffStyles from '../styles/data-review/HandoffSummary.module.css'
 import styles from '../styles/SmartReturnPage.module.css'
 
+const REVIEW_RETURN_PATH = '/data-review?entry=review-return&role=reviewer&startReview=true'
+
 export default function SmartReturnPage() {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const roleParam = searchParams.get('role')
   const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>(() =>
@@ -34,7 +35,8 @@ export default function SmartReturnPage() {
   }
 
   const handleReviewReturn = () => {
-    navigate('/data-review?entry=review-return&role=reviewer&startReview=true')
+    const base = `${window.location.origin}${window.location.pathname}`
+    window.open(`${base}#${REVIEW_RETURN_PATH}`, '_blank', 'noopener,noreferrer')
   }
 
   const isReviewer = reviewRole === 'reviewer'

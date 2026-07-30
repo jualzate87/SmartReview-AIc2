@@ -98,7 +98,6 @@ export default function SmartReturnHeader({
           <button type="button" className={styles.ghostBtn}>
             Select Status <ChevronDown size="small" />
           </button>
-          <Button priority="secondary">Notes</Button>
           <Button priority="primary">
             Return actions <ChevronDown size="small" />
           </Button>
@@ -145,9 +144,10 @@ export default function SmartReturnHeader({
           </span>
           {showReviewReturn && (
             <Button
-              priority="standard"
+              priority="secondary"
               onClick={onReviewReturn}
               automationId="review-return-header-cta"
+              className={styles.reviewReturnBtn}
             >
               Review return
             </Button>

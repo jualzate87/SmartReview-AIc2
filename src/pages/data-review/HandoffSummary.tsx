@@ -9,6 +9,7 @@ import '@ids-ts/typography/dist/main.css'
 import { Tabs, Tab } from '@ids-ts/tabs'
 import '@ids-ts/tabs/dist/main.css'
 import { AiSparkles, ChevronRight, CircleCheck, CircleCheckFill } from '@design-systems/icons'
+import intuitAssistIcon from '../../assets/icons/intuit-assist.svg'
 import type { HandoffJump, HandoffSnapshot } from '../../data/handoffSnapshot'
 import type { LiveAmounts } from '../../data/liveReturn'
 import type { ReviewChecklistState } from '../../data/reviewChecklist'
@@ -276,8 +277,41 @@ function BriefTextLine({ parts }: { parts: BriefTextPart[] }) {
 }
 
 function ConversationalBriefCard({ brief, enterAnim = false }: { brief: ConversationalBrief; enterAnim?: boolean }) {
+  const [animPhase, setAnimPhase] = useState<'loading' | 'reveal' | 'done'>(enterAnim ? 'loading' : 'done')
+
+  useEffect(() => {
+    if (!enterAnim) {
+      setAnimPhase('done')
+      return
+    }
+    setAnimPhase('loading')
+    const revealTimer = window.setTimeout(() => setAnimPhase('reveal'), 650)
+    const doneTimer = window.setTimeout(() => setAnimPhase('done'), 2400)
+    return () => {
+      window.clearTimeout(revealTimer)
+      window.clearTimeout(doneTimer)
+    }
+  }, [enterAnim])
+
+  if (animPhase === 'loading') {
+    return (
+      <div className={styles.briefLoading} aria-busy="true" aria-live="polite">
+        <div className={styles.briefLoadingIconRow}>
+          <img src={intuitAssistIcon} alt="" className={styles.briefLoadingAssistIcon} />
+          <span className={styles.briefLoadingSparkle} aria-hidden>
+            <AiSparkles size="small" />
+          </span>
+        </div>
+        <div className={styles.briefLoadingShimmer} aria-hidden />
+        <p className={styles.briefLoadingText}>Preparing your review brief…</p>
+      </div>
+    )
+  }
+
+  const revealClass = animPhase === 'reveal' ? styles.conversationalBriefEnter : ''
+
   return (
-    <section className={`${styles.conversationalBrief} ${enterAnim ? styles.conversationalBriefEnter : ""}`} aria-labelledby="executive-brief-heading">
+    <section className={`${styles.conversationalBrief} ${revealClass}`} aria-labelledby="executive-brief-heading">
       <h3 id="executive-brief-heading" className={styles.conversationalBriefHeading}>
         {brief.heading}
       </h3>
@@ -639,6 +673,7 @@ export default function HandoffSummary({
         onClose={onClose}
         closeLabel="Close summary"
         closing={closing}
+        enterAnim={briefEnterAnim}
         footer={!hideFooter ? footerActions : undefined}
       >
         {briefContent}

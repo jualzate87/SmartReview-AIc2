@@ -139,3 +139,20 @@
     animation: none;
   }
 }
+
+
+.shellEnterFromRight {
+  animation: summaryPanelSlideIn var(--duration-progress-moderate, 1000ms)
+    var(--ease-appear-emphasize, cubic-bezier(0.15, 1.4, 0.25, 1)) both;
+}
+
+@keyframes summaryPanelSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
