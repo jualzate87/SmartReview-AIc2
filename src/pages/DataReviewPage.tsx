@@ -1643,11 +1643,9 @@ export default function DataReviewPage() {
               <span className={styles.intuitIntelLabel}>Source Documents</span>
               {sourceDocsBadgeCount > 0 && (
                 <span className={styles.toolbarBadge} aria-hidden>
-                  <Badge
-                    shape="round"
-                    status="warning"
-                    value={sourceDocsBadgeCount > 99 ? '99+' : sourceDocsBadgeCount}
-                  />
+                  <Badge status="warning" capitalization="sentence">
+                    {sourceDocsBadgeCount > 99 ? '99+' : sourceDocsBadgeCount}
+                  </Badge>
                 </span>
               )}
             </button>
