@@ -348,15 +348,16 @@
 }
 .tabMeta svg { color: #393a3d; flex-shrink: 0; }
 
-/* Review return — outline secondary passive (matches Notes style) */
+/* Review return — secondary passive outline; muted slate text + border (not action blue) */
 .reviewReturnBtn {
-  font-weight: var(--font-weight-component-semibold, 500) !important;
-  color: var(--color-action-standard, #205ea3) !important;
-  background: var(--color-container-background-primary, #ffffff) !important;
-  border-color: var(--color-action-border, #859299) !important;
+  font-weight: var(--font-weight-component-semibold) !important;
+  color: var(--color-text-secondary) !important;
+  background: var(--color-container-background-primary) !important;
+  border: 1px solid var(--color-text-secondary) !important;
 }
 
 .reviewReturnBtn:hover {
-  color: var(--color-action-standard-hover, #174d87) !important;
-  background: var(--color-container-background-secondary, #f4f5f8) !important;
+  color: var(--color-text-primary) !important;
+  background: var(--color-container-background-secondary) !important;
+  border-color: var(--color-text-secondary) !important;
 }

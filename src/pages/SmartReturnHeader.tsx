@@ -145,6 +145,7 @@ export default function SmartReturnHeader({
           {showReviewReturn && (
             <Button
               priority="secondary"
+              purpose="passive"
               onClick={onReviewReturn}
               automationId="review-return-header-cta"
               className={styles.reviewReturnBtn}
