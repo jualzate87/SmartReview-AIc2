@@ -9,8 +9,9 @@ import { getPhase1FlagKeysForVerifiedDoc } from '../pages/data-review/phase1Fiel
 import { normalizeVerifiedDocEntries, normalizeVerifiedDocKey } from '../data/verifiedDocKeys'
 import type { MilestoneCompletion } from '../data/reviewMilestones'
 
-// ProtoC: source-doc review state persisted in sessionStorage. BroadcastChannel
-// remains available for cross-tab sync if a second view is added later.
+// ProtoC2: source-doc review state persisted in localStorage so preparer work in
+// tab A is visible when the reviewer opens tab B (same origin). BroadcastChannel
+// + storage events keep open tabs in sync.
 
 /** @deprecated Prefer LiveAmounts — kept for DetailFields prop shims. */
 export interface FieldValues {
@@ -73,10 +74,98 @@ interface SyncedState {
 
 const CHANNEL_NAME = 'protoc2-data-review-sync'
 // Bump whenever DEFAULT_STATE shape or seed values change so stale sessions reset.
-const STATE_VERSION = 26
+const STATE_VERSION = 27
 const STORAGE_KEY = 'protoc2-data-review-state-v' + STATE_VERSION
+/** Prior keys — sessionStorage (tab-scoped) and v26 localStorage */
+const LEGACY_STORAGE_KEYS = [
+  STORAGE_KEY,
+  'protoc2-data-review-state-v26',
+] as const
+
+function readPersistedRaw(): string | null {
+  for (const key of LEGACY_STORAGE_KEYS) {
+    try {
+      const fromLocal = localStorage.getItem(key)
+      if (fromLocal) {
+        if (key !== STORAGE_KEY) localStorage.setItem(STORAGE_KEY, fromLocal)
+        return fromLocal
+      }
+      const fromSession = sessionStorage.getItem(key)
+      if (fromSession) {
+        localStorage.setItem(STORAGE_KEY, fromSession)
+        sessionStorage.removeItem(key)
+        return fromSession
+      }
+    } catch {
+      // ignore quota / private mode
+    }
+  }
+  return null
+}
+
+function writePersisted(state: SyncedState): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function hydrateSyncedState(raw: string): SyncedState {
+  const parsed = JSON.parse(raw) as Partial<SyncedState> & {
+    verifiedDocsList?: unknown
+    editedFieldsList?: unknown
+    reviewedFieldsList?: unknown
+    summaryCheckedFieldsList?: unknown
+    reviewerConfirmedFieldsList?: unknown
+    reviewerConfirmedDocsList?: unknown
+    reviewerSignedOffFormsList?: unknown
+    reviewerConfirmStaleFieldsList?: unknown
+    manualChecklistItems?: unknown
+    completedMilestones?: unknown
+    summaryFlaggedFieldsList?: unknown
+  }
+  const dualSlots = migrateDualSlotLists(parsed)
+  const normalizedDualSlots = {
+    ...dualSlots,
+    verifiedDocsList: normalizeVerifiedDocEntries(dualSlots.verifiedDocsList),
+    reviewerConfirmedDocsList: normalizeVerifiedDocEntries(dualSlots.reviewerConfirmedDocsList),
+  }
+  const loaded: SyncedState = {
+    ...DEFAULT_STATE,
+    ...parsed,
+    amounts: {
+      ...SEED_AMOUNTS,
+      ...(parsed.amounts ?? {}),
+      box12Rows: {
+        ...SEED_AMOUNTS.box12Rows,
+        ...(parsed.amounts?.box12Rows ?? {}),
+      },
+    },
+    reviewedFieldsList: migrateActivityList(parsed.reviewedFieldsList),
+    editedFieldsList: migrateActivityList(parsed.editedFieldsList),
+    ...normalizedDualSlots,
+    manualChecklistItems: parsed.manualChecklistItems && typeof parsed.manualChecklistItems === 'object'
+      ? parsed.manualChecklistItems as Record<string, boolean>
+      : {},
+    completedMilestones: parsed.completedMilestones && typeof parsed.completedMilestones === 'object'
+      ? parsed.completedMilestones as Record<string, MilestoneCompletion>
+      : {},
+    reviewerConfirmStaleFieldsList: Array.isArray(parsed.reviewerConfirmStaleFieldsList)
+      ? parsed.reviewerConfirmStaleFieldsList.filter((k): k is string => typeof k === 'string')
+      : [],
+    reviewerSignedOffFormsList: migrateActivityList(parsed.reviewerSignedOffFormsList),
+    summaryFlaggedFieldsList: migrateActivityList(parsed.summaryFlaggedFieldsList),
+    summaryFlagNotes: parsed.summaryFlagNotes ?? {},
+    summaryFlagActivity: parsed.summaryFlagActivity ?? {},
+    fieldOverrides: parsed.fieldOverrides ?? {},
+  }
+  return reconcileVerifiedDocFlags(enforceMutualExclusion(loaded))
+}
 export const PREPARER_NAME = 'Sara Chen'
 export const REVIEWER_NAME = 'Jordan Lee'
+/** Storage key for review state — exported for tests and diagnostics */
+export { STORAGE_KEY }
 
 /** C2: who stamps checks/flags/edits — switched when “Open as reviewer” */
 let currentActorName = PREPARER_NAME
@@ -305,56 +394,8 @@ function reconcileVerifiedDocFlags(state: SyncedState): SyncedState {
 
 function loadInitialState(): SyncedState {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<SyncedState> & {
-        verifiedDocsList?: unknown
-        editedFieldsList?: unknown
-        summaryCheckedFieldsList?: unknown
-        reviewerConfirmedFieldsList?: unknown
-        reviewerConfirmedDocsList?: unknown
-        reviewerSignedOffFormsList?: unknown
-        reviewerConfirmStaleFieldsList?: unknown
-        manualChecklistItems?: unknown
-        completedMilestones?: unknown
-        summaryFlaggedFieldsList?: unknown
-      }
-      const dualSlots = migrateDualSlotLists(parsed)
-      const normalizedDualSlots = {
-        ...dualSlots,
-        verifiedDocsList: normalizeVerifiedDocEntries(dualSlots.verifiedDocsList),
-        reviewerConfirmedDocsList: normalizeVerifiedDocEntries(dualSlots.reviewerConfirmedDocsList),
-      }
-      const loaded: SyncedState = {
-        ...DEFAULT_STATE,
-        ...parsed,
-        amounts: {
-          ...SEED_AMOUNTS,
-          ...(parsed.amounts ?? {}),
-          box12Rows: {
-            ...SEED_AMOUNTS.box12Rows,
-            ...(parsed.amounts?.box12Rows ?? {}),
-          },
-        },
-        editedFieldsList: migrateActivityList(parsed.editedFieldsList),
-        ...normalizedDualSlots,
-        manualChecklistItems: parsed.manualChecklistItems && typeof parsed.manualChecklistItems === 'object'
-          ? parsed.manualChecklistItems as Record<string, boolean>
-          : {},
-        completedMilestones: parsed.completedMilestones && typeof parsed.completedMilestones === 'object'
-          ? parsed.completedMilestones as Record<string, MilestoneCompletion>
-          : {},
-        reviewerConfirmStaleFieldsList: Array.isArray(parsed.reviewerConfirmStaleFieldsList)
-          ? parsed.reviewerConfirmStaleFieldsList.filter((k): k is string => typeof k === 'string')
-          : [],
-        reviewerSignedOffFormsList: migrateActivityList(parsed.reviewerSignedOffFormsList),
-        summaryFlaggedFieldsList: migrateActivityList(parsed.summaryFlaggedFieldsList),
-        summaryFlagNotes: parsed.summaryFlagNotes ?? {},
-        summaryFlagActivity: parsed.summaryFlagActivity ?? {},
-        fieldOverrides: parsed.fieldOverrides ?? {},
-      }
-      return reconcileVerifiedDocFlags(enforceMutualExclusion(loaded))
-    }
+    const raw = readPersistedRaw()
+    if (raw) return hydrateSyncedState(raw)
   } catch {
     // ignore malformed storage — fall through to defaults
   }
@@ -362,7 +403,7 @@ function loadInitialState(): SyncedState {
 }
 
 /**
- * Shared source-doc review state with sessionStorage persistence.
+ * Shared source-doc review state with localStorage persistence (cross-tab handoff).
  */
 export function useSyncedReviewState() {
   const channelRef = useRef<BroadcastChannel | null>(null)
@@ -374,11 +415,28 @@ export function useSyncedReviewState() {
     const channel = new BroadcastChannel(CHANNEL_NAME)
     channelRef.current = channel
     channel.onmessage = (e: MessageEvent<SyncedState>) => {
-      const next = enforceMutualExclusion(e.data)
+      const next = reconcileVerifiedDocFlags(enforceMutualExclusion(e.data))
+      stateRef.current = next
       setState(next)
-      try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      writePersisted(next)
     }
-    return () => channel.close()
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || !e.newValue) return
+      try {
+        const next = hydrateSyncedState(e.newValue)
+        stateRef.current = next
+        setState(next)
+      } catch {
+        // ignore malformed cross-tab payload
+      }
+    }
+    window.addEventListener('storage', onStorage)
+
+    return () => {
+      channel.close()
+      window.removeEventListener('storage', onStorage)
+    }
   }, [])
 
   const publish = (next: SyncedState) => {
@@ -389,7 +447,7 @@ export function useSyncedReviewState() {
     const safe = reconcileVerifiedDocFlags(enforceMutualExclusion(next))
     stateRef.current = safe
     setState(safe)
-    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(safe)) } catch { /* ignore */ }
+    writePersisted(safe)
     channelRef.current?.postMessage(safe)
   }
 

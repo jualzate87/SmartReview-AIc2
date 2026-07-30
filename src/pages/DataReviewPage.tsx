@@ -157,7 +157,7 @@ export default function DataReviewPage() {
   }, [entry, navigate])
 
   // Source-doc review state — flags, reviewed fields, active tab, editable field
-  // values — persisted in sessionStorage via useSyncedReviewState.
+  // values — persisted in localStorage via useSyncedReviewState (cross-tab handoff).
   const {
     activeTopTab, setActiveTopTab,
     activeSubTab, setActiveSubTab,
@@ -243,15 +243,22 @@ export default function DataReviewPage() {
   // Which agent subview to restore when going back to agent insights
   // 'overview' = report overview, 'yoyDetail' = YoY detail pane open
   const [agentSubView, setAgentSubView] = useState<'overview' | 'yoyDetail'>('overview')
-  // Notes / comments — persisted for C2 handoff
+  // Notes / comments — persisted for C2 handoff (localStorage for cross-tab reviewer)
   const NOTES_KEY = 'protoc2-notes'
-  const [notes, setNotes] = useState<Note[]>(() => {
+  const loadNotes = (): Note[] => {
     try {
-      const raw = sessionStorage.getItem(NOTES_KEY)
-      if (raw) return JSON.parse(raw) as Note[]
+      const fromLocal = localStorage.getItem(NOTES_KEY)
+      if (fromLocal) return JSON.parse(fromLocal) as Note[]
+      const fromSession = sessionStorage.getItem(NOTES_KEY)
+      if (fromSession) {
+        localStorage.setItem(NOTES_KEY, fromSession)
+        sessionStorage.removeItem(NOTES_KEY)
+        return JSON.parse(fromSession) as Note[]
+      }
     } catch { /* ignore */ }
     return []
-  })
+  }
+  const [notes, setNotes] = useState<Note[]>(loadNotes)
   // C2: multi-pass handoff — summary content when rightPanelMode === 'summary'
   const [reviewPass, setReviewPass] = useState<1 | 2>(() =>
     entry === 'review-return' && startReviewParam ? 2 : 1,
@@ -282,7 +289,7 @@ export default function DataReviewPage() {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(NOTES_KEY, JSON.stringify(notes))
+      localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
     } catch { /* ignore */ }
   }, [notes])
 
