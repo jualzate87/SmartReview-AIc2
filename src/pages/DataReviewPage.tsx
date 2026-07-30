@@ -954,10 +954,6 @@ export default function DataReviewPage() {
     openSummaryPanel('finish-and-file', summaryOpts)
   }
 
-  const handlePreviewPassToReviewer = () => {
-    openSummaryPanel('pass-to-reviewer', summaryOpts)
-  }
-
   const handleConfirmHandoffSend = () => {
     setPreparerHandoffChoice('awaiting-reviewer')
     openSummaryPanel('awaiting-reviewer', summaryOpts)
@@ -2501,17 +2497,10 @@ export default function DataReviewPage() {
                   briefEnterAnim={summaryBriefEnterAnim}
                   closing={panelClosing}
                   onClose={handleCloseSummaryPanel}
-                  onContinue={() => {
-                    if (handoffSnapshot.mode === 'pass-to-reviewer') {
-                      openSummaryPanel('signoff-review', summaryOpts)
-                    } else {
-                      handleCloseSummaryPanel()
-                    }
-                  }}
+                  onContinue={handleCloseSummaryPanel}
                   onJump={handleHandoffJump}
                   onFinishAndFile={handlePreviewFinishAndFile}
-                  onPassToReviewer={handlePreviewPassToReviewer}
-                  onConfirmSend={handleConfirmHandoffSend}
+                  onPassToReviewer={handleConfirmHandoffSend}
                   onOpenAsReviewer={
                     summaryMode === 'awaiting-reviewer'
                       ? handleSwitchToReviewerRole

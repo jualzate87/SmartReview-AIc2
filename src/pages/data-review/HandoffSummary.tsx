@@ -34,7 +34,6 @@ type Props = {
   onContinue?: () => void
   onFinishAndFile?: () => void
   onPassToReviewer?: () => void
-  onConfirmSend?: () => void
   onOpenAsReviewer?: () => void
   titleOverride?: string
   subtitleOverride?: string
@@ -469,7 +468,6 @@ export default function HandoffSummary({
   onContinue,
   onFinishAndFile,
   onPassToReviewer,
-  onConfirmSend,
   onOpenAsReviewer,
   hideFooter = false,
   closing = false,
@@ -576,21 +574,6 @@ export default function HandoffSummary({
           {onOpenAsReviewer && (
             <Button priority="primary" size="medium" onClick={onOpenAsReviewer}>
               Begin Pass 2 review
-            </Button>
-          )}
-        </div>
-      )}
-      {snapshot.mode === 'pass-to-reviewer' && (
-        <div className={styles.footerActionsRow}>
-          {onContinue && (
-            <Button priority="tertiary" size="medium" onClick={onContinue}>
-              Back
-            </Button>
-          )}
-          <div className={sidePanelStyles.footerSpacer} />
-          {onConfirmSend && (
-            <Button priority="primary" size="medium" onClick={onConfirmSend}>
-              Send to reviewer
             </Button>
           )}
         </div>
