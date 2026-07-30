@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
 import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close, ClockCounterclockwise } from '@design-systems/icons'
-import { Badge } from '@ids-ts/badge'
+import { Badge, NumericBadge } from '@ids-ts/badge'
 import '@ids-ts/badge/dist/main.css'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
@@ -1288,7 +1288,18 @@ export default function DataReviewPage() {
     singlePersonMode,
   })
 
-  /** Summary toolbar badge — Pass 2 checklist open items; preparer uses granular open count */
+  /** Source Documents toolbar badge — import work (preparer Pass 1) or doc confirm (reviewer Pass 2). */
+  const sourceDocsBadgeCount = (() => {
+    if (reviewRole === 'preparer' && inImportPhase) {
+      return phase1Remaining + unreviewedDocCount
+    }
+    if (reviewRole === 'reviewer' && reviewPass === 2) {
+      return pass2DocConfirmOpenCount
+    }
+    return 0
+  })()
+
+  /** Summary toolbar badge — reviewer Pass 2 checklist only; preparer import has no Summary badge. */
   const summaryBadgeCount = (() => {
     if (reviewRole === 'reviewer' && reviewPass === 2) {
       const pass2Brief = buildSmartReviewBrief({
@@ -1305,7 +1316,6 @@ export default function DataReviewPage() {
       })
       return countStrategicOpenItems(pass2Brief.phases)
     }
-    if (reviewRole === 'preparer') return outstandingOpenCount
     return 0
   })()
 
@@ -1587,14 +1597,21 @@ export default function DataReviewPage() {
                   <ClockCounterclockwise size="medium" />
                 </IconControl>
                 {summaryBadgeCount > 0 && (
-                  <span className={styles.notesBadge}>{summaryBadgeCount}</span>
+                  <span className={styles.toolbarBadge} aria-hidden>
+                    <NumericBadge quantity={summaryBadgeCount} isShort />
+                  </span>
                 )}
               </span>
             </div>
             {(reviewRole !== 'reviewer' || reviewerReviewStarted) && (
             <button
               className={`${styles.intuitIntelBtn} ${rightPanelVisible && !agentPanelActive ? styles.intuitIntelBtnActive : ''}`}
-              aria-label="Toggle panel"
+              aria-label={
+                sourceDocsBadgeCount > 0
+                  ? `Source Documents, ${sourceDocsBadgeCount} item${sourceDocsBadgeCount === 1 ? '' : 's'} need attention`
+                  : 'Toggle panel'
+              }
+              style={{ position: 'relative' }}
               onClick={() => {
                 if (agentPanelActive) {
                   handleAgentClose()
@@ -1611,6 +1628,11 @@ export default function DataReviewPage() {
             >
               <Panel size="medium" />
               <span className={styles.intuitIntelLabel}>Source Documents</span>
+              {sourceDocsBadgeCount > 0 && (
+                <span className={styles.toolbarBadge} aria-hidden>
+                  <NumericBadge quantity={sourceDocsBadgeCount} isShort />
+                </span>
+              )}
             </button>
             )}
             {/* ProtoC: AI Review is Phase 2 only — hidden during Phase 1 (import accuracy) */}

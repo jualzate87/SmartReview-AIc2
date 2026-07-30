@@ -107,6 +107,15 @@
   height: 24px;
 }
 
+/* IDS NumericBadge overlay on toolbar icon/button controls */
+.toolbarBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  pointer-events: none;
+  line-height: 0;
+}
+
 /* Red badge on Notes button in header */
 .notesBadge {
   position: absolute;
