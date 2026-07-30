@@ -788,7 +788,7 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
   return {
     viewMode,
     header: {
-      title: 'Smart review brief',
+      title: viewMode === 'preparer-summary' ? 'Review log' : 'Smart review brief',
       pass1Line:
         viewMode === 'preparer-summary'
           ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`

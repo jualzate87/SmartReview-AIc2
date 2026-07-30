@@ -211,10 +211,9 @@ export default function DataReviewPage() {
   // Agent panel width in px when open (default 588px, user-resizable)
   const [agentPanelWidth, setAgentPanelWidth] = useState(588)
   // Right panel width in px (default ~65% viewport once imports start)
-  const [rightPanelWidth, setRightPanelWidth] = useState(() => {
-    if (entry === 'input-return' && roleParam !== 'reviewer') return SUMMARY_PANEL_WIDTH
-    return typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.65) : 920
-  })
+  const [rightPanelWidth, setRightPanelWidth] = useState(() =>
+    typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.65) : 920,
+  )
   // Body width for Sources-panel share of the row (drives auto side-by-side).
   const [bodyWidth, setBodyWidth] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1400,
@@ -225,9 +224,7 @@ export default function DataReviewPage() {
   const [previewHeight, setPreviewHeight] = useState(40)
   // Unified right rail — one shell, one active mode (sources | ai | comments | summary)
   const isPreparerEntry = entry === 'input-return' && roleParam !== 'reviewer'
-  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>(() =>
-    isPreparerEntry ? 'summary' : 'closed',
-  )
+  const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>('closed')
   // Whether the right panel is animating out (slide-out before mode → closed)
   const [rightPanelExiting, setRightPanelExiting] = useState(false)
   // Agent sub-state when mode === 'ai': idle → loading → report → closing
@@ -1093,7 +1090,7 @@ export default function DataReviewPage() {
     })
   }
 
-  // Preparer entry (Import confirmation / Input return tab): Return Summary left, brief right, sources closed
+  // Preparer entry (Import confirmation / Input return tab): Return Summary full width, panels closed
   useEffect(() => {
     if (!isPreparerEntry) return
     setReviewRole('preparer')
@@ -1107,10 +1104,9 @@ export default function DataReviewPage() {
     setSelectedField(null)
     setSummaryMode('signoff-review')
     setSummaryOpts({})
-    setRightPanelWidth(SUMMARY_PANEL_WIDTH)
     setRightPanelExiting(false)
     setPanelClosing(false)
-    setRightPanelMode('summary')
+    setRightPanelMode('closed')
   }, [entry, roleParam, isPreparerEntry, setSelectedField])
 
   // Auto-start review when navigated from SmartReturn header CTA
@@ -1147,8 +1143,7 @@ export default function DataReviewPage() {
     setFocusNoteId(null)
     setSummaryMode('signoff-review')
     setSummaryOpts({})
-    setRightPanelWidth(SUMMARY_PANEL_WIDTH)
-    openRightPanel('summary')
+    closeRightPanel()
     navigate('/data-review?entry=input-return&role=preparer', { replace: true })
   }
 
@@ -1471,7 +1466,8 @@ export default function DataReviewPage() {
     }, SUMMARY_TOGGLE_MS)
   }, [])
 
-  // ProtoC: preparer skips welcome — lands in import phase, Return Summary + brief, sources closed
+  // ProtoC: preparer skips welcome — lands in import phase, Return Summary full width, panels closed
+  const summaryPanelLabel = reviewRole === 'preparer' ? 'Review log' : 'Smart review brief'
   const isReviewerConfirmMode = reviewRole === 'reviewer'
   const showImportPhaseBanner = inImportPhase && reviewRole === 'preparer' && importsStarted
   const isDedicatedReviewTab = entry === 'review-return' || entry === 'input-return'
@@ -1600,13 +1596,13 @@ export default function DataReviewPage() {
               </span>
               <span className={styles.headerIconWrap}>
                 <IconControl
-                  label="Summary"
+                  label={summaryPanelLabel}
                   size="medium"
                   selected={summaryPanelOpen}
                   aria-label={
                     summaryBadgeCount > 0
-                      ? `Smart review brief, ${summaryBadgeCount} checklist item${summaryBadgeCount === 1 ? '' : 's'} remaining`
-                      : 'Smart review brief'
+                      ? `${summaryPanelLabel}, ${summaryBadgeCount} checklist item${summaryBadgeCount === 1 ? '' : 's'} remaining`
+                      : summaryPanelLabel
                   }
                   onClick={
                     summaryPanelOpen ? handleCloseSummaryPanel : handleOpenSummaryReport
@@ -1648,7 +1644,11 @@ export default function DataReviewPage() {
               <span className={styles.intuitIntelLabel}>Source Documents</span>
               {sourceDocsBadgeCount > 0 && (
                 <span className={styles.toolbarBadge} aria-hidden>
-                  <NumericBadge quantity={sourceDocsBadgeCount} isShort />
+                  <Badge
+                    shape="round"
+                    status="warning"
+                    value={sourceDocsBadgeCount > 99 ? '99+' : sourceDocsBadgeCount}
+                  />
                 </span>
               )}
             </button>
