@@ -291,7 +291,7 @@ export default function DetailFieldsNec({
       {/* Page header */}
       <div className={styles.pageHeader}>
         <div className={styles.headerActions}>
-          <h2 style={{ fontFamily: 'var(--font-family-component)', fontSize: 18, fontWeight: 500, color: '#21262a', margin: 0, flex: 1, textAlign: 'left' }}>Details: Nonemployee Comp (1099-NEC)</h2>
+          <h2 className={styles.headerTitle}>Details: Nonemployee Comp (1099-NEC)</h2>
           <DocVerifyHeaderActions
             docKey={DOC_KEY}
             verifiedDocs={verifiedDocs}

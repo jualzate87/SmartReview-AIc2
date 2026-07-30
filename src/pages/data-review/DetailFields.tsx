@@ -476,7 +476,7 @@ export default function DetailFields({
       {/* Page header */}
       <div className={styles.pageHeader}>
         <div className={styles.headerActions}>
-          <h2 style={{ fontFamily: 'var(--font-family-component)', fontSize: 18, fontWeight: 500, color: '#21262a', margin: 0, flex: 1, textAlign: 'left' }}>{formTitle}</h2>
+          <h2 className={styles.headerTitle}>{formTitle}</h2>
           <DocVerifyHeaderActions
             docKey={activeSubTab}
             verifiedDocs={verifiedDocs}

@@ -1,22 +1,15 @@
 import {
-  formatDualCheckTooltip,
   getReviewActor,
   REVIEWER_NAME,
   type ActivityEntry,
 } from '../../hooks/useSyncedReviewState'
 import Tooltip from './Tooltip'
-import { Badge } from '@ids-ts/badge'
+import { Badge, SuccessBadgeIcon, WarningBadgeIcon } from '@ids-ts/badge'
 import '@ids-ts/badge/dist/main.css'
+import { Button } from '@ids-ts/button'
+import '@ids-ts/button/dist/main.css'
 import { getVerifiedDocEntry, isVerifiedInSet } from '../../data/verifiedDocKeys'
 import styles from '../../styles/data-review/DetailFields.module.css'
-
-function CheckIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-      <path d="M19.0711 7.0506C18.8836 6.86313 18.6293 6.75781 18.3641 6.75781C18.099 6.75781 17.8447 6.86313 17.6571 7.0506L9.87916 14.8286L6.34316 11.2936C6.15456 11.1115 5.90195 11.0107 5.63976 11.0129C5.37756 11.0152 5.12675 11.1204 4.94134 11.3058C4.75593 11.4912 4.65076 11.742 4.64848 12.0042C4.6462 12.2664 4.747 12.519 4.92916 12.7076L9.17216 16.9506C9.35968 17.1381 9.61399 17.2434 9.87916 17.2434C10.1443 17.2434 10.3986 17.1381 10.5861 16.9506L19.0711 8.4646C19.2586 8.27707 19.3639 8.02276 19.3639 7.7576C19.3639 7.49244 19.2586 7.23813 19.0711 7.0506Z" fill="currentColor"/>
-    </svg>
-  )
-}
 
 type Props = {
   docKey: string
@@ -42,6 +35,7 @@ export default function DocVerifyHeaderActions({
   const isReviewerActor = getReviewActor() === REVIEWER_NAME
   const preparerMeta = getVerifiedDocEntry(verifiedDocsMeta, docKey)
   const reviewerMeta = getVerifiedDocEntry(reviewerConfirmedDocsMeta, docKey)
+  const preparerName = preparerMeta?.by ?? 'preparer'
   const preparerTooltip = preparerMeta
     ? `Verified by ${preparerMeta.by} · ${preparerMeta.at}`
     : 'Click to unmark verified'
@@ -49,48 +43,105 @@ export default function DocVerifyHeaderActions({
     ? `Confirmed by ${reviewerMeta.by} · ${reviewerMeta.at}`
     : 'Click to remove confirmation'
 
-  const handleMarkClick = () => {
+  const handlePreparerMark = () => {
     onVerifyDoc?.(docKey)
-    if (!isReviewerActor) onPreparerMarkVerified?.()
+    onPreparerMarkVerified?.()
   }
+
+  const needsReviewerConfirm =
+    isReviewerActor && isPreparerVerified && !isReviewerConfirmed
 
   return (
     <div className={styles.verifyStatusGroup}>
-      {isPreparerVerified ? (
-        <Tooltip text={preparerTooltip} placement="top">
-          <button
-            type="button"
-            className={styles.verifiedBadge}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 4, display: 'flex', alignItems: 'center' }}
-            onClick={() => !isReviewerActor && onVerifyDoc?.(docKey)}
-          >
-            <CheckIcon size={14} /> Verified by {preparerMeta?.by ?? 'preparer'}
-          </button>
+      {needsReviewerConfirm && (
+        <Tooltip text="Needs confirmation" placement="top">
+          <span className={styles.needsConfirmIconWrap}>
+            <Badge
+              shape="round"
+              status="warning"
+              aria-label="Needs confirmation"
+            >
+              <WarningBadgeIcon />
+            </Badge>
+          </span>
         </Tooltip>
-      ) : !isReviewerActor ? (
-        <button type="button" className={styles.markVerifiedBtn} onClick={handleMarkClick}>
-          Mark as verified
-        </button>
-      ) : null}
+      )}
 
-      {isReviewerConfirmed ? (
-        <Tooltip text={reviewerTooltip} placement="top">
-          <button
-            type="button"
-            className={styles.confirmedBadge}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, gap: 4, display: 'flex', alignItems: 'center' }}
-            onClick={() => isReviewerActor && onVerifyDoc?.(docKey)}
-          >
-            <CheckIcon size={14} /> Confirmed
-          </button>
+      {isPreparerVerified && (
+        <Tooltip text={preparerTooltip} placement="top">
+          {isReviewerActor ? (
+            <Badge
+              shape="round"
+              status="success"
+              label={`Verified by ${preparerName}`}
+              aria-label={`Verified by ${preparerName}`}
+            >
+              <SuccessBadgeIcon />
+            </Badge>
+          ) : (
+            <button
+              type="button"
+              className={styles.preparerVerifiedBtn}
+              onClick={() => onVerifyDoc?.(docKey)}
+              aria-label={preparerTooltip}
+            >
+              <Badge
+                shape="round"
+                status="success"
+                label={`Verified by ${preparerName}`}
+              >
+                <SuccessBadgeIcon />
+              </Badge>
+            </button>
+          )}
         </Tooltip>
-      ) : isReviewerActor && isPreparerVerified ? (
-        <button type="button" className={styles.needsConfirmBtn} onClick={() => onVerifyDoc?.(docKey)}>
-          <Badge status="warning" priority="secondary" capitalization="sentence">
-            Needs confirmation
-          </Badge>
-        </button>
-      ) : null}
+      )}
+
+      {!isPreparerVerified && !isReviewerActor && (
+        <Button size="small" priority="secondary" onClick={handlePreparerMark}>
+          Mark as verified
+        </Button>
+      )}
+
+      {needsReviewerConfirm && (
+        <Button size="small" priority="primary" onClick={() => onVerifyDoc?.(docKey)}>
+          Confirm document
+        </Button>
+      )}
+
+      {isReviewerConfirmed && (
+        <Tooltip text={reviewerTooltip} placement="top">
+          {isReviewerActor ? (
+            <button
+              type="button"
+              className={styles.confirmedBadgeBtn}
+              onClick={() => onVerifyDoc?.(docKey)}
+              aria-label={reviewerTooltip}
+            >
+              <Badge
+                shape="round"
+                status="success"
+                label="Confirmed"
+                capitalization="sentence"
+                priority="secondary"
+              >
+                <SuccessBadgeIcon />
+              </Badge>
+            </button>
+          ) : (
+            <Badge
+              shape="round"
+              status="success"
+              label="Confirmed"
+              capitalization="sentence"
+              priority="secondary"
+              aria-label={reviewerTooltip}
+            >
+              <SuccessBadgeIcon />
+            </Badge>
+          )}
+        </Tooltip>
+      )}
     </div>
   )
 }

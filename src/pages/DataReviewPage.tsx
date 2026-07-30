@@ -355,7 +355,8 @@ export default function DataReviewPage() {
   const peelDocConfirmStatus = (docKey: string) => {
     if (reviewRole !== 'reviewer') return undefined
     const status = getDocConfirmStatus(verifiedDocs, docKey, reviewerConfirmedDocs)
-    return status === 'unverified' ? 'needs-confirm' : status
+    if (status === 'unverified') return undefined
+    return status
   }
 
   const unreviewedSourceDocs = getUnreviewedSourceDocs({

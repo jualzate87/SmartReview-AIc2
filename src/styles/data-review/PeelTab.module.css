@@ -93,20 +93,19 @@
   color: #ffffff;
 }
 
-.needsConfirmBadge {
-  display: inline-flex;
-  align-items: center;
+.needsConfirmDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-left: var(--space-component-gap-small, 6px);
+  border-radius: 50%;
+  background: var(--color-container-background-attention-primary, #e5a043);
   flex-shrink: 0;
 }
 
-.needsConfirmBadgeActive {
-  opacity: 0.95;
-}
-
-.tabNeedsConfirm:not(.tabActive) {
-  border-color: var(--color-container-border-attention, #e5a043);
-  background: var(--color-container-background-attention-secondary, #fff8eb);
+.needsConfirmDotActive {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
 .tabConfirmed:not(.tabActive) {

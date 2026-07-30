@@ -433,7 +433,7 @@ export default function DetailFields1099({
       {/* Page header */}
       <div className={styles.pageHeader}>
         <div className={styles.headerActions}>
-          <h2 style={{ fontFamily: 'var(--font-family-component)', fontSize: 18, fontWeight: 500, color: '#21262a', margin: 0, flex: 1, textAlign: 'left' }}>Details: Interest Income (1099-INT)</h2>
+          <h2 className={styles.headerTitle}>Details: Interest Income (1099-INT)</h2>
           <DocVerifyHeaderActions
             docKey={docKey}
             verifiedDocs={verifiedDocs}

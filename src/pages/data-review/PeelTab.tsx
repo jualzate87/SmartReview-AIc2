@@ -1,6 +1,4 @@
 import { CircleCheck } from '@design-systems/icons'
-import { Badge } from '@ids-ts/badge'
-import '@ids-ts/badge/dist/main.css'
 import type { DocConfirmStatus } from './docReviewStatus'
 import styles from '../../styles/data-review/PeelTab.module.css'
 
@@ -32,7 +30,6 @@ export default function PeelTab({ tabs, activeKey, onChange }: PeelTabProps) {
             className={[
               styles.tab,
               isActive ? styles.tabActive : styles.tabInactive,
-              confirmStatus === 'needs-confirm' ? styles.tabNeedsConfirm : '',
               confirmStatus === 'confirmed' && !isActive ? styles.tabConfirmed : '',
             ].filter(Boolean).join(' ')}
             onClick={() => onChange(tab.key)}
@@ -44,15 +41,11 @@ export default function PeelTab({ tabs, activeKey, onChange }: PeelTabProps) {
               </span>
             )}
             {confirmStatus === 'needs-confirm' && (
-              <Badge
-                status="warning"
-                priority="secondary"
-                capitalization="sentence"
-                className={`${styles.needsConfirmBadge} ${isActive ? styles.needsConfirmBadgeActive : ''}`}
+              <span
+                className={`${styles.needsConfirmDot} ${isActive ? styles.needsConfirmDotActive : ''}`}
                 aria-label="Needs reviewer confirmation"
-              >
-                Needs confirm
-              </Badge>
+                title="Needs reviewer confirmation"
+              />
             )}
             {confirmStatus === 'confirmed' && (
               <span

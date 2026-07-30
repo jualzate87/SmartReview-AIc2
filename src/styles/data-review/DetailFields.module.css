@@ -22,9 +22,34 @@
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: var(--space-component-gap-medium, 12px);
   padding: 14px 20px 12px;
   border-bottom: 1px solid #e8edf0;
+}
+
+.headerTitle {
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-large, 18px);
+  font-weight: var(--font-weight-heading, 500);
+  line-height: 26px;
+  color: var(--color-text-primary, #21262a);
+  margin: 0;
+}
+
+.preparerVerifiedBtn,
+.confirmedBadgeBtn {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.needsConfirmIconWrap {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .markVerifiedBtn {
