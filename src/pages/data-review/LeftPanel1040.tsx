@@ -532,6 +532,7 @@ export default function LeftPanel1040({
 
   /** Shared handler for output-form flag buttons (1040 + schedules). */
   const handleOutputFlagClick = (fieldKey: string, btn: HTMLElement) => {
+    if (!onToggleFlagged) return
     if (flaggedFields.has(fieldKey) && flagNoteField === fieldKey) {
       closeFlagNotePopover()
       return

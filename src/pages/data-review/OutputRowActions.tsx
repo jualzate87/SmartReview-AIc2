@@ -51,9 +51,12 @@ export default function OutputRowActions({
             className={`${styles.summaryActionBtn} ${isFlagged ? styles.summaryActionBtnFlag : ''} ${flagNoteOpen ? styles.summaryActionBtnActive : ''}`}
             aria-label={isFlagged ? `Remove flag from ${label}` : `Flag ${label} for follow-up`}
             aria-pressed={isFlagged}
-            onClick={onFlagClick}
+            onClick={e => {
+              e.stopPropagation()
+              onFlagClick?.(e)
+            }}
           >
-            <Flag size="small" />
+            <Flag size="small" aria-hidden />
           </button>
         </Tooltip>
       ) : (

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
 import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close, ClockCounterclockwise } from '@design-systems/icons'
 import { Badge, NumericBadge } from '@ids-ts/badge'
@@ -144,6 +144,7 @@ type RightPanelMode = 'closed' | 'sources' | 'ai' | 'comments' | 'summary'
 
 export default function DataReviewPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const entry = searchParams.get('entry')
   const roleParam = searchParams.get('role')
@@ -1090,7 +1091,8 @@ export default function DataReviewPage() {
     })
   }
 
-  // Preparer entry (Import confirmation / Input return tab): Return Summary full width, panels closed
+  // Preparer entry (Import confirmation / Input return tab): Return Summary full width, panels closed.
+  // Re-run on route navigation (location.key), not on every render — setSelectedField is unstable.
   useEffect(() => {
     if (!isPreparerEntry) return
     setReviewRole('preparer')
@@ -1107,7 +1109,7 @@ export default function DataReviewPage() {
     setRightPanelExiting(false)
     setPanelClosing(false)
     setRightPanelMode('closed')
-  }, [entry, roleParam, isPreparerEntry, setSelectedField])
+  }, [entry, roleParam, isPreparerEntry, location.key])
 
   // Auto-start review when navigated from SmartReturn header CTA
   const startReviewHandled = useRef(false)
@@ -1470,16 +1472,17 @@ export default function DataReviewPage() {
   const summaryPanelLabel = reviewRole === 'preparer' ? 'Review log' : 'Smart review brief'
   const isReviewerConfirmMode = reviewRole === 'reviewer'
   const showImportPhaseBanner = inImportPhase && reviewRole === 'preparer' && importsStarted
-  const isDedicatedReviewTab = entry === 'review-return' || entry === 'input-return'
+  /** Preparer input-return: Honey Tax product header. Review-return: chromeless dedicated tab. */
+  const showSmartReturnHeader = isPreparerEntry
 
   return (
     <div
       className={styles.page}
       style={{
-        ['--app-header-offset' as string]: isDedicatedReviewTab ? '0px' : '68px',
+        ['--app-header-offset' as string]: showSmartReturnHeader ? '0px' : '68px',
       }}
     >
-      {!isDedicatedReviewTab && (
+      {showSmartReturnHeader && (
         <SmartReturnHeader
           activeTab="inputreturn"
           showReviewReturn={false}

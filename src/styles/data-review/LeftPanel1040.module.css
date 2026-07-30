@@ -1387,6 +1387,12 @@
   box-sizing: border-box;
   transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
 }
+.summaryActionBtn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
 .summaryActionBtn:hover {
   background: #e0ecf8;
   border-color: var(--color-action-standard, #0077c5);
