@@ -696,7 +696,7 @@
   line-height: 1.4;
 }
 
-/* Pass bar + role switcher (DataReviewPage) */
+/* Pass bar workflow context (DataReviewPage, SmartReturnPage) */
 .passBar {
   display: flex;
   align-items: center;
@@ -754,29 +754,6 @@
   background: rgba(44, 160, 28, 0.08);
 }
 
-.roleSwitcher {
-  display: inline-flex;
-  margin-left: 12px;
-  border: 1px solid var(--color-divider-tertiary);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.roleBtn {
-  border: none;
-  background: transparent;
-  padding: 4px 10px;
-  font-family: var(--font-family-component);
-  font-size: var(--font-size-component-x-small);
-  font-weight: var(--font-weight-component-semibold);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-
-.roleBtnActive {
-  background: var(--color-container-background-secondary, #eef0f3);
-  color: var(--color-text-primary);
-}
 
 /* Legacy classes used by WrapUpDecision */
 .title {

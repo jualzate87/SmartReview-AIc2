@@ -1,0 +1,31 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-component-gap-medium);
+  min-height: 34px;
+  padding: 0 var(--space-container-padding-large, 24px);
+  background: var(--color-container-background-accent);
+  border-bottom: 1px solid var(--color-divider-secondary);
+  flex-shrink: 0;
+}
+
+.label {
+  font-family: var(--font-family-component);
+  font-size: var(--font-size-component-x-small);
+  font-weight: var(--font-weight-component-semibold);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+}
+
+.segmented {
+  display: flex;
+  align-items: center;
+}

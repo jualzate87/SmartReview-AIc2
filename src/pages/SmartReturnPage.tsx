@@ -46,29 +46,12 @@ export default function SmartReturnPage() {
           activeTab="smartreturn"
           showReviewReturn={isReviewer}
           onReviewReturn={handleReviewReturn}
+          demoRole={reviewRole}
+          onDemoRoleChange={handleSwitchRole}
         />
 
         <div className={handoffStyles.passBar} role="status">
-          <span className={handoffStyles.passBarStrong}>
-            {isReviewer ? 'Reviewer mode' : 'Preparer mode'}
-          </span>
-          <span>· SmartReturn landing</span>
-          <span className={handoffStyles.roleSwitcher} role="group" aria-label="Demo role">
-            <button
-              type="button"
-              className={`${handoffStyles.roleBtn} ${!isReviewer ? handoffStyles.roleBtnActive : ''}`}
-              onClick={() => handleSwitchRole('preparer')}
-            >
-              Preparer
-            </button>
-            <button
-              type="button"
-              className={`${handoffStyles.roleBtn} ${isReviewer ? handoffStyles.roleBtnActive : ''}`}
-              onClick={() => handleSwitchRole('reviewer')}
-            >
-              Reviewer
-            </button>
-          </span>
+          <span>SmartReturn landing</span>
         </div>
 
         <SmartReturnDocumentHub readOnly={isReviewer} />

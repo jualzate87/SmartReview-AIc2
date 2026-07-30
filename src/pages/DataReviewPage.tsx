@@ -1444,11 +1444,12 @@ export default function DataReviewPage() {
       <SmartReturnHeader
         activeTab="inputreturn"
         showReviewReturn={false}
+        demoRole={reviewRole}
+        onDemoRoleChange={handleSwitchRole}
       />
       {reviewRole === 'reviewer' && reviewerReviewStarted ? (
         <div className={handoffStyles.passBar} role="status">
-          <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
-          <span>· Pass 1 completed by {PREPARER_NAME}</span>
+          <span>Pass 1 completed by {PREPARER_NAME}</span>
           {reviewPass === 2 && (
             <Badge status="info" priority="secondary" capitalization="sentence">
               Pass 2
@@ -1504,14 +1505,12 @@ export default function DataReviewPage() {
         </div>
       ) : reviewRole === 'reviewer' ? (
         <div className={handoffStyles.passBar} role="status">
-          <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
-          <span>· {REVIEWER_NAME}</span>
+          <span>{REVIEWER_NAME}</span>
           <span>· Use Review return in the return header on SmartReturn to begin</span>
         </div>
       ) : (
         <div className={handoffStyles.passBar} role="status">
-          <span className={handoffStyles.passBarStrong}>Preparer mode</span>
-          <span>· Pass {reviewPass} · {PREPARER_NAME}</span>
+          <span>Pass {reviewPass} · {PREPARER_NAME}</span>
           {preparerHandoffChoice === 'awaiting-reviewer' && (
             <span>· Assigned to reviewer</span>
           )}
@@ -1534,22 +1533,6 @@ export default function DataReviewPage() {
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <span className={styles.headerTitle}>Data Review - Form 1040</span>
-            <span className={handoffStyles.roleSwitcher} role="group" aria-label="Demo role">
-              <button
-                type="button"
-                className={`${handoffStyles.roleBtn} ${reviewRole === 'preparer' ? handoffStyles.roleBtnActive : ''}`}
-                onClick={() => handleSwitchRole('preparer')}
-              >
-                Preparer
-              </button>
-              <button
-                type="button"
-                className={`${handoffStyles.roleBtn} ${reviewRole === 'reviewer' ? handoffStyles.roleBtnActive : ''}`}
-                onClick={() => handleSwitchRole('reviewer')}
-              >
-                Reviewer
-              </button>
-            </span>
           </div>
           <div className={styles.headerRight}>
             <div className={styles.headerIconGroup}>
