@@ -88,6 +88,7 @@ export default function DetailFields1099R({
   reviewerConfirmedDocsMeta,
   onVerifyDoc,
   onAddFieldNote,
+  importReadOnly = false,
   flaggedFields = {},
 }: DetailFields1099RProps) {
   const highlightedRef = useRef<HTMLDivElement>(null)
@@ -299,11 +300,15 @@ export default function DetailFields1099R({
             const tip = meta ? `Reviewed by ${meta.by} · ${meta.at}. Click to unmark` : 'Click to unmark'
             return (
               <Tooltip text={tip} placement="top">
-                <button className={styles.markCorrectBtn} style={{ color: '#108000' }} onClick={e => { e.stopPropagation(); onMarkReviewed?.(resolveKey) }}><CircleCheck size="small" /></button>
+                {importReadOnly ? (
+                  <span className={styles.reviewedBadge} style={{ display: 'inline-flex', alignItems: 'center', color: '#108000' }}><CircleCheck size="small" /></span>
+                ) : (
+                  <button className={styles.markCorrectBtn} style={{ color: '#108000' }} onClick={e => { e.stopPropagation(); onMarkReviewed?.(resolveKey) }}><CircleCheck size="small" /></button>
+                )}
               </Tooltip>
             )
           })()
-        ) : (
+        ) : importReadOnly ? null : (
           <div className={styles.fieldActions}>
             <Tooltip text="Mark as correct" placement="top"><button className={styles.markCorrectBtn} onClick={e => { e.stopPropagation(); onMarkReviewed?.(resolveKey) }}><CircleCheck size="small" /></button></Tooltip>
             {renderCommentBtn(fieldKey, label)}
