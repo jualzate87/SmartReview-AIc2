@@ -2,6 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
 import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close, ClockCounterclockwise } from '@design-systems/icons'
+import { Badge } from '@ids-ts/badge'
+import '@ids-ts/badge/dist/main.css'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
 import { IconControl } from '@ids-ts/icon-control'
@@ -9,6 +11,10 @@ import '@ids-ts/icon-control/dist/main.css'
 import NotesPane from './data-review/NotesPane'
 import type { Note } from './data-review/NotesPane'
 import HandoffSummary from './data-review/HandoffSummary'
+import ReviewerAssistWelcome, {
+  markReviewerWelcomeShown,
+  readReviewerWelcomeShown,
+} from './data-review/ReviewerAssistWelcome'
 import handoffStyles from '../styles/data-review/HandoffSummary.module.css'
 import {
   buildHandoffSnapshot,
@@ -247,7 +253,9 @@ export default function DataReviewPage() {
     return []
   })
   // C2: multi-pass handoff — summary content when rightPanelMode === 'summary'
-  const [reviewPass, setReviewPass] = useState<1 | 2>(1)
+  const [reviewPass, setReviewPass] = useState<1 | 2>(() =>
+    entry === 'review-return' && startReviewParam ? 2 : 1,
+  )
   const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>(() =>
     roleParam === 'reviewer' || entry === 'review-return' ? 'reviewer' : 'preparer',
   )
@@ -300,6 +308,9 @@ export default function DataReviewPage() {
   /** One-shot nudge after Phase 2 diagnostics are all reviewed */
   const [outputFormsCoach, setOutputFormsCoach] = useState(false)
   const [outputSourcesCoach, setOutputSourcesCoach] = useState(false)
+  /** One-shot Intuit Assist welcome when reviewer enters Pass 2 via Review return */
+  const [reviewerWelcomeVisible, setReviewerWelcomeVisible] = useState(false)
+  const [reviewerWelcomeExiting, setReviewerWelcomeExiting] = useState(false)
   /** Explicit left-panel px width during Summary collapse/expand (null = natural flex). */
   const [leftAnimWidth, setLeftAnimWidth] = useState<number | null>(null)
   /** Keep doc|Details side-by-side during Summary toggle so flexDirection doesn't flip mid-motion. */
@@ -1031,21 +1042,34 @@ export default function DataReviewPage() {
     navigate('/smart-return?role=reviewer')
   }
 
-  /** Header CTA — reviewer begins Pass 2 workflow via Pass 1 briefing */
+  const dismissReviewerWelcome = useCallback(() => {
+    markReviewerWelcomeShown()
+    setReviewerWelcomeExiting(true)
+    window.setTimeout(() => {
+      setReviewerWelcomeVisible(false)
+      setReviewerWelcomeExiting(false)
+    }, 300)
+  }, [])
+
+  /** Header CTA — reviewer lands directly on Pass 2 strategic checklist */
   const handleReviewReturn = () => {
     setReviewerReviewStarted(true)
     setReviewRole('reviewer')
     setReviewActor(REVIEWER_NAME)
-    setReviewPass(1)
+    setReviewPass(2)
     setPhase('diagnostics')
     setShow1040(true)
     setOutputFormId('summary')
-    setPass2Filter('all')
+    setPass2Filter('flags')
     openSummaryPanel('signoff-review', {
-      pass: 1,
-      actor: pass1ActorLabel,
-      voice: 'reviewer-briefing',
+      pass: 2,
+      actor: REVIEWER_NAME,
+      voice: 'self',
     })
+    if (!readReviewerWelcomeShown()) {
+      setReviewerWelcomeVisible(true)
+      setReviewerWelcomeExiting(false)
+    }
     setNotes(prev => {
       if (prev.length > 0) return prev
       return [{
@@ -1069,6 +1093,13 @@ export default function DataReviewPage() {
     handleReviewReturn()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on entry from SmartReturn
   }, [startReviewParam, entry])
+
+  // Auto-dismiss reviewer welcome toast after ~3s
+  useEffect(() => {
+    if (!reviewerWelcomeVisible || reviewerWelcomeExiting) return
+    const timer = window.setTimeout(() => dismissReviewerWelcome(), 3000)
+    return () => window.clearTimeout(timer)
+  }, [reviewerWelcomeVisible, reviewerWelcomeExiting, dismissReviewerWelcome])
 
   /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
   const handleSwitchRole = (role: 'preparer' | 'reviewer') => {
@@ -1417,7 +1448,13 @@ export default function DataReviewPage() {
       {reviewRole === 'reviewer' && reviewerReviewStarted ? (
         <div className={handoffStyles.passBar} role="status">
           <span className={handoffStyles.passBarStrong}>Reviewer mode</span>
-          <span>· Pass {reviewPass} · {REVIEWER_NAME}</span>
+          <span>· Pass 1 completed by {PREPARER_NAME}</span>
+          {reviewPass === 2 && (
+            <Badge status="info" priority="secondary" capitalization="sentence">
+              Pass 2
+            </Badge>
+          )}
+          <span>· {REVIEWER_NAME}</span>
           <div className={handoffStyles.filterChips} role="group" aria-label="Open items filter">
             {([
               ['all', 'All'],
@@ -1482,6 +1519,15 @@ export default function DataReviewPage() {
             <span>· Moved to finish and file</span>
           )}
         </div>
+      )}
+      {reviewRole === 'reviewer' && reviewerReviewStarted && (
+        <ReviewerAssistWelcome
+          reviewerFirstName={REVIEWER_NAME.split(' ')[0]}
+          preparerName={PREPARER_NAME}
+          visible={reviewerWelcomeVisible}
+          exiting={reviewerWelcomeExiting}
+          onDismiss={dismissReviewerWelcome}
+        />
       )}
       {/* Header — title + peer icon controls (Sign-off lives on Step 2 banner) */}
       <div className={styles.headerBlock}>
@@ -2410,6 +2456,7 @@ export default function DataReviewPage() {
                   reviewPass={reviewPass}
                   isPreparer={reviewRole === 'preparer'}
                   amounts={amounts}
+                  briefEnterAnim={reviewerWelcomeVisible && !reviewerWelcomeExiting}
                   closing={panelClosing}
                   onClose={handleCloseSummaryPanel}
                   onContinue={() => {

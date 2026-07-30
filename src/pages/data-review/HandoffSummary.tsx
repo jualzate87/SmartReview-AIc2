@@ -51,6 +51,8 @@ type Props = {
   reviewPass?: 1 | 2
   isPreparer?: boolean
   amounts?: LiveAmounts
+  /** Slide-in animation for conversational brief on reviewer welcome */
+  briefEnterAnim?: boolean
 }
 
 function JumpLink({
@@ -273,9 +275,9 @@ function BriefTextLine({ parts }: { parts: BriefTextPart[] }) {
   )
 }
 
-function ConversationalBriefCard({ brief }: { brief: ConversationalBrief }) {
+function ConversationalBriefCard({ brief, enterAnim = false }: { brief: ConversationalBrief; enterAnim?: boolean }) {
   return (
-    <section className={styles.conversationalBrief} aria-labelledby="executive-brief-heading">
+    <section className={`${styles.conversationalBrief} ${enterAnim ? styles.conversationalBriefEnter : ""}`} aria-labelledby="executive-brief-heading">
       <h3 id="executive-brief-heading" className={styles.conversationalBriefHeading}>
         {brief.heading}
       </h3>
@@ -328,15 +330,17 @@ function ReviewerChecklistTab({
   executiveBrief,
   onJump,
   onToggle,
+  briefEnterAnim = false,
 }: {
   phases: BriefPhase[]
   executiveBrief: ConversationalBrief | null
   onJump?: (jump: HandoffJump) => void
   onToggle?: (itemId: string, checked: boolean) => void
+  briefEnterAnim?: boolean
 }) {
   return (
     <div className={styles.tabPanel}>
-      {executiveBrief && <ConversationalBriefCard brief={executiveBrief} />}
+      {executiveBrief && <ConversationalBriefCard brief={executiveBrief} enterAnim={briefEnterAnim} />}
       <div className={styles.phaseStack}>
         {phases.map(phase => (
           <PhaseCard
@@ -444,6 +448,7 @@ export default function HandoffSummary({
   reviewPass = snapshot.pass,
   isPreparer = false,
   amounts,
+  briefEnterAnim = false,
 }: Props) {
   const brief = useMemo(
     () =>
@@ -591,6 +596,7 @@ export default function HandoffSummary({
               executiveBrief={brief.executiveBrief}
               onJump={onJump}
               onToggle={onToggleChecklistItem}
+              briefEnterAnim={briefEnterAnim}
             />
           </Tab>
           <Tab id="activity" title={`What ${PREPARER_NAME.split(' ')[0]} completed`}>

@@ -108,6 +108,23 @@
   line-height: 1.5;
 }
 
+.conversationalBriefEnter {
+  animation: briefSlideIn var(--duration-appear-emphasize-moderate, 700ms)
+    var(--ease-appear-emphasize, cubic-bezier(0.15, 1.4, 0.25, 1)) both;
+  animation-delay: 200ms;
+}
+
+@keyframes briefSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .conversationalBriefSubheading {
   margin: 0;
   font-family: var(--font-family-component);
