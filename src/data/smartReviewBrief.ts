@@ -3,6 +3,7 @@
  * Derives from handoffSnapshot, reviewChecklist, and live review state.
  */
 import { milestoneActorLabel, PREPARER_NAME, REVIEWER_NAME } from '../hooks/useSyncedReviewState'
+import { coerceTimestamp } from '../lib/coerceTimestamp'
 import type { HandoffJump, HandoffSnapshot, HandoffItemGroup, HandoffItem } from './handoffSnapshot'
 import {
   canonicalActivityKey,
@@ -213,7 +214,11 @@ function isPhase1ImportFlag(key: string): boolean {
 
 function docVerificationDetail(docItem: HandoffItem): string | undefined {
   if (!docItem.detail) return 'Marked verified against source document'
-  const metaOnly = docItem.detail.split(' · ')[0]
+  const detail =
+    typeof docItem.detail === 'string'
+      ? docItem.detail
+      : coerceTimestamp(docItem.detail)
+  const metaOnly = detail.split(' · ')[0]
   if (metaOnly && !metaOnly.startsWith('Cleared')) return metaOnly
   return 'Marked verified against source document'
 }

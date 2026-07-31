@@ -4,11 +4,11 @@
  */
 import type { ActivityEntry } from '../hooks/useSyncedReviewState'
 import {
-  coerceActivityAt,
   milestoneActorLabel,
   PREPARER_NAME,
   REVIEWER_NAME,
 } from '../hooks/useSyncedReviewState'
+import { coerceTimestamp, timestampDatePart } from '../lib/coerceTimestamp'
 import type { HandoffJump } from './handoffSnapshot'
 import { computeLiveReturn, type LiveAmounts } from './liveReturn'
 import {
@@ -381,12 +381,26 @@ function actorRole(name: string): MilestoneRole {
   return name === REVIEWER_NAME ? 'reviewer' : 'preparer'
 }
 
+function sanitizeMilestoneCompletion(
+  raw: MilestoneCompletion | undefined,
+): MilestoneCompletion | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name : PREPARER_NAME
+  const by: MilestoneRole =
+    raw.by === 'reviewer' || raw.by === 'preparer'
+      ? raw.by
+      : name === REVIEWER_NAME
+        ? 'reviewer'
+        : 'preparer'
+  return { by, name, at: coerceTimestamp(raw.at) }
+}
+
 function toCompletion(entry: ActivityEntry): MilestoneCompletion {
-  return {
+  return sanitizeMilestoneCompletion({
     by: actorRole(entry.by),
-    at: coerceActivityAt(entry.at),
+    at: coerceTimestamp(entry.at),
     name: entry.by,
-  }
+  })!
 }
 
 function allDocsReviewerConfirmed(docs: Set<string>): boolean {
@@ -527,29 +541,22 @@ function actorCanCompleteEligible(
   return false
 }
 
-/** Inline attribution — e.g. "SC · Jul 29" or "Jordan · Jul 29" (always shows who) */
-function milestoneDatePart(at: unknown): string {
-  const normalized = coerceActivityAt(at)
-  const byDot = normalized.split(' · ')[0]
-  if (byDot !== normalized) return byDot.trim()
-  const byComma = normalized.split(',')[0]
-  return (byComma ?? normalized).trim() || normalized
-}
-
 export function formatMilestoneAttribution(
   completion: MilestoneCompletion | undefined,
 ): string | undefined {
-  if (!completion) return undefined
-  const datePart = milestoneDatePart(completion.at)
-  return `${milestoneActorLabel(completion.name)} · ${datePart}`
+  const safe = sanitizeMilestoneCompletion(completion)
+  if (!safe) return undefined
+  const datePart = timestampDatePart(safe.at)
+  return `${milestoneActorLabel(safe.name)} · ${datePart}`
 }
 
 /** Full name + timestamp for tooltip / audit detail */
 export function formatMilestoneAttributionTooltip(
   completion: MilestoneCompletion | undefined,
 ): string | undefined {
-  if (!completion) return undefined
-  return `${completion.name} · ${coerceActivityAt(completion.at)}`
+  const safe = sanitizeMilestoneCompletion(completion)
+  if (!safe) return undefined
+  return `${safe.name} · ${coerceTimestamp(safe.at)}`
 }
 
 export function deriveMilestoneState(input: MilestoneInputs): MilestoneState {
@@ -558,12 +565,12 @@ export function deriveMilestoneState(input: MilestoneInputs): MilestoneState {
     let completion: MilestoneCompletion | undefined
 
     if (milestone.completionType === 'declaration') {
-      completion = input.completedMilestones[milestone.id]
+      completion = sanitizeMilestoneCompletion(input.completedMilestones[milestone.id])
       complete = !!completion
     } else if (milestone.completionType === 'auto' || milestone.completionType === 'linked') {
       const linked = resolveLinkedCompletion(milestone.linkedKey, input)
       complete = linked.complete
-      completion = linked.completion
+      completion = sanitizeMilestoneCompletion(linked.completion)
     }
 
     const locked = milestone.completionType !== 'declaration'

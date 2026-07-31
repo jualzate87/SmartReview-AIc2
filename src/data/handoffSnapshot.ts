@@ -2,6 +2,7 @@
  * C2 handoff snapshot — conversational storyline for preparer sign-off and reviewer briefing.
  */
 import type { ActivityEntry } from '../hooks/useSyncedReviewState'
+import { coerceTimestamp } from '../lib/coerceTimestamp'
 import { computeLiveReturn, type LiveAmounts } from './liveReturn'
 import {
   PHASE1_FLAG_KEYS,
@@ -311,7 +312,8 @@ function initials(name: string): string {
 }
 
 export function formatCheckMeta(entry: ActivityEntry): string {
-  return `${initials(entry.by)} · ${entry.at}`
+  const at = coerceTimestamp(entry.at)
+  return `${initials(entry.by)} · ${at}`
 }
 
 function fieldLabel(key: string): string {

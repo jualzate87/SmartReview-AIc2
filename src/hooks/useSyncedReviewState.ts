@@ -8,6 +8,11 @@ import { PHASE1_TO_PHASE2_ISSUES } from '../pages/data-review/phase2FlagSync'
 import { getPhase1FlagKeysForVerifiedDoc } from '../pages/data-review/phase1FieldSync'
 import { normalizeVerifiedDocEntries, normalizeVerifiedDocKey } from '../data/verifiedDocKeys'
 import type { MilestoneCompletion } from '../data/reviewMilestones'
+import {
+  coerceTimestamp,
+  formatActivityTimestamp,
+  sanitizeActivityEntry,
+} from '../lib/coerceTimestamp'
 
 // ProtoC2: source-doc review state persisted in localStorage so preparer work in
 // tab A is visible when the reviewer opens tab B (same origin). BroadcastChannel
@@ -74,11 +79,12 @@ interface SyncedState {
 
 const CHANNEL_NAME = 'protoc2-data-review-sync'
 // Bump whenever DEFAULT_STATE shape or seed values change so stale sessions reset.
-const STATE_VERSION = 27
+const STATE_VERSION = 28
 const STORAGE_KEY = 'protoc2-data-review-state-v' + STATE_VERSION
-/** Prior keys — sessionStorage (tab-scoped) and v26 localStorage */
+/** Prior keys — sessionStorage (tab-scoped) and older localStorage versions */
 const LEGACY_STORAGE_KEYS = [
   STORAGE_KEY,
+  'protoc2-data-review-state-v27',
   'protoc2-data-review-state-v26',
 ] as const
 
@@ -124,14 +130,9 @@ function hydrateSyncedState(raw: string): SyncedState {
     manualChecklistItems?: unknown
     completedMilestones?: unknown
     summaryFlaggedFieldsList?: unknown
+    summaryFlagActivity?: unknown
   }
-  const dualSlots = migrateDualSlotLists(parsed)
-  const normalizedDualSlots = {
-    ...dualSlots,
-    verifiedDocsList: normalizeVerifiedDocEntries(dualSlots.verifiedDocsList),
-    reviewerConfirmedDocsList: normalizeVerifiedDocEntries(dualSlots.reviewerConfirmedDocsList),
-  }
-  const loaded: SyncedState = {
+  return sanitizeSyncedState({
     ...DEFAULT_STATE,
     ...parsed,
     amounts: {
@@ -142,21 +143,42 @@ function hydrateSyncedState(raw: string): SyncedState {
         ...(parsed.amounts?.box12Rows ?? {}),
       },
     },
-    reviewedFieldsList: migrateActivityList(parsed.reviewedFieldsList),
-    editedFieldsList: migrateActivityList(parsed.editedFieldsList),
-    ...normalizedDualSlots,
     manualChecklistItems: parsed.manualChecklistItems && typeof parsed.manualChecklistItems === 'object'
       ? parsed.manualChecklistItems as Record<string, boolean>
       : {},
-    completedMilestones: migrateCompletedMilestones(parsed.completedMilestones),
+    summaryFlagNotes: parsed.summaryFlagNotes ?? {},
+    fieldOverrides: parsed.fieldOverrides ?? {},
     reviewerConfirmStaleFieldsList: Array.isArray(parsed.reviewerConfirmStaleFieldsList)
       ? parsed.reviewerConfirmStaleFieldsList.filter((k): k is string => typeof k === 'string')
       : [],
+    reviewedFieldsList: migrateActivityList(parsed.reviewedFieldsList),
+    editedFieldsList: migrateActivityList(parsed.editedFieldsList),
+    ...migrateDualSlotLists(parsed),
+    completedMilestones: migrateCompletedMilestones(parsed.completedMilestones),
     reviewerSignedOffFormsList: migrateActivityList(parsed.reviewerSignedOffFormsList),
     summaryFlaggedFieldsList: migrateActivityList(parsed.summaryFlaggedFieldsList),
-    summaryFlagNotes: parsed.summaryFlagNotes ?? {},
-    summaryFlagActivity: parsed.summaryFlagActivity ?? {},
-    fieldOverrides: parsed.fieldOverrides ?? {},
+    summaryFlagActivity: migrateActivityRecord(parsed.summaryFlagActivity),
+  })
+}
+
+/** Re-sanitize in-memory or cross-tab state so every `at` field is a string. */
+export function sanitizeSyncedState(state: SyncedState): SyncedState {
+  const dualSlots = {
+    summaryCheckedFieldsList: migrateActivityList(state.summaryCheckedFieldsList),
+    reviewerConfirmedFieldsList: migrateActivityList(state.reviewerConfirmedFieldsList),
+    verifiedDocsList: normalizeVerifiedDocEntries(migrateActivityList(state.verifiedDocsList)),
+    reviewerConfirmedDocsList: normalizeVerifiedDocEntries(migrateActivityList(state.reviewerConfirmedDocsList)),
+  }
+  const loaded: SyncedState = {
+    ...DEFAULT_STATE,
+    ...state,
+    reviewedFieldsList: migrateActivityList(state.reviewedFieldsList),
+    editedFieldsList: migrateActivityList(state.editedFieldsList),
+    ...dualSlots,
+    completedMilestones: migrateCompletedMilestones(state.completedMilestones),
+    reviewerSignedOffFormsList: migrateActivityList(state.reviewerSignedOffFormsList),
+    summaryFlaggedFieldsList: migrateActivityList(state.summaryFlaggedFieldsList),
+    summaryFlagActivity: migrateActivityRecord(state.summaryFlagActivity),
   }
   return reconcileVerifiedDocFlags(enforceMutualExclusion(loaded))
 }
@@ -176,21 +198,9 @@ export function getReviewActor(): string {
   return currentActorName
 }
 
-export function formatActivityTimestamp(date: Date = new Date()): string {
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
-}
-
-/** Normalize persisted activity timestamps — legacy sessions may store numbers or nested shapes. */
-export function coerceActivityAt(at: unknown, fallback = 'earlier'): string {
-  if (typeof at === 'string' && at.trim()) return at
-  if (typeof at === 'number' && Number.isFinite(at)) {
-    return formatActivityTimestamp(new Date(at))
-  }
-  if (at && typeof at === 'object' && 'at' in at) {
-    return coerceActivityAt((at as { at: unknown }).at, fallback)
-  }
-  return fallback
-}
+export { formatActivityTimestamp }
+/** @deprecated Use coerceTimestamp from lib/coerceTimestamp — kept for existing imports */
+export const coerceActivityAt = coerceTimestamp
 
 function migrateCompletedMilestones(raw: unknown): Record<string, MilestoneCompletion> {
   if (!raw || typeof raw !== 'object') return {}
@@ -205,14 +215,14 @@ function migrateCompletedMilestones(raw: unknown): Record<string, MilestoneCompl
         : name === REVIEWER_NAME
           ? 'reviewer'
           : 'preparer'
-    out[id] = { by, name, at: coerceActivityAt(v.at) }
+    out[id] = { by, name, at: coerceTimestamp(v.at) }
   }
   return out
 }
 
 export function formatActivityMeta(entry?: ActivityEntry | null): string {
   if (!entry) return ''
-  return `${entry.by} · ${entry.at}`
+  return `${entry.by} · ${coerceTimestamp(entry.at)}`
 }
 
 export function actorInitials(name: string): string {
@@ -363,12 +373,21 @@ function migrateActivityList(
       if (entry && typeof entry === 'object' && 'by' in entry) {
         const e = entry as Partial<ActivityEntry>
         const by = typeof e.by === 'string' ? e.by : PREPARER_NAME
-        return [item[0], { by, at: coerceActivityAt(e.at, fallbackAt) }]
+        return [item[0], sanitizeActivityEntry(e, by, fallbackAt)]
       }
       return [item[0], { by: PREPARER_NAME, at: fallbackAt }]
     }
     return null
   }).filter((x): x is [string, ActivityEntry] => x !== null)
+}
+
+function migrateActivityRecord(raw: unknown): Record<string, ActivityEntry> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, ActivityEntry> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    out[key] = sanitizeActivityEntry(value, PREPARER_NAME)
+  }
+  return out
 }
 
 const DEFAULT_STATE: SyncedState = {
@@ -408,8 +427,12 @@ function reconcileVerifiedDocFlags(state: SyncedState): SyncedState {
   if (!state.verifiedDocsList.length) return state
   const nextReviewed = new Map(state.reviewedFieldsList)
   let changed = false
-  const at = state.verifiedDocsList[0]?.[1]?.at ?? formatActivityTimestamp()
-  const by = state.verifiedDocsList[0]?.[1]?.by ?? PREPARER_NAME
+  const stamp = sanitizeActivityEntry(
+    state.verifiedDocsList[0]?.[1],
+    PREPARER_NAME,
+    formatActivityTimestamp(),
+  )
+  const { at, by } = stamp
   for (const [docKey] of state.verifiedDocsList) {
     for (const flag of getPhase1FlagKeysForVerifiedDoc(docKey)) {
       if (!nextReviewed.has(flag)) {
@@ -445,7 +468,7 @@ export function useSyncedReviewState() {
     const channel = new BroadcastChannel(CHANNEL_NAME)
     channelRef.current = channel
     channel.onmessage = (e: MessageEvent<SyncedState>) => {
-      const next = reconcileVerifiedDocFlags(enforceMutualExclusion(e.data))
+      const next = sanitizeSyncedState(e.data)
       stateRef.current = next
       setState(next)
       writePersisted(next)
@@ -474,7 +497,7 @@ export function useSyncedReviewState() {
     // fieldKeys.forEach(k => markReviewed(k))) each see the previous call's
     // write instead of all reading the same stale snapshot and clobbering
     // each other. setState is still what actually triggers the re-render.
-    const safe = reconcileVerifiedDocFlags(enforceMutualExclusion(next))
+    const safe = sanitizeSyncedState(next)
     stateRef.current = safe
     setState(safe)
     writePersisted(safe)
