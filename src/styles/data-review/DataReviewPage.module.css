@@ -69,6 +69,7 @@
 
 /* Intuit Intelligence button — bordered box */
 .intuitIntelBtn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -79,6 +80,7 @@
   border-radius: 6px;
   cursor: pointer;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .intuitIntelLabel {
@@ -112,6 +114,7 @@
   position: absolute;
   top: -4px;
   right: -4px;
+  z-index: 1;
   pointer-events: none;
   line-height: 0;
 }

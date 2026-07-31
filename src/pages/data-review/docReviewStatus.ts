@@ -52,7 +52,9 @@ export function countDocsIncompleteForReviewer(args: {
   docKeys: readonly string[]
 }): number {
   const { verifiedDocs, reviewerConfirmedDocs, docKeys } = args
-  return docKeys.filter(k => !isDocShownVerified(verifiedDocs, k, reviewerConfirmedDocs)).length
+  return docKeys.filter(
+    k => getDocConfirmStatus(verifiedDocs, k, reviewerConfirmedDocs) !== 'confirmed',
+  ).length
 }
 
 /**

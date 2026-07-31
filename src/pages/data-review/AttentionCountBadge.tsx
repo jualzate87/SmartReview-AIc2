@@ -14,7 +14,7 @@ type AttentionCountBadgeProps = {
   'aria-label'?: string
 }
 
-/** Round warning badge for unresolved import flags, confirm work, and toolbar counts. */
+/** Warning numeric badge for unresolved import flags, confirm work, and toolbar counts. */
 export default function AttentionCountBadge({
   count,
   className,
@@ -29,7 +29,8 @@ export default function AttentionCountBadge({
       aria-hidden={ariaHidden}
       aria-label={ariaLabel}
     >
-      <Badge shape="round" status="warning" capitalization="sentence">
+      {/* Rectangular warning badge — IDS only applies attention background for rect/dot, not round */}
+      <Badge status="warning" capitalization="sentence">
         {formatAttentionCount(count)}
       </Badge>
     </span>
