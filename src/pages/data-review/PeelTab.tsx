@@ -1,4 +1,5 @@
 import { CircleCheck } from '@design-systems/icons'
+import AttentionCountBadge from './AttentionCountBadge'
 import type { DocConfirmStatus } from './docReviewStatus'
 import styles from '../../styles/data-review/PeelTab.module.css'
 
@@ -36,15 +37,13 @@ export default function PeelTab({ tabs, activeKey, onChange }: PeelTabProps) {
           >
             {tab.label}
             {count > 0 && !tab.showClearedCheck && confirmStatus !== 'needs-confirm' && (
-              <span className={`${styles.badge} ${isActive ? styles.badgeActive : styles.badgeInactive}`}>
-                {count}
-              </span>
+              <AttentionCountBadge count={count} className={styles.tabCountBadge} />
             )}
             {confirmStatus === 'needs-confirm' && (
-              <span
-                className={`${styles.needsConfirmDot} ${isActive ? styles.needsConfirmDotActive : ''}`}
+              <AttentionCountBadge
+                count={1}
+                className={styles.tabCountBadge}
                 aria-label="Needs reviewer confirmation"
-                title="Needs reviewer confirmation"
               />
             )}
             {confirmStatus === 'confirmed' && (

@@ -1,5 +1,6 @@
 import { CircleCheck } from '@design-systems/icons'
 import sparklesIcon from '../../assets/icons/sparkles.svg'
+import AttentionCountBadge from './AttentionCountBadge'
 import type { DocConfirmStatus } from './docReviewStatus'
 import styles from '../../styles/data-review/ReviewTab.module.css'
 
@@ -44,6 +45,8 @@ interface ReviewTabProps {
   typeReviewed?: Record<string, boolean>
   /** Pass 2 reviewer: aggregate confirm status per top tab */
   tabConfirmStatus?: Record<string, DocConfirmStatus>
+  /** Pass 2 reviewer: count of docs awaiting confirmation per top tab */
+  tabConfirmCounts?: Record<string, number>
 }
 
 export default function ReviewTab({
@@ -56,6 +59,7 @@ export default function ReviewTab({
   tabVerifiedKeys,
   typeReviewed,
   tabConfirmStatus,
+  tabConfirmCounts,
 }: ReviewTabProps) {
   const handleTabClick = (key: string, label: string) => {
     if (TAB_KEYS.has(key)) {
@@ -67,11 +71,12 @@ export default function ReviewTab({
   const renderBadge = (tabKey: string) => {
     const confirmStatus = tabConfirmStatus?.[tabKey]
     if (confirmStatus === 'needs-confirm') {
+      const confirmCount = tabConfirmCounts?.[tabKey] ?? 1
       return (
-        <span
-          className={styles.tabNeedsConfirmDot}
+        <AttentionCountBadge
+          count={confirmCount}
+          className={styles.tabCountBadge}
           aria-label="Documents need reviewer confirmation"
-          title="Needs reviewer confirmation"
         />
       )
     }
@@ -86,7 +91,7 @@ export default function ReviewTab({
     if (!flagCounts && !typeReviewed && !verifiedDocs) return null
     const count = flagCounts?.[tabKey] ?? 0
     if (count > 0) {
-      return <span className={styles.tabFlagBadge}>{count}</span>
+      return <AttentionCountBadge count={count} className={styles.tabCountBadge} />
     }
     if (typeReviewed?.[tabKey]) {
       return (

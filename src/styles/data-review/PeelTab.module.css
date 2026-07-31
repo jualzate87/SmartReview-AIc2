@@ -58,29 +58,6 @@
   color: #21262a;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9999px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  margin-left: 6px;
-}
-
-.badgeActive {
-  background: rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-}
-
-.badgeInactive {
-  background: #c9500f;
-  color: #ffffff;
-}
 
 .clearedCheck {
   display: inline-flex;
@@ -93,21 +70,11 @@
   color: #ffffff;
 }
 
-.needsConfirmDot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-left: var(--space-component-gap-small, 6px);
-  border-radius: 50%;
-  background: var(--color-container-background-attention-primary, #e5a043);
-  flex-shrink: 0;
-}
-
-.needsConfirmDotActive {
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
-}
 
 .tabConfirmed:not(.tabActive) {
   border-color: var(--color-action-success, #00856d);
+}
+
+.tabCountBadge {
+  margin-left: var(--space-component-gap-small, 6px);
 }

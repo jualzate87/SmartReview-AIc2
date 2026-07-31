@@ -107,32 +107,13 @@
   height: 24px;
 }
 
-/* IDS NumericBadge overlay on toolbar icon/button controls */
+/* IDS warning count badge overlay on toolbar icon/button controls */
 .toolbarBadge {
   position: absolute;
   top: -4px;
   right: -4px;
   pointer-events: none;
   line-height: 0;
-}
-
-/* Red badge on Notes button in header */
-.notesBadge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
-  background: #c9500f;
-  color: #fff;
-  font-family: var(--font-family-component);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 16px;
-  text-align: center;
-  padding: 0 4px;
-  pointer-events: none;
 }
 
 /* Body — fills remaining space */

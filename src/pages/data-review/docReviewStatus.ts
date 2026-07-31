@@ -70,6 +70,26 @@ export function isDocReviewed(
   return initialFlagCount > 0 && remainingFlagCount === 0
 }
 
+/** Count docs awaiting reviewer confirmation per L1 document type tab. */
+export function buildTabConfirmCounts(args: {
+  verifiedDocs: Set<string>
+  reviewerConfirmedDocs: Set<string>
+  tabVerifiedKeys: Record<string, string[]>
+  isReviewer: boolean
+}): Record<string, number> {
+  if (!args.isReviewer) return {}
+  const out: Record<string, number> = {}
+  for (const [tabKey, keys] of Object.entries(args.tabVerifiedKeys)) {
+    const count = countDocsNeedingReviewerConfirm({
+      verifiedDocs: args.verifiedDocs,
+      reviewerConfirmedDocs: args.reviewerConfirmedDocs,
+      docKeys: keys,
+    })
+    if (count > 0) out[tabKey] = count
+  }
+  return out
+}
+
 /** Aggregate reviewer confirm state per L1 document type tab. */
 export function buildTabConfirmStatus(args: {
   verifiedDocs: Set<string>

@@ -2,7 +2,6 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
 import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close, ClockCounterclockwise } from '@design-systems/icons'
-import { Badge, NumericBadge } from '@ids-ts/badge'
 import '@ids-ts/badge/dist/main.css'
 import { Button } from '@ids-ts/button'
 import '@ids-ts/button/dist/main.css'
@@ -53,6 +52,7 @@ import type { IntPayer } from './data-review/DetailFields1099'
 import DetailFieldsDiv, { DIV_PAYER_TABS, divVerifiedDocKey } from './data-review/DetailFieldsDiv'
 import type { DivPayer } from './data-review/DetailFieldsDiv'
 import {
+  buildTabConfirmCounts,
   buildTabConfirmStatus,
   buildTabVerifiedKeys,
   buildTypeReviewed,
@@ -65,6 +65,7 @@ import {
 import { isDocShownVerified, navigationForVerifiedDocKey } from '../data/verifiedDocKeys'
 import DetailFields1099R, { R_PAYER_TABS } from './data-review/DetailFields1099R'
 import DetailFieldsNec, { NEC_PAYER_TABS } from './data-review/DetailFieldsNec'
+import AttentionCountBadge from './data-review/AttentionCountBadge'
 import PeelTab from './data-review/PeelTab'
 import PriorYear1040Fields from './data-review/PriorYear1040Fields'
 import QuestionnaireResponsesPanel from './data-review/QuestionnaireResponsesPanel'
@@ -351,6 +352,12 @@ export default function DataReviewPage() {
     rRemaining: tabFlagCounts['1099-rs'] ?? 0,
   })
   const tabConfirmStatus = buildTabConfirmStatus({
+    verifiedDocs,
+    reviewerConfirmedDocs,
+    tabVerifiedKeys,
+    isReviewer: reviewRole === 'reviewer',
+  })
+  const tabConfirmCounts = buildTabConfirmCounts({
     verifiedDocs,
     reviewerConfirmedDocs,
     tabVerifiedKeys,
@@ -1583,7 +1590,7 @@ export default function DataReviewPage() {
                   <Comment size="medium" />
                 </IconControl>
                 {notes.length > 0 && (
-                  <span className={styles.notesBadge}>{notes.length}</span>
+                  <AttentionCountBadge count={notes.length} className={styles.toolbarBadge} aria-hidden />
                 )}
               </span>
               <span className={styles.headerIconWrap}>
@@ -1603,9 +1610,7 @@ export default function DataReviewPage() {
                   <ClockCounterclockwise size="medium" />
                 </IconControl>
                 {summaryBadgeCount > 0 && (
-                  <span className={styles.toolbarBadge} aria-hidden>
-                    <NumericBadge quantity={summaryBadgeCount} isShort />
-                  </span>
+                  <AttentionCountBadge count={summaryBadgeCount} className={styles.toolbarBadge} aria-hidden />
                 )}
               </span>
             </div>
@@ -1635,11 +1640,7 @@ export default function DataReviewPage() {
               <Panel size="medium" />
               <span className={styles.intuitIntelLabel}>Source Documents</span>
               {sourceDocsBadgeCount > 0 && (
-                <span className={styles.toolbarBadge} aria-hidden>
-                  <Badge status="warning" capitalization="sentence">
-                    {sourceDocsBadgeCount > 99 ? '99+' : sourceDocsBadgeCount}
-                  </Badge>
-                </span>
+                <AttentionCountBadge count={sourceDocsBadgeCount} className={styles.toolbarBadge} aria-hidden />
               )}
             </button>
             )}
@@ -1658,7 +1659,7 @@ export default function DataReviewPage() {
                 <img src={intuitAssistIcon} alt="" className={styles.intuitIntelIcon} />
                 <span className={styles.intuitIntelLabel}>AI Review</span>
                 {!agentPanelActive && phase2Progress.remaining > 0 && (
-                  <span className={styles.notesBadge}>{phase2Progress.remaining}</span>
+                  <AttentionCountBadge count={phase2Progress.remaining} className={styles.toolbarBadge} aria-hidden />
                 )}
               </button>
             )}
@@ -1971,6 +1972,7 @@ export default function DataReviewPage() {
                 tabVerifiedKeys={tabVerifiedKeys}
                 typeReviewed={showPreparerImportPhase ? typeReviewed : undefined}
                 tabConfirmStatus={reviewRole === 'reviewer' ? tabConfirmStatus : undefined}
+                tabConfirmCounts={reviewRole === 'reviewer' ? tabConfirmCounts : undefined}
                 onTopTabChange={(tab) => {
                   setActiveTopTab(tab)
                   setFromAgent(false)
