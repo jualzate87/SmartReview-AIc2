@@ -451,3 +451,11 @@
   width: fit-content;
   flex-shrink: 0;
 }
+
+/* Reviewer open-items filter chips — relocated from pass bar into page toolbar */
+.toolbarFilterChips {
+  margin-left: 0;
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

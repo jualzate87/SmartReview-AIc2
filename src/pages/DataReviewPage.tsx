@@ -898,6 +898,49 @@ export default function DataReviewPage() {
 
   const pass2ConfirmOpenCount = pass2DocConfirmOpenCount + pass2SummaryConfirmOpenCount
 
+  const handlePass2FilterSelect = useCallback((id: Pass2Filter) => {
+    setPass2Filter(id)
+    if (id === 'notes') {
+      const open = notes.find(n => (n.status ?? 'open') === 'open')
+      openNotesFocus(open?.id)
+    } else if (id === 'flags') {
+      const first = [...summaryFlaggedFields][0]
+      if (first) {
+        setSelectedField(first)
+        setShow1040(true)
+        setOutputFormId('summary')
+      }
+    } else if (id === 'confirm') {
+      const firstDoc = getFirstDocNeedingReviewerAttention({
+        verifiedDocs,
+        reviewerConfirmedDocs,
+        docKeys: EXPECTED_SOURCE_DOCS,
+      })
+      if (firstDoc) {
+        handleNavigateToSourceDoc(firstDoc)
+        return
+      }
+      const first = [...summaryCheckedFields].find(f => !reviewerConfirmedFields.has(f))
+      if (first) {
+        setSelectedField(first)
+        setShow1040(true)
+        setOutputFormId('summary')
+      }
+    }
+  }, [
+    notes,
+    summaryFlaggedFields,
+    summaryCheckedFields,
+    reviewerConfirmedFields,
+    verifiedDocs,
+    reviewerConfirmedDocs,
+    handleNavigateToSourceDoc,
+    openNotesFocus,
+    setSelectedField,
+    setShow1040,
+    setOutputFormId,
+  ])
+
   const buildSnapshot = (
     mode: HandoffMode,
     pass: 1 | 2 = reviewPass,
@@ -1498,79 +1541,6 @@ export default function DataReviewPage() {
           onDemoRoleChange={handleSwitchRole}
         />
       )}
-      {reviewRole === 'reviewer' && reviewerReviewStarted ? (
-        <div className={handoffStyles.passBar} role="status">
-          <span>Pass 1 completed by {PREPARER_NAME}</span>
-          {reviewPass === 2 && (
-            <Badge status="info" priority="secondary" capitalization="sentence">
-              Pass 2
-            </Badge>
-          )}
-          <span>· {REVIEWER_NAME}</span>
-          <div className={handoffStyles.filterChips} role="group" aria-label="Open items filter">
-            {([
-              ['all', 'All'],
-              ['confirm', `Needs confirm${pass2ConfirmOpenCount ? ` (${pass2ConfirmOpenCount})` : ''}`],
-              ['flags', 'Open flags'],
-              ['notes', 'Unresolved notes'],
-            ] as const).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                className={`${handoffStyles.filterChip} ${pass2Filter === id ? handoffStyles.filterChipActive : ''}`}
-                onClick={() => {
-                  setPass2Filter(id)
-                  if (id === 'notes') {
-                    const open = notes.find(n => (n.status ?? 'open') === 'open')
-                    openNotesFocus(open?.id)
-                  } else if (id === 'flags') {
-                    const first = [...summaryFlaggedFields][0]
-                    if (first) {
-                      setSelectedField(first)
-                      setShow1040(true)
-                      setOutputFormId('summary')
-                    }
-                  } else if (id === 'confirm') {
-                    const firstDoc = getFirstDocNeedingReviewerAttention({
-                      verifiedDocs,
-                      reviewerConfirmedDocs,
-                      docKeys: EXPECTED_SOURCE_DOCS,
-                    })
-                    if (firstDoc) {
-                      handleNavigateToSourceDoc(firstDoc)
-                      return
-                    }
-                    const first = [...summaryCheckedFields].find(f => !reviewerConfirmedFields.has(f))
-                    if (first) {
-                      setSelectedField(first)
-                      setShow1040(true)
-                      setOutputFormId('summary')
-                    }
-                  }
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : reviewRole === 'reviewer' ? (
-        <div className={handoffStyles.passBar} role="status">
-          <span>{REVIEWER_NAME}</span>
-          <span>· Use Review return in the return header on SmartReturn to begin</span>
-        </div>
-      ) : (
-        <div className={handoffStyles.passBar} role="status">
-          <span>Pass {reviewPass} · {PREPARER_NAME}</span>
-          {preparerHandoffChoice === 'awaiting-reviewer' && (
-            <span>· Assigned to reviewer</span>
-          )}
-          {preparerHandoffChoice === 'finish-and-file' && (
-            <span>· Moved to finish and file</span>
-          )}
-        </div>
-      )}
-
       {/* Header — title + peer icon controls (Sign-off lives on Step 2 banner) */}
       <div className={styles.headerBlock}>
         <div className={styles.header}>
@@ -1578,6 +1548,29 @@ export default function DataReviewPage() {
             <span className={styles.headerTitle}>Data Review - Form 1040</span>
           </div>
           <div className={styles.headerRight}>
+            {reviewRole === 'reviewer' && reviewerReviewStarted && (
+              <div
+                className={`${handoffStyles.filterChips} ${styles.toolbarFilterChips}`}
+                role="group"
+                aria-label="Open items filter"
+              >
+                {([
+                  ['all', 'All'],
+                  ['confirm', `Needs confirm${pass2ConfirmOpenCount ? ` (${pass2ConfirmOpenCount})` : ''}`],
+                  ['flags', 'Open flags'],
+                  ['notes', 'Unresolved notes'],
+                ] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`${handoffStyles.filterChip} ${pass2Filter === id ? handoffStyles.filterChipActive : ''}`}
+                    onClick={() => handlePass2FilterSelect(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className={styles.headerIconGroup}>
               <span className={styles.headerIconWrap}>
                 <IconControl
