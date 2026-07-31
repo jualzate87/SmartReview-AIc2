@@ -8,6 +8,26 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Repair GitHub Pages path-only URLs (e.g. /SmartReview-AIc2/data-review) → #/data-review
+      (function () {
+        var hash = window.location.hash.replace(/^#/, '')
+        if (hash.length > 0 && hash.indexOf('%2F') === -1 && hash.indexOf('%2f') === -1) return
+        var path = window.location.pathname
+        var routes = ['check-return/insights', 'check-return', 'import-confirmation', 'data-review', 'smart-return']
+        for (var i = 0; i < routes.length; i++) {
+          var route = routes[i]
+          var suffix = '/' + route
+          if (path.endsWith(suffix) || path.endsWith(suffix + '/')) {
+            var base = path.slice(0, path.length - suffix.length)
+            if (!base.endsWith('/')) base += '/'
+            var search = window.location.search || ''
+            window.location.replace(window.location.origin + base + '#/' + route + search)
+            return
+          }
+        }
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1373,6 +1373,7 @@ export default function LeftPanel1040({
                                       aria-label={checkEntry ? `Verified by ${checkEntry.by}` : 'Preparer verify'}
                                       disabled={isReviewerRole}
                                       onClick={e => {
+                                        e.preventDefault()
                                         e.stopPropagation()
                                         if (!isReviewerRole && row.field) togglePreparer?.(row.field)
                                       }}
@@ -1393,6 +1394,7 @@ export default function LeftPanel1040({
                                       aria-label={reviewerEntry ? `Confirmed by ${reviewerEntry.by}` : 'Reviewer confirm'}
                                       disabled={!isReviewerRole}
                                       onClick={e => {
+                                        e.preventDefault()
                                         e.stopPropagation()
                                         if (isReviewerRole && row.field) toggleReviewer?.(row.field)
                                       }}

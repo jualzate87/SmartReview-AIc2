@@ -3,7 +3,11 @@ import { useSearchParams } from 'react-router-dom'
 import SmartReturnHeader from './SmartReturnHeader'
 import SmartReturnDocumentHub from './SmartReturnDocumentHub'
 import styles from '../styles/SmartReturnPage.module.css'
-import { openHashRoute, REVIEWER_DATA_REVIEW_PATH } from '../lib/prototypeRoutes'
+import {
+  openHashRoute,
+  REVIEWER_DATA_REVIEW_PATH,
+  setStoredDemoRole,
+} from '../lib/prototypeRoutes'
 
 export default function SmartReturnPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -11,6 +15,10 @@ export default function SmartReturnPage() {
   const [reviewRole, setReviewRole] = useState<'preparer' | 'reviewer'>(() =>
     roleParam === 'reviewer' ? 'reviewer' : 'preparer',
   )
+
+  useEffect(() => {
+    setStoredDemoRole(reviewRole)
+  }, [reviewRole])
 
   useEffect(() => {
     const el = document.documentElement
@@ -29,6 +37,7 @@ export default function SmartReturnPage() {
 
   const handleSwitchRole = (role: 'preparer' | 'reviewer') => {
     setReviewRole(role)
+    setStoredDemoRole(role)
     setSearchParams(role === 'reviewer' ? { role: 'reviewer' } : {}, { replace: true })
   }
 

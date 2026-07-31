@@ -39,7 +39,11 @@ export default function FormSignOffControl({
         <button
           type="button"
           className={`${styles.formSignoffBtn} ${styles.formSignoffBtnDone} ${className ?? ''}`}
-          onClick={() => onToggle(signoffKey)}
+          onClick={e => {
+            e.preventDefault()
+            e.stopPropagation()
+            onToggle(signoffKey)
+          }}
           aria-label={`${signOffLabel} — click to undo sign-off`}
         >
           <CircleCheckFill size="small" aria-hidden />
@@ -53,7 +57,11 @@ export default function FormSignOffControl({
     <button
       type="button"
       className={`${styles.formSignoffBtn} ${className ?? ''}`}
-      onClick={() => onToggle(signoffKey)}
+      onClick={e => {
+        e.preventDefault()
+        e.stopPropagation()
+        onToggle(signoffKey)
+      }}
       aria-label={signOffLabel}
     >
       <CircleCheck size="small" aria-hidden />

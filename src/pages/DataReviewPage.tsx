@@ -4,6 +4,7 @@ import {
   PREPARER_DATA_REVIEW_PATH,
   REVIEWER_DATA_REVIEW_PATH,
   VALID_DATA_REVIEW_ENTRIES,
+  setStoredDemoRole,
 } from '../lib/prototypeRoutes'
 import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
 import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close, ClockCounterclockwise } from '@design-systems/icons'
@@ -304,6 +305,10 @@ export default function DataReviewPage() {
   useEffect(() => {
     setReviewActor(actorLabel)
   }, [actorLabel])
+
+  useEffect(() => {
+    setStoredDemoRole(reviewRole)
+  }, [reviewRole])
 
   // --- ProtoC: two-phase sequential review ------------------------------------
   // 'welcome'     → Intuit Assist orientation screen
@@ -1116,6 +1121,7 @@ export default function DataReviewPage() {
 
   /** Demo chrome: jump between Pass 1 / Pass 2 without full grind */
   const handleSwitchRole = (role: 'preparer' | 'reviewer') => {
+    setStoredDemoRole(role)
     if (role === 'reviewer') {
       handleSwitchToReviewerRole()
       return
