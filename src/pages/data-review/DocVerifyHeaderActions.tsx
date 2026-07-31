@@ -21,6 +21,42 @@ type Props = {
   onPreparerMarkVerified?: () => void
 }
 
+function VerifiedBadge({
+  label,
+  tooltip,
+  clickable,
+  onClick,
+}: {
+  label: string
+  tooltip: string
+  clickable: boolean
+  onClick?: () => void
+}) {
+  const badge = (
+    <Badge
+      shape="round"
+      status="success"
+      label={label}
+      aria-label={label}
+    >
+      <SuccessBadgeIcon />
+    </Badge>
+  )
+
+  if (!clickable) return badge
+
+  return (
+    <button
+      type="button"
+      className={styles.verifiedBadgeBtn}
+      onClick={onClick}
+      aria-label={tooltip}
+    >
+      {badge}
+    </button>
+  )
+}
+
 export default function DocVerifyHeaderActions({
   docKey,
   verifiedDocs,
@@ -36,6 +72,7 @@ export default function DocVerifyHeaderActions({
   const preparerMeta = getVerifiedDocEntry(verifiedDocsMeta, docKey)
   const reviewerMeta = getVerifiedDocEntry(reviewerConfirmedDocsMeta, docKey)
   const preparerName = preparerMeta?.by ?? 'preparer'
+  const reviewerName = reviewerMeta?.by ?? REVIEWER_NAME
   const preparerTooltip = preparerMeta
     ? `Verified by ${preparerMeta.by} · ${preparerMeta.at}`
     : 'Click to unmark verified'
@@ -69,31 +106,12 @@ export default function DocVerifyHeaderActions({
 
       {isPreparerVerified && (
         <Tooltip text={preparerTooltip} placement="top">
-          {isReviewerActor ? (
-            <Badge
-              shape="round"
-              status="success"
-              label={`Verified by ${preparerName}`}
-              aria-label={`Verified by ${preparerName}`}
-            >
-              <SuccessBadgeIcon />
-            </Badge>
-          ) : (
-            <button
-              type="button"
-              className={styles.preparerVerifiedBtn}
-              onClick={() => onVerifyDoc?.(docKey)}
-              aria-label={preparerTooltip}
-            >
-              <Badge
-                shape="round"
-                status="success"
-                label={`Verified by ${preparerName}`}
-              >
-                <SuccessBadgeIcon />
-              </Badge>
-            </button>
-          )}
+          <VerifiedBadge
+            label={`Verified by ${preparerName}`}
+            tooltip={preparerTooltip}
+            clickable={!isReviewerActor}
+            onClick={() => onVerifyDoc?.(docKey)}
+          />
         </Tooltip>
       )}
 
@@ -104,42 +122,19 @@ export default function DocVerifyHeaderActions({
       )}
 
       {needsReviewerConfirm && (
-        <Button size="small" priority="primary" onClick={() => onVerifyDoc?.(docKey)}>
+        <Button size="small" priority="secondary" onClick={() => onVerifyDoc?.(docKey)}>
           Confirm document
         </Button>
       )}
 
       {isReviewerConfirmed && (
         <Tooltip text={reviewerTooltip} placement="top">
-          {isReviewerActor ? (
-            <button
-              type="button"
-              className={styles.confirmedBadgeBtn}
-              onClick={() => onVerifyDoc?.(docKey)}
-              aria-label={reviewerTooltip}
-            >
-              <Badge
-                shape="round"
-                status="success"
-                label="Confirmed"
-                capitalization="sentence"
-                priority="secondary"
-              >
-                <SuccessBadgeIcon />
-              </Badge>
-            </button>
-          ) : (
-            <Badge
-              shape="round"
-              status="success"
-              label="Confirmed"
-              capitalization="sentence"
-              priority="secondary"
-              aria-label={reviewerTooltip}
-            >
-              <SuccessBadgeIcon />
-            </Badge>
-          )}
+          <VerifiedBadge
+            label={`Confirmed by ${reviewerName}`}
+            tooltip={reviewerTooltip}
+            clickable={isReviewerActor}
+            onClick={() => onVerifyDoc?.(docKey)}
+          />
         </Tooltip>
       )}
     </div>

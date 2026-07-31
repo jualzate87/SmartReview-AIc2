@@ -1,11 +1,14 @@
-import { CircleCheck, CircleCheckFill } from '@design-systems/icons'
 import {
   formatActivityMeta,
   REVIEWER_NAME,
   type ActivityEntry,
 } from '../../hooks/useSyncedReviewState'
 import Tooltip from './Tooltip'
-import styles from '../../styles/data-review/LeftPanel1040.module.css'
+import { Badge, SuccessBadgeIcon } from '@ids-ts/badge'
+import '@ids-ts/badge/dist/main.css'
+import { Button } from '@ids-ts/button'
+import '@ids-ts/button/dist/main.css'
+import detailStyles from '../../styles/data-review/DetailFields.module.css'
 
 type Props = {
   /** Full button label — e.g. "Sign off Form 1040" */
@@ -29,44 +32,49 @@ export default function FormSignOffControl({
 }: Props) {
   if (!isReviewerRole || !onToggle) return null
 
+  const signerName = signoffMeta?.by ?? REVIEWER_NAME
   const tooltip = signedOff && signoffMeta
     ? `Signed off · ${formatActivityMeta(signoffMeta)}`
     : signOffLabel
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onToggle(signoffKey)
+  }
 
   if (signedOff) {
     return (
       <Tooltip text={tooltip} placement="bottom">
         <button
           type="button"
-          className={`${styles.formSignoffBtn} ${styles.formSignoffBtnDone} ${className ?? ''}`}
-          onClick={e => {
-            e.preventDefault()
-            e.stopPropagation()
-            onToggle(signoffKey)
-          }}
+          className={`${detailStyles.verifiedBadgeBtn} ${className ?? ''}`}
+          onClick={handleToggle}
           aria-label={`${signOffLabel} — click to undo sign-off`}
         >
-          <CircleCheckFill size="small" aria-hidden />
-          Signed off
+          <Badge
+            shape="round"
+            status="success"
+            label={`Signed off by ${signerName}`}
+            aria-label={`Signed off by ${signerName}`}
+          >
+            <SuccessBadgeIcon />
+          </Badge>
         </button>
       </Tooltip>
     )
   }
 
   return (
-    <button
-      type="button"
-      className={`${styles.formSignoffBtn} ${className ?? ''}`}
-      onClick={e => {
-        e.preventDefault()
-        e.stopPropagation()
-        onToggle(signoffKey)
-      }}
+    <Button
+      size="small"
+      priority="secondary"
+      className={className}
+      onClick={handleToggle}
       aria-label={signOffLabel}
     >
-      <CircleCheck size="small" aria-hidden />
       {signOffLabel}
-    </button>
+    </Button>
   )
 }
 
