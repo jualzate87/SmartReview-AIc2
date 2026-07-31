@@ -34,7 +34,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     } catch {
       /* ignore */
     }
-    window.location.hash = '#/data-review'
+    window.location.hash = '#/data-review?entry=input-return&role=preparer'
     window.location.reload()
   }
 

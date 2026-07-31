@@ -1,5 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  PREPARER_DATA_REVIEW_PATH,
+  REVIEWER_DATA_REVIEW_PATH,
+  VALID_DATA_REVIEW_ENTRIES,
+} from '../lib/prototypeRoutes'
 import { useSyncedReviewState } from '../hooks/useSyncedReviewState'
 import { DotsSix, Panel, ChevronLeft, ChevronRight, Comment, Close, ClockCounterclockwise } from '@design-systems/icons'
 import '@ids-ts/badge/dist/main.css'
@@ -151,12 +156,21 @@ export default function DataReviewPage() {
   const roleParam = searchParams.get('role')
   const startReviewParam = searchParams.get('startReview') === 'true'
 
-  // Valid entries: input-return (preparer) or review-return (reviewer). Otherwise redirect to SmartReturn.
+  // Valid entries: input-return (preparer) or review-return (reviewer).
+  const entryValid = entry != null && VALID_DATA_REVIEW_ENTRIES.has(entry)
   useEffect(() => {
-    if (!entry) {
-      navigate('/smart-return', { replace: true })
+    const legacyAgent = searchParams.get('agent') === 'true'
+    if (legacyAgent && !entryValid) {
+      navigate(PREPARER_DATA_REVIEW_PATH, { replace: true })
+      return
     }
-  }, [entry, navigate])
+    if (entryValid) return
+    if (roleParam === 'reviewer' || searchParams.get('startReview') === 'true') {
+      navigate(REVIEWER_DATA_REVIEW_PATH, { replace: true })
+      return
+    }
+    navigate('/smart-return', { replace: true })
+  }, [entry, entryValid, roleParam, searchParams, navigate])
 
   // Source-doc review state — flags, reviewed fields, active tab, editable field
   // values — persisted in localStorage via useSyncedReviewState (cross-tab handoff).
@@ -1524,6 +1538,8 @@ export default function DataReviewPage() {
   }, [])
 
   // ProtoC: preparer skips welcome — lands in import phase, Return Summary full width, panels closed
+  if (!entryValid) return null
+
   const summaryPanelLabel = reviewRole === 'preparer' ? 'Review log' : 'Smart review brief'
   const isReviewerConfirmMode = reviewRole === 'reviewer'
   /** ProtoC Phase 1 banner — visible for entire preparer import phase (CTA before sources open). */

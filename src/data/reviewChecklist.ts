@@ -72,7 +72,7 @@ export type ReviewChecklistInputs = {
 
 const FORM_SIGNOFF_LABELS: Record<string, { label: string; jump: HandoffJump; jumpLabel: string }> = {
   'return-summary': { label: 'Return Summary', jump: { type: 'field', field: 'wages' }, jumpLabel: 'Open summary' },
-  'form-1040': { label: 'Form 1040', jump: { type: 'field', field: 'wages' }, jumpLabel: 'Open Form 1040' },
+  'form-1040': { label: 'Form 1040', jump: { type: 'outputForm', formId: '1040' }, jumpLabel: 'Open Form 1040' },
   'schedule-1': { label: 'Schedule 1', jump: { type: 'outputForm', formId: 'sch1' }, jumpLabel: 'Open Schedule 1' },
   'schedule-c': { label: 'Schedule C', jump: { type: 'outputForm', formId: 'schC' }, jumpLabel: 'Open Schedule C' },
   'schedule-a': { label: 'Schedule A', jump: { type: 'outputForm', formId: 'schA' }, jumpLabel: 'Open Schedule A' },

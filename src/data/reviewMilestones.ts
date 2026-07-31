@@ -108,7 +108,7 @@ export const REVIEW_MILESTONES: ReviewMilestone[] = [
     completionType: 'linked',
     eligibleActor: 'any',
     linkedKey: 'import-flags-cleared',
-    jumpTarget: { type: 'field', field: 'wages' },
+    jumpTarget: { type: 'outputForm', formId: '1040' },
     jumpLabel: 'Open Form 1040',
     required: true,
   },

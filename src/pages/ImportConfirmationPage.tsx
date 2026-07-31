@@ -9,8 +9,7 @@ import { H5, B2, B3 } from '@ids-ts/typography'
 import '@ids-ts/typography/dist/main.css'
 import SmartReturnHeader from './SmartReturnHeader'
 import styles from '../styles/ImportConfirmationPage.module.css'
-
-const REVIEW_PATH = '/data-review?entry=input-return&role=preparer'
+import { openHashRoute, PREPARER_DATA_REVIEW_PATH } from '../lib/prototypeRoutes'
 
 export default function ImportConfirmationPage() {
   const navigate = useNavigate()
@@ -48,8 +47,7 @@ export default function ImportConfirmationPage() {
   }
 
   const handleReviewReturn = () => {
-    const base = `${window.location.origin}${window.location.pathname}`
-    window.open(`${base}#${REVIEW_PATH}`, '_blank', 'noopener,noreferrer')
+    openHashRoute(PREPARER_DATA_REVIEW_PATH)
   }
 
   return (

@@ -3,8 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import SmartReturnHeader from './SmartReturnHeader'
 import SmartReturnDocumentHub from './SmartReturnDocumentHub'
 import styles from '../styles/SmartReturnPage.module.css'
-
-const REVIEW_RETURN_PATH = '/data-review?entry=review-return&role=reviewer&startReview=true'
+import { openHashRoute, REVIEWER_DATA_REVIEW_PATH } from '../lib/prototypeRoutes'
 
 export default function SmartReturnPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -34,8 +33,7 @@ export default function SmartReturnPage() {
   }
 
   const handleReviewReturn = () => {
-    const base = `${window.location.origin}${window.location.pathname}`
-    window.open(`${base}#${REVIEW_RETURN_PATH}`, '_blank', 'noopener,noreferrer')
+    openHashRoute(REVIEWER_DATA_REVIEW_PATH)
   }
 
   const isReviewer = reviewRole === 'reviewer'
