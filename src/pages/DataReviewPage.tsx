@@ -15,7 +15,6 @@ import '@ids-ts/icon-control/dist/main.css'
 import NotesPane from './data-review/NotesPane'
 import type { Note } from './data-review/NotesPane'
 import HandoffSummary from './data-review/HandoffSummary'
-import handoffStyles from '../styles/data-review/HandoffSummary.module.css'
 import {
   buildHandoffSnapshot,
   getOutstandingOpenCount,
@@ -63,7 +62,6 @@ import {
   buildTypeReviewed,
   countDocsIncompleteForReviewer,
   getDocConfirmStatus,
-  getFirstDocNeedingReviewerAttention,
   getNextUnreviewedSourceDoc,
   getUnreviewedSourceDocs,
 } from './data-review/docReviewStatus'
@@ -293,9 +291,6 @@ export default function DataReviewPage() {
   const [reviewerReviewStarted, setReviewerReviewStarted] = useState(
     () => entry === 'review-return' && startReviewParam,
   )
-  /** Pass 2 open-items filter */
-  type Pass2Filter = 'all' | 'flags' | 'notes' | 'confirm'
-  const [pass2Filter, setPass2Filter] = useState<Pass2Filter>('all')
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const actorLabel = reviewRole === 'reviewer' ? REVIEWER_NAME : PREPARER_NAME
   const pass1ActorLabel = PREPARER_NAME
@@ -879,36 +874,6 @@ export default function DataReviewPage() {
     }))
   }
 
-  const openNotesFocus = (noteId?: string) => {
-    if (noteId) setFocusNoteId(noteId)
-    
-    openRightPanel('comments')
-  }
-
-  const pass2FocusFields: Set<string> | null = (() => {
-    if (reviewRole !== 'reviewer' || pass2Filter === 'all') return null
-    if (pass2Filter === 'flags') return new Set(summaryFlaggedFields)
-    if (pass2Filter === 'confirm') {
-      const set = new Set<string>()
-      for (const field of summaryCheckedFields) {
-        if (!reviewerConfirmedFields.has(field)) set.add(field)
-      }
-      for (const field of reviewerConfirmStaleFields) set.add(field)
-      return set.size ? set : new Set(['__none__'])
-    }
-    const set = new Set<string>()
-    for (const n of notes) {
-      if ((n.status ?? 'open') !== 'open') continue
-      if (n.context) set.add(n.context)
-    }
-    return set.size ? set : new Set(['__none__'])
-  })()
-
-  const pass2SummaryConfirmOpenCount = new Set([
-    ...[...summaryCheckedFields].filter(f => !reviewerConfirmedFields.has(f)),
-    ...reviewerConfirmStaleFields,
-  ]).size
-
   const pass2DocConfirmOpenCount = reviewRole === 'reviewer'
     ? countDocsIncompleteForReviewer({
         verifiedDocs,
@@ -916,51 +881,6 @@ export default function DataReviewPage() {
         docKeys: EXPECTED_SOURCE_DOCS,
       })
     : 0
-
-  const pass2ConfirmOpenCount = pass2DocConfirmOpenCount + pass2SummaryConfirmOpenCount
-
-  const handlePass2FilterSelect = useCallback((id: Pass2Filter) => {
-    setPass2Filter(id)
-    if (id === 'notes') {
-      const open = notes.find(n => (n.status ?? 'open') === 'open')
-      openNotesFocus(open?.id)
-    } else if (id === 'flags') {
-      const first = [...summaryFlaggedFields][0]
-      if (first) {
-        setSelectedField(first)
-        setShow1040(true)
-        setOutputFormId('summary')
-      }
-    } else if (id === 'confirm') {
-      const firstDoc = getFirstDocNeedingReviewerAttention({
-        verifiedDocs,
-        reviewerConfirmedDocs,
-        docKeys: EXPECTED_SOURCE_DOCS,
-      })
-      if (firstDoc) {
-        handleNavigateToSourceDoc(firstDoc)
-        return
-      }
-      const first = [...summaryCheckedFields].find(f => !reviewerConfirmedFields.has(f))
-      if (first) {
-        setSelectedField(first)
-        setShow1040(true)
-        setOutputFormId('summary')
-      }
-    }
-  }, [
-    notes,
-    summaryFlaggedFields,
-    summaryCheckedFields,
-    reviewerConfirmedFields,
-    verifiedDocs,
-    reviewerConfirmedDocs,
-    handleNavigateToSourceDoc,
-    openNotesFocus,
-    setSelectedField,
-    setShow1040,
-    setOutputFormId,
-  ])
 
   const buildSnapshot = (
     mode: HandoffMode,
@@ -1112,7 +1032,6 @@ export default function DataReviewPage() {
     setPhase('diagnostics')
     setShow1040(true)
     setOutputFormId('summary')
-    setPass2Filter('flags')
     openSummaryPanel('signoff-review', {
       pass: 2,
       actor: REVIEWER_NAME,
@@ -1134,7 +1053,6 @@ export default function DataReviewPage() {
     setPhase('diagnostics')
     setShow1040(true)
     setOutputFormId('summary')
-    setPass2Filter('flags')
     openSummaryPanel('signoff-review', {
       pass: 2,
       actor: REVIEWER_NAME,
@@ -1210,7 +1128,6 @@ export default function DataReviewPage() {
     setImportsStarted(false)
     setShow1040(true)
     setOutputFormId('summary')
-    setPass2Filter('all')
     setFocusNoteId(null)
     setSummaryMode('signoff-review')
     setSummaryOpts({})
@@ -1556,29 +1473,6 @@ export default function DataReviewPage() {
             <span className={styles.headerTitle}>Data Review - Form 1040</span>
           </div>
           <div className={styles.headerRight}>
-            {reviewRole === 'reviewer' && reviewerReviewStarted && (
-              <div
-                className={`${handoffStyles.filterChips} ${styles.toolbarFilterChips}`}
-                role="group"
-                aria-label="Open items filter"
-              >
-                {([
-                  ['all', 'All'],
-                  ['confirm', `Needs confirm${pass2ConfirmOpenCount ? ` (${pass2ConfirmOpenCount})` : ''}`],
-                  ['flags', 'Open flags'],
-                  ['notes', 'Unresolved notes'],
-                ] as const).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`${handoffStyles.filterChip} ${pass2Filter === id ? handoffStyles.filterChipActive : ''}`}
-                    onClick={() => handlePass2FilterSelect(id)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
             <div className={styles.headerIconGroup}>
               <span className={styles.headerIconWrap}>
                 <IconControl
@@ -1837,7 +1731,6 @@ export default function DataReviewPage() {
             onDismissOutputFormsCoach={dismissOutputFormsCoach}
             outputSourcesCoachOpen={outputSourcesCoach}
             onDismissOutputSourcesCoach={dismissOutputSourcesCoach}
-            focusFields={pass2FocusFields}
             onAddFieldNote={(text, context) => handleAddNote(text, context)}
             onNavigateToSourceDoc={handleNavigateToSourceDoc}
             onNavigateSource={handleNavigateSource}
