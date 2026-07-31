@@ -111,7 +111,7 @@ import img1040PriorPage1 from '../assets/jessica-1040-2024-variant-1.png'
 import img1040PriorPage2 from '../assets/jessica-1040-2024-variant-2.png'
 import styles from '../styles/data-review/DataReviewPage.module.css'
 import dragStyles from '../styles/data-review/DragHandle.module.css'
-import SmartReturnHeader from './SmartReturnHeader'
+import DemoRoleBar from '../components/DemoRoleBar/DemoRoleBar'
 
 function VerticalGripIcon() {
   return (
@@ -1530,24 +1530,9 @@ export default function DataReviewPage() {
   const showPreparerImportPhase = inImportPhase && reviewRole === 'preparer'
   /** Left outputs share row with Smart review brief — allow flex shrink (avoid 795px + 755px overflow). */
   const outputsShareWithBrief = summaryPanelOpen && show1040
-  /** Preparer input-return: Honey Tax product header. Review-return: chromeless dedicated tab. */
-  const showSmartReturnHeader = isPreparerEntry
-
   return (
-    <div
-      className={styles.page}
-      style={{
-        ['--app-header-offset' as string]: showSmartReturnHeader ? '0px' : '68px',
-      }}
-    >
-      {showSmartReturnHeader && (
-        <SmartReturnHeader
-          activeTab="inputreturn"
-          showReviewReturn={false}
-          demoRole={reviewRole}
-          onDemoRoleChange={handleSwitchRole}
-        />
-      )}
+    <div className={styles.page}>
+      <DemoRoleBar role={reviewRole} onRoleChange={handleSwitchRole} />
       {/* Header — title + peer icon controls (Sign-off lives on Step 2 banner) */}
       <div className={styles.headerBlock}>
         <div className={styles.header}>
