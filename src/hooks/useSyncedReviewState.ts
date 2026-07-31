@@ -148,9 +148,7 @@ function hydrateSyncedState(raw: string): SyncedState {
     manualChecklistItems: parsed.manualChecklistItems && typeof parsed.manualChecklistItems === 'object'
       ? parsed.manualChecklistItems as Record<string, boolean>
       : {},
-    completedMilestones: parsed.completedMilestones && typeof parsed.completedMilestones === 'object'
-      ? parsed.completedMilestones as Record<string, MilestoneCompletion>
-      : {},
+    completedMilestones: migrateCompletedMilestones(parsed.completedMilestones),
     reviewerConfirmStaleFieldsList: Array.isArray(parsed.reviewerConfirmStaleFieldsList)
       ? parsed.reviewerConfirmStaleFieldsList.filter((k): k is string => typeof k === 'string')
       : [],
@@ -180,6 +178,36 @@ export function getReviewActor(): string {
 
 export function formatActivityTimestamp(date: Date = new Date()): string {
   return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+/** Normalize persisted activity timestamps — legacy sessions may store numbers or nested shapes. */
+export function coerceActivityAt(at: unknown, fallback = 'earlier'): string {
+  if (typeof at === 'string' && at.trim()) return at
+  if (typeof at === 'number' && Number.isFinite(at)) {
+    return formatActivityTimestamp(new Date(at))
+  }
+  if (at && typeof at === 'object' && 'at' in at) {
+    return coerceActivityAt((at as { at: unknown }).at, fallback)
+  }
+  return fallback
+}
+
+function migrateCompletedMilestones(raw: unknown): Record<string, MilestoneCompletion> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, MilestoneCompletion> = {}
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object') continue
+    const v = value as Partial<MilestoneCompletion>
+    const name = typeof v.name === 'string' ? v.name : PREPARER_NAME
+    const by: MilestoneCompletion['by'] =
+      v.by === 'reviewer' || v.by === 'preparer'
+        ? v.by
+        : name === REVIEWER_NAME
+          ? 'reviewer'
+          : 'preparer'
+    out[id] = { by, name, at: coerceActivityAt(v.at) }
+  }
+  return out
 }
 
 export function formatActivityMeta(entry?: ActivityEntry | null): string {
@@ -332,8 +360,10 @@ function migrateActivityList(
     }
     if (Array.isArray(item) && typeof item[0] === 'string') {
       const entry = item[1]
-      if (entry && typeof entry === 'object' && 'by' in entry && 'at' in entry) {
-        return [item[0], entry as ActivityEntry]
+      if (entry && typeof entry === 'object' && 'by' in entry) {
+        const e = entry as Partial<ActivityEntry>
+        const by = typeof e.by === 'string' ? e.by : PREPARER_NAME
+        return [item[0], { by, at: coerceActivityAt(e.at, fallbackAt) }]
       }
       return [item[0], { by: PREPARER_NAME, at: fallbackAt }]
     }

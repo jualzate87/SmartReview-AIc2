@@ -3,7 +3,12 @@
  * Milestones map to CPA review phases from Phase 1–5 source doc (client setup → final check).
  */
 import type { ActivityEntry } from '../hooks/useSyncedReviewState'
-import { milestoneActorLabel, PREPARER_NAME, REVIEWER_NAME } from '../hooks/useSyncedReviewState'
+import {
+  coerceActivityAt,
+  milestoneActorLabel,
+  PREPARER_NAME,
+  REVIEWER_NAME,
+} from '../hooks/useSyncedReviewState'
 import type { HandoffJump } from './handoffSnapshot'
 import { computeLiveReturn, type LiveAmounts } from './liveReturn'
 import {
@@ -379,7 +384,7 @@ function actorRole(name: string): MilestoneRole {
 function toCompletion(entry: ActivityEntry): MilestoneCompletion {
   return {
     by: actorRole(entry.by),
-    at: entry.at,
+    at: coerceActivityAt(entry.at),
     name: entry.by,
   }
 }
@@ -523,11 +528,19 @@ function actorCanCompleteEligible(
 }
 
 /** Inline attribution — e.g. "SC · Jul 29" or "Jordan · Jul 29" (always shows who) */
+function milestoneDatePart(at: unknown): string {
+  const normalized = coerceActivityAt(at)
+  const byDot = normalized.split(' · ')[0]
+  if (byDot !== normalized) return byDot.trim()
+  const byComma = normalized.split(',')[0]
+  return (byComma ?? normalized).trim() || normalized
+}
+
 export function formatMilestoneAttribution(
   completion: MilestoneCompletion | undefined,
 ): string | undefined {
   if (!completion) return undefined
-  const datePart = completion.at.split(' · ')[0] || completion.at
+  const datePart = milestoneDatePart(completion.at)
   return `${milestoneActorLabel(completion.name)} · ${datePart}`
 }
 
@@ -536,7 +549,7 @@ export function formatMilestoneAttributionTooltip(
   completion: MilestoneCompletion | undefined,
 ): string | undefined {
   if (!completion) return undefined
-  return `${completion.name} · ${completion.at}`
+  return `${completion.name} · ${coerceActivityAt(completion.at)}`
 }
 
 export function deriveMilestoneState(input: MilestoneInputs): MilestoneState {

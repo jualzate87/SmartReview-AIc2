@@ -101,6 +101,16 @@ describe('formatMilestoneAttribution', () => {
     )
     expect(tooltip).toBe('Sara Chen · Jul 29 · 2:30 PM')
   })
+
+  it('handles non-string at values from legacy persisted state', () => {
+    const label = formatMilestoneAttribution(
+      { by: 'preparer', at: 1_722_280_200_000 as unknown as string, name: PREPARER_NAME },
+    )
+    expect(label).toMatch(/^SC · Jul/)
+    expect(formatMilestoneAttributionTooltip(
+      { by: 'preparer', at: { at: 'Jul 29 · 2:30 PM' } as unknown as string, name: PREPARER_NAME },
+    )).toBe('Sara Chen · Jul 29 · 2:30 PM')
+  })
 })
 
 describe('canSignOffFromMilestones', () => {
