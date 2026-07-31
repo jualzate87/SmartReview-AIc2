@@ -6,6 +6,8 @@
   width: 100%;
   flex-shrink: 0;
   font-family: var(--font-family-component);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ── Row 1: Product header 48px ── */
@@ -19,7 +21,7 @@
   flex-shrink: 0;
 }
 
-/* Product / brand name — Honey Tax Accounting */
+/* Product / brand name — Honey Tax Accounting (ALL CAPS via text-transform) */
 .businessName {
   font-family: var(--font-family-heading);
   font-size: var(--font-size-component-medium);
@@ -48,11 +50,13 @@
   padding: 8px;
   border-radius: 4px;
   color: #5d686f;
+  font-family: var(--font-family-component);
 }
 .navBtn:hover { background: rgba(226, 233, 237, 0.6); }
 .navBtn svg { color: #5d686f; }
 
 .navBtnLabel {
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-small);
   font-weight: var(--font-weight-component);
   line-height: 20px;
@@ -75,6 +79,7 @@
   border-radius: 50%;
   background: #205ea3;
   color: #ffffff;
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-medium);
   font-weight: var(--font-weight-component-bold);
   display: flex;
@@ -106,6 +111,7 @@
 
 /* Client name */
 .clientName {
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-medium);
   font-weight: var(--font-weight-component-semibold);
   line-height: 19px;
@@ -130,11 +136,13 @@
   padding: 6px;
   border-radius: 4px;
   color: #5d686f;
+  font-family: var(--font-family-component);
 }
 .clientProfileBtn:hover { background: rgba(226, 233, 237, 0.6); }
 .clientProfileBtn svg { color: #5d686f; }
 
 .clientProfileLabel {
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-medium);
   font-weight: var(--font-weight-component-semibold);
   line-height: 24px;
@@ -161,6 +169,7 @@
 }
 
 .metaLabel {
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-small);
   font-weight: var(--font-weight-component);
   line-height: 16px;
@@ -176,6 +185,7 @@
 }
 
 .metaValue {
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-medium);
   font-weight: var(--font-weight-component-bold);
   line-height: 24px;
@@ -210,6 +220,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-medium);
   font-weight: var(--font-weight-component-bold);
   color: #ffffff;
@@ -235,6 +246,7 @@
   cursor: pointer;
   padding: 6px 4px 6px 8px;
   border-radius: 4px;
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-medium);
   font-weight: var(--font-weight-component-semibold);
   line-height: 24px;
@@ -286,6 +298,7 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-small);
   font-weight: var(--font-weight-component);
   line-height: 20px;
@@ -331,6 +344,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  font-family: var(--font-family-component);
   font-size: var(--font-size-component-small);
   font-weight: var(--font-weight-component);
   line-height: 16px;

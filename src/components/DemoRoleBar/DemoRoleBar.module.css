@@ -8,6 +8,9 @@
   background: var(--color-container-background-accent);
   border-bottom: 1px solid var(--color-divider-secondary);
   flex-shrink: 0;
+  font-family: var(--font-family-component);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .label {
