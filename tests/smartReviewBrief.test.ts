@@ -22,8 +22,8 @@ const emptyChecklist: ReviewChecklistState = {
   blockers: [],
 }
 
-describe('buildSmartReviewBrief reviewer checklist', () => {
-  it('shows reviewer-strategic view with phased checklist and executive brief', () => {
+describe('buildSmartReviewBrief unified checklist', () => {
+  it('shows unified view with phased checklist and executive brief for reviewer Pass 2', () => {
     const snapshot = buildHandoffSnapshot('signoff-review', 2, 'Jordan Lee', {
       reviewedFields: new Map([['ssn-techCircle', meta()]]),
       verifiedDocs: new Set(['techCircle']),
@@ -76,7 +76,8 @@ describe('buildSmartReviewBrief reviewer checklist', () => {
       amounts,
     })
 
-    expect(brief.viewMode).toBe('reviewer-strategic')
+    expect(brief.viewMode).toBe('unified')
+    expect(brief.header.title).toBe('Review log')
     expect(brief.executiveBrief?.heading).toBe("Here's what you need to know, Jordan")
     expect(brief.executiveBrief?.intro).toBe('Sara completed the first pass:')
     expect(brief.executiveBrief?.completed.items).toHaveLength(4)
@@ -91,6 +92,57 @@ describe('buildSmartReviewBrief reviewer checklist', () => {
     expect(brief.phases[0].title).toContain('Client information')
     const phase2Items = brief.phases.find(p => p.id === 'phase-2')?.items ?? []
     expect(phase2Items.some(i => i.title.includes('W-2'))).toBe(true)
+  })
+
+
+  it('shows unified view for preparer Pass 1 with shared milestones', () => {
+    const snapshot = buildHandoffSnapshot('signoff-review', 1, 'Sara Chen', {
+      reviewedFields: new Map([['ssn-techCircle', meta()]]),
+      verifiedDocs: new Set(['techCircle']),
+      verifiedDocsMeta: new Map([['techCircle', meta()]]),
+      editedFields: new Map(),
+      summaryChecked: new Map(),
+      summaryFlagged: new Map(),
+      summaryFlagNotes: {},
+      notes: [],
+      amounts,
+    })
+
+    const milestoneState = deriveMilestoneState({
+      verifiedDocs: new Set(['techCircle']),
+      reviewerConfirmedDocs: new Set(),
+      summaryCheckedFields: new Set(),
+      reviewerConfirmedFields: new Set(),
+      reviewerConfirmStaleFields: new Set(),
+      reviewerSignedOffForms: new Set(),
+      verifiedDocsMeta: new Map([['techCircle', meta()]]),
+      reviewerConfirmedDocsMeta: new Map(),
+      reviewerSignedOffFormsMeta: new Map(),
+      amounts,
+      reviewedFields: new Map([['ssn-techCircle', meta()]]),
+      completedMilestones: {},
+      outstandingOpenCount: 0,
+      currentActorName: 'Sara Chen',
+      reviewPass: 1,
+      singlePersonMode: false,
+    })
+
+    const brief = buildSmartReviewBrief({
+      snapshot,
+      checklist: emptyChecklist,
+      milestoneState,
+      outstandingOpenCount: 0,
+      manualChecklistItems: {},
+      reviewPass: 1,
+      showStrategicChecklist: true,
+      isPreparer: true,
+      amounts,
+    })
+
+    expect(brief.viewMode).toBe('unified')
+    expect(brief.header.title).toBe('Review log')
+    expect(brief.phases).toHaveLength(5)
+    expect(brief.executiveBrief?.heading).toContain('Pass 1 progress')
   })
 
   it('hides reviewer checklist in reviewer-briefing mode', () => {

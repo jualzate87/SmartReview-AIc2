@@ -66,7 +66,8 @@ export type ActivityLogCategory = {
   entries: ActivityLogEntry[]
 }
 
-export type BriefViewMode = 'preparer-summary' | 'reviewer-briefing' | 'reviewer-strategic'
+/** Tabbed Review log + Checklist — shared by preparer and reviewer */
+export type BriefViewMode = 'unified' | 'reviewer-briefing'
 
 export type BriefTextPart = { text: string; bold?: boolean }
 
@@ -356,10 +357,6 @@ function buildActivityLog(_snapshot: HandoffSnapshot, _preparerFirstName: string
   ]
 }
 
-function buildPreparerActivityLog(snapshot: HandoffSnapshot): ActivityLogCategory[] {
-  return buildActivityLog(snapshot, firstName(snapshot.actorLabel))
-}
-
 function countStrategicProgress(phases: BriefPhase[]): {
   attested: number
   required: number
@@ -417,10 +414,76 @@ function buildExecutiveBrief(
   outstandingOpenCount: number,
   reviewPass: 1 | 2,
   milestoneState?: MilestoneState,
+  isPreparer = false,
 ): SmartReviewBrief['executiveBrief'] {
   const reviewerFirst = firstName(REVIEWER_NAME)
 
-  if (reviewPass === 2) {
+  if (isPreparer && reviewPass === 1) {
+    const { attested, required } = countStrategicProgress(phases)
+    const activity = countActivityEntries(snapshot)
+    const milestoneCounts = milestoneState ? countMilestonesByRole(milestoneState) : null
+    const remainingMilestones = milestoneState
+      ? Math.max(0, milestoneState.requiredTotal - milestoneState.requiredCompleteCount)
+      : required - attested
+
+    const completedItems: ConversationalBriefItem[] = []
+    if (milestoneCounts && milestoneCounts.complete > 0) {
+      completedItems.push(
+        briefItem('milestones-progress', [
+          { text: String(milestoneCounts.complete), bold: true },
+          { text: ' of ' },
+          { text: String(milestoneState!.requiredTotal), bold: true },
+          { text: ' required checklist items complete' },
+        ]),
+      )
+    }
+    if (activity.docsVerified > 0) {
+      completedItems.push(
+        briefItem('docs-verified', [
+          { text: String(activity.docsVerified), bold: true },
+          { text: ` source document${activity.docsVerified === 1 ? '' : 's'} verified` },
+        ]),
+      )
+    }
+    if (activity.flagsCleared > 0) {
+      completedItems.push(
+        briefItem('flags-cleared', [
+          { text: String(activity.flagsCleared), bold: true },
+          { text: ` import flag${activity.flagsCleared === 1 ? '' : 's'} cleared` },
+        ]),
+      )
+    }
+    if (completedItems.length === 0) {
+      completedItems.push(
+        briefItem('start', [{ text: 'Start verifying source documents and clearing import flags.' }]),
+      )
+    }
+
+    let attention: ConversationalBriefSection | null = null
+    if (remainingMilestones > 0 || outstandingOpenCount > 0) {
+      const n = Math.max(remainingMilestones, outstandingOpenCount)
+      attention = {
+        label: 'Still open',
+        items: [
+          briefItem('open-items', [
+            { text: String(n), bold: true },
+            { text: ` item${n === 1 ? '' : 's'} need${n === 1 ? 's' : ''} your attention — use the Checklist tab to track progress.` },
+          ]),
+        ],
+      }
+    }
+
+    return {
+      reviewerFirstName: preparerFirst,
+      heading: `Here's your Pass 1 progress, ${preparerFirst}`,
+      intro: 'Your work syncs with the reviewer in real time.',
+      completed: { label: 'Completed so far', items: completedItems },
+      attention,
+      syncedAt: 'Synced just now',
+    }
+  }
+
+  if (reviewPass === 2 && !isPreparer) {
     const stats = getPass2OpenStats(snapshot)
     const completedItems: ConversationalBriefItem[] = []
 
@@ -762,15 +825,13 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
   const preparerName = snapshot.voice === 'reviewer-briefing' ? snapshot.actorLabel : PREPARER_NAME
   const preparerFirst = firstName(preparerName)
 
-  let viewMode: BriefViewMode = 'reviewer-strategic'
-  if (isPreparer) {
-    viewMode = 'preparer-summary'
-  } else if (snapshot.voice === 'reviewer-briefing' || !showStrategicChecklist) {
+  let viewMode: BriefViewMode = 'unified'
+  if (snapshot.voice === 'reviewer-briefing' || !showStrategicChecklist) {
     viewMode = 'reviewer-briefing'
   }
 
   const phases =
-    viewMode === 'reviewer-strategic' && milestoneState
+    viewMode === 'unified' && milestoneState
       ? buildPhasesFromMilestones(milestoneState)
       : []
 
@@ -778,25 +839,26 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
     ? allRequiredPhasesComplete(phases)
     : milestoneState?.allRequiredComplete ?? checklist.allRequiredComplete
 
-  const activityLog =
-    viewMode === 'preparer-summary'
-      ? buildPreparerActivityLog(snapshot)
-      : buildActivityLog(snapshot, preparerFirst)
+  const activityLog = buildActivityLog(snapshot, preparerFirst)
 
-  const passBadge = reviewPass === 2 && viewMode === 'reviewer-strategic' ? 'Pass 2' : null
+  const passBadge =
+    reviewPass === 2 && viewMode === 'unified' && !isPreparer ? 'Pass 2' : null
+
+  const passLine = isPreparer
+    ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
+    : reviewPass === 2
+      ? `Pass 2 · ${REVIEWER_NAME}`
+      : `Pass 1 completed by ${preparerName}`
 
   return {
     viewMode,
     header: {
-      title: viewMode === 'preparer-summary' ? 'Review log' : 'Smart review brief',
-      pass1Line:
-        viewMode === 'preparer-summary'
-          ? `Pass ${snapshot.pass} · ${snapshot.actorLabel}`
-          : `Pass 1 completed by ${preparerName}`,
+      title: viewMode === 'unified' ? 'Review log' : 'Review log',
+      pass1Line: passLine,
       passBadge,
     },
     executiveBrief:
-      viewMode === 'reviewer-strategic'
+      viewMode === 'unified'
         ? buildExecutiveBrief(
           snapshot,
           preparerFirst,
@@ -805,6 +867,7 @@ export function buildSmartReviewBrief(input: SmartReviewBriefInputs): SmartRevie
           outstandingOpenCount,
           reviewPass,
           milestoneState,
+          isPreparer,
         )
         : null,
     phases,

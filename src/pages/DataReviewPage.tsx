@@ -1007,7 +1007,7 @@ export default function DataReviewPage() {
     openRightPanel,
   ])
 
-  /** Canonical chrome entry — Smart review brief (pass-aware content, single drawer shell) */
+  /** Canonical chrome entry — Review log (pass-aware content, unified two-tab drawer) */
   const handleOpenSummaryReport = () => {
     if (reviewRole === 'reviewer') {
       if (reviewPass === 1) {
@@ -1306,31 +1306,26 @@ export default function DataReviewPage() {
     return 0
   })()
 
-  /** Summary toolbar badge — reviewer Pass 2 checklist only; preparer import has no Summary badge. */
-  const summaryBadgeCount = (() => {
-    if (reviewRole === 'reviewer' && reviewPass === 2) {
-      const pass2Brief = buildSmartReviewBrief({
-        snapshot: buildSnapshot('signoff-review', 2, REVIEWER_NAME, 'self'),
-        checklist: reviewChecklist,
-        milestoneState,
-        outstandingOpenCount,
-        manualChecklistItems,
-        reviewPass: 2,
-        showStrategicChecklist: true,
-        isPreparer: false,
-        amounts,
-        singlePersonMode,
-      })
-      return countStrategicOpenItems(pass2Brief.phases)
-    }
-    return 0
-  })()
+  /** Shared checklist badge — both roles when unified Review log panel is active. */
+  const isReviewerBriefing = (summaryOpts.voice ?? 'self') === 'reviewer-briefing'
+  const showChecklist = !isReviewerBriefing
 
-  const showChecklist =
-    reviewRole === 'reviewer' &&
-    reviewPass === 2 &&
-    summaryMode === 'signoff-review' &&
-    (summaryOpts.voice ?? 'self') !== 'reviewer-briefing'
+  const summaryBadgeCount = (() => {
+    if (!showChecklist) return 0
+    const brief = buildSmartReviewBrief({
+      snapshot: buildSnapshot('signoff-review'),
+      checklist: reviewChecklist,
+      milestoneState,
+      outstandingOpenCount,
+      manualChecklistItems,
+      reviewPass,
+      showStrategicChecklist: true,
+      isPreparer: reviewRole === 'preparer',
+      amounts,
+      singlePersonMode,
+    })
+    return countStrategicOpenItems(brief.phases)
+  })()
 
   const signOffGatingActive = !inImportPhase && reviewRole === 'reviewer'
   const briefForGating = buildSmartReviewBrief({
@@ -1463,7 +1458,7 @@ export default function DataReviewPage() {
   // ProtoC: preparer skips welcome — lands in import phase, Return Summary full width, panels closed
   if (!entryValid) return null
 
-  const summaryPanelLabel = reviewRole === 'preparer' ? 'Review log' : 'Smart review brief'
+  const summaryPanelLabel = 'Review log'
   const isReviewerConfirmMode = reviewRole === 'reviewer'
   /** ProtoC Phase 1 banner — visible for entire preparer import phase (CTA before sources open). */
   const showPreparerImportPhase = inImportPhase && reviewRole === 'preparer'

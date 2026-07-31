@@ -361,22 +361,44 @@ function ConversationalBriefCard({ brief, enterAnim = false }: { brief: Conversa
   )
 }
 
-function ReviewerChecklistTab({
-  phases,
+function ReviewLogTab({
   executiveBrief,
-  onJump,
-  onToggle,
+  categories,
   briefEnterAnim = false,
 }: {
-  phases: BriefPhase[]
   executiveBrief: ConversationalBrief | null
-  onJump?: (jump: HandoffJump) => void
-  onToggle?: (itemId: string, checked: boolean) => void
+  categories: ActivityLogCategory[]
   briefEnterAnim?: boolean
 }) {
   return (
     <div className={styles.tabPanel}>
       {executiveBrief && <ConversationalBriefCard brief={executiveBrief} enterAnim={briefEnterAnim} />}
+      <p className={styles.activityIntro}>
+        Shared activity trail — updates sync in real time for preparer and reviewer.
+      </p>
+      <div className={styles.activityStack}>
+        {categories.map(cat => (
+          <ActivityCategoryCard key={cat.id} category={cat} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ChecklistTab({
+  phases,
+  onJump,
+  onToggle,
+}: {
+  phases: BriefPhase[]
+  onJump?: (jump: HandoffJump) => void
+  onToggle?: (itemId: string, checked: boolean) => void
+}) {
+  return (
+    <div className={styles.tabPanel}>
+      <p className={styles.activityIntro}>
+        Shared milestone checklist — either role can complete eligible items. Attribution shows who checked each item.
+      </p>
       <div className={styles.phaseStack}>
         {phases.map(phase => (
           <PhaseCard
@@ -387,41 +409,6 @@ function ReviewerChecklistTab({
           />
         ))}
       </div>
-    </div>
-  )
-}
-
-function ActivityLogTab({ categories }: { categories: ActivityLogCategory[] }) {
-  return (
-    <div className={styles.tabPanel}>
-      <p className={styles.activityIntro}>
-        Read-only audit trail from Pass 1. Green checks show what {PREPARER_NAME.split(' ')[0]} cleared before handoff.
-      </p>
-      <div className={styles.activityStack}>
-        {categories.map(cat => (
-          <ActivityCategoryCard key={cat.id} category={cat} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function PreparerSummaryTab({ categories, actorLabel }: { categories: ActivityLogCategory[]; actorLabel: string }) {
-  return (
-    <div className={styles.tabPanel}>
-      <p className={styles.activityIntro}>
-        Summary of your work on this pass. This is what the next reviewer will see in the activity log.
-      </p>
-      <div className={styles.activityStack}>
-        {categories.map(cat => (
-          <ActivityCategoryCard key={cat.id} category={cat} />
-        ))}
-      </div>
-      {categories.every(c => c.entries.length === 0) && (
-        <p className={styles.activityEmpty}>
-          No completed actions recorded yet for {actorLabel}.
-        </p>
-      )}
     </div>
   )
 }
@@ -507,16 +494,16 @@ export default function HandoffSummary({
   const signOffReady = canApproveSignOff(brief)
 
   const [activeTab, setActiveTab] = useState(
-    brief.viewMode === 'reviewer-strategic' ? 'checklist' : 'activity',
+    brief.viewMode === 'unified' ? 'review-log' : 'activity',
   )
 
   useEffect(() => {
-    if (brief.viewMode === 'reviewer-strategic') {
-      setActiveTab('checklist')
+    if (brief.viewMode === 'unified') {
+      setActiveTab('review-log')
     }
   }, [brief.viewMode])
 
-  const showTabs = brief.viewMode === 'reviewer-strategic'
+  const showTabs = brief.viewMode === 'unified'
 
   const footerActions = !hideFooter ? (
     <div className={styles.footerWrap}>
@@ -533,7 +520,7 @@ export default function HandoffSummary({
           </Button>
         </div>
       )}
-      {!importsPending && snapshot.mode === 'signoff-review' && brief.viewMode === 'reviewer-strategic' && (
+      {!importsPending && snapshot.mode === 'signoff-review' && brief.viewMode === 'unified' && !isPreparer && (
         <div className={styles.footerActionsRow}>
           <div className={sidePanelStyles.footerSpacer} />
           {onFinishAndFile && (
@@ -543,7 +530,7 @@ export default function HandoffSummary({
           )}
         </div>
       )}
-      {!importsPending && snapshot.mode === 'signoff-review' && brief.viewMode === 'preparer-summary' && (
+      {!importsPending && snapshot.mode === 'signoff-review' && brief.viewMode === 'unified' && isPreparer && (
         <div className={styles.footerActionsRow}>
           {onContinue && (
             <Button priority="tertiary" size="medium" onClick={onContinue}>
@@ -625,23 +612,27 @@ export default function HandoffSummary({
           isHorizontalRuleVisible
           className={styles.briefTabs}
         >
-          <Tab id="checklist" title="Reviewer checklist">
-            <ReviewerChecklistTab
-              phases={brief.phases}
+          <Tab id="review-log" title="Review log">
+            <ReviewLogTab
               executiveBrief={brief.executiveBrief}
-              onJump={onJump}
-              onToggle={onToggleChecklistItem}
+              categories={brief.activityLog}
               briefEnterAnim={briefEnterAnim}
             />
           </Tab>
-          <Tab id="activity" title={`What ${PREPARER_NAME.split(' ')[0]} completed`}>
-            <ActivityLogTab categories={brief.activityLog} />
+          <Tab id="checklist" title="Checklist">
+            <ChecklistTab
+              phases={brief.phases}
+              onJump={onJump}
+              onToggle={onToggleChecklistItem}
+            />
           </Tab>
         </Tabs>
-      ) : brief.viewMode === 'preparer-summary' ? (
-        <PreparerSummaryTab categories={brief.activityLog} actorLabel={snapshot.actorLabel} />
       ) : (
-        <ActivityLogTab categories={brief.activityLog} />
+        <ReviewLogTab
+          executiveBrief={brief.executiveBrief}
+          categories={brief.activityLog}
+          briefEnterAnim={briefEnterAnim}
+        />
       )}
     </div>
   )
