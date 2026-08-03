@@ -1309,9 +1309,8 @@ export default function DataReviewPage() {
     singlePersonMode,
   })
 
-  /** Source Documents toolbar badge — import work (preparer Pass 1) or doc confirm (reviewer Pass 2). */
+  /** Source Documents toolbar badge — uncleared import flags + unreviewed docs (always visible on Pass 1). */
   const sourceDocsBadgeCount = (() => {
-    if (reviewRole === 'preparer' && !importsStarted) return 0
     if (reviewRole === 'preparer' && inImportPhase) {
       return phase1Remaining + unreviewedDocCount
     }
@@ -1321,12 +1320,12 @@ export default function DataReviewPage() {
     return 0
   })()
 
-  /** Shared checklist badge — both roles when unified Review log panel is active. */
+  /** Checklist pending badge — reviewer only (Review log toolbar). */
   const isReviewerBriefing = (summaryOpts.voice ?? 'self') === 'reviewer-briefing'
   const showChecklist = !isReviewerBriefing
 
   const summaryBadgeCount = (() => {
-    if (reviewRole === 'preparer' && !importsStarted) return 0
+    if (reviewRole !== 'reviewer') return 0
     if (!showChecklist) return 0
     const brief = buildSmartReviewBrief({
       snapshot: buildSnapshot('signoff-review'),
