@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SEED_AMOUNTS, type LiveAmounts } from '../data/liveReturn'
 import type { W2Employer } from '../pages/data-review/DetailFields'
 import type { TopTab } from '../pages/data-review/ReviewTab'
@@ -445,7 +445,17 @@ function reconcileVerifiedDocFlags(state: SyncedState): SyncedState {
   return { ...state, reviewedFieldsList: Array.from(nextReviewed.entries()) }
 }
 
+function isFreshPreparerEntry(): boolean {
+  if (typeof window === 'undefined') return false
+  const hash = window.location.hash.replace(/^#/, '')
+  const q = hash.indexOf('?')
+  if (q === -1) return false
+  const params = new URLSearchParams(hash.slice(q + 1))
+  return params.get('entry') === 'input-return' && params.get('role') !== 'reviewer'
+}
+
 function loadInitialState(): SyncedState {
+  if (isFreshPreparerEntry()) return createDefaultReviewState()
   try {
     const raw = readPersistedRaw()
     if (raw) return hydrateSyncedState(raw)
@@ -453,6 +463,25 @@ function loadInitialState(): SyncedState {
     // ignore malformed storage — fall through to defaults
   }
   return DEFAULT_STATE
+}
+
+/** Fresh review state — used when preparer starts a new Pass 1 session. */
+export function createDefaultReviewState(): SyncedState {
+  return sanitizeSyncedState({ ...DEFAULT_STATE })
+}
+
+/** Clear persisted review state (localStorage + in-memory). Reviewer handoff uses the same store. */
+export function resetPersistedReviewState(): SyncedState {
+  const fresh = createDefaultReviewState()
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+    for (const key of LEGACY_STORAGE_KEYS) {
+      if (key !== STORAGE_KEY) localStorage.removeItem(key)
+    }
+  } catch {
+    // ignore quota / private mode
+  }
+  return fresh
 }
 
 /**
@@ -490,6 +519,13 @@ export function useSyncedReviewState() {
       channel.close()
       window.removeEventListener('storage', onStorage)
     }
+  }, [])
+
+  const resetReviewState = useCallback(() => {
+    const fresh = resetPersistedReviewState()
+    stateRef.current = fresh
+    setState(fresh)
+    channelRef.current?.postMessage(fresh)
   }, [])
 
   const publish = (next: SyncedState) => {
@@ -910,5 +946,6 @@ export function useSyncedReviewState() {
     reviewerSignedOffForms: reviewerSignedOffFormKeys,
     reviewerSignedOffFormsMeta: reviewerSignedOffForms,
     toggleReviewerFormSignOff,
+    resetReviewState,
   }
 }

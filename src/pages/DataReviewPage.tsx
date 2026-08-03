@@ -216,6 +216,7 @@ export default function DataReviewPage() {
     reviewerSignedOffForms,
     reviewerSignedOffFormsMeta,
     toggleReviewerFormSignOff,
+    resetReviewState,
   } = useSyncedReviewState()
   const liveTotals = computeLiveReturn(amounts)
   const total1a = liveTotals.wages
@@ -258,6 +259,16 @@ export default function DataReviewPage() {
   // Notes / comments — persisted for C2 handoff (localStorage for cross-tab reviewer)
   const NOTES_KEY = 'protoc2-notes'
   const loadNotes = (): Note[] => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace(/^#/, '')
+      const q = hash.indexOf('?')
+      if (q !== -1) {
+        const params = new URLSearchParams(hash.slice(q + 1))
+        if (params.get('entry') === 'input-return' && params.get('role') !== 'reviewer') {
+          return []
+        }
+      }
+    }
     try {
       const fromLocal = localStorage.getItem(NOTES_KEY)
       if (fromLocal) return JSON.parse(fromLocal) as Note[]
@@ -1083,6 +1094,9 @@ export default function DataReviewPage() {
   // Re-run on route navigation (location.key), not on every render — setSelectedField is unstable.
   useEffect(() => {
     if (!isPreparerEntry) return
+    resetReviewState()
+    setNotes([])
+    try { localStorage.removeItem(NOTES_KEY) } catch { /* ignore */ }
     setReviewRole('preparer')
     setReviewPass(1)
     setReviewActor(PREPARER_NAME)
@@ -1101,7 +1115,7 @@ export default function DataReviewPage() {
     setCoachTip(null)
     // Fresh preparer session — replay the Summary (i) coach sequence like ProtoC welcome
     try { sessionStorage.removeItem('protoc-coach-tip:outputSourcesFirst') } catch { /* ignore */ }
-  }, [entry, roleParam, isPreparerEntry, location.key])
+  }, [entry, roleParam, isPreparerEntry, location.key, resetReviewState])
 
   // Auto-start review when navigated from SmartReturn header CTA
   const startReviewHandled = useRef(false)
@@ -1297,6 +1311,7 @@ export default function DataReviewPage() {
 
   /** Source Documents toolbar badge — import work (preparer Pass 1) or doc confirm (reviewer Pass 2). */
   const sourceDocsBadgeCount = (() => {
+    if (reviewRole === 'preparer' && !importsStarted) return 0
     if (reviewRole === 'preparer' && inImportPhase) {
       return phase1Remaining + unreviewedDocCount
     }
@@ -1311,6 +1326,7 @@ export default function DataReviewPage() {
   const showChecklist = !isReviewerBriefing
 
   const summaryBadgeCount = (() => {
+    if (reviewRole === 'preparer' && !importsStarted) return 0
     if (!showChecklist) return 0
     const brief = buildSmartReviewBrief({
       snapshot: buildSnapshot('signoff-review'),
