@@ -1309,10 +1309,11 @@ export default function DataReviewPage() {
     singlePersonMode,
   })
 
-  /** Source Documents toolbar badge — uncleared import flags + unreviewed docs (always visible on Pass 1). */
+  /** Source Documents toolbar badge — matches tab flag totals (or unreviewed docs after flags clear). */
   const sourceDocsBadgeCount = (() => {
     if (reviewRole === 'preparer' && inImportPhase) {
-      return phase1Remaining + unreviewedDocCount
+      if (phase1Remaining > 0) return phase1Remaining
+      return unreviewedDocCount
     }
     if (reviewRole === 'reviewer' && reviewPass === 2) {
       return pass2DocConfirmOpenCount
