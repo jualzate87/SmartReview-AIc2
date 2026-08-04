@@ -561,7 +561,7 @@ export default function DataReviewPage() {
     setOutputSourcesCoach(true)
   }, [phase, show1040])
 
-  // Second tip: Hide outputs — after first tip is dismissed, when Return Summary + Sources are both open
+  // Second tip: Hide output panel — after first tip is dismissed, when Return Summary + Sources are both open
   useEffect(() => {
     if (phase !== 'import' || !bothPanelsOpen) return
     if (readCoachTipShown('hideSummary')) return
@@ -1721,7 +1721,7 @@ export default function DataReviewPage() {
               : !show1040 ? 0 : undefined,
             opacity: !show1040 ? 0 : 1,
             /* Keep Summary ≥ 795.7px so Return Breakdown labels aren’t truncated.
-               Collapse animation / Hide outputs / brief-open still use minWidth 0. */
+               Collapse animation / Hide output panel / brief-open still use minWidth 0. */
             minWidth: leftAnimWidth !== null || !show1040 || outputsShareWithBrief
               ? 0
               : LEFT_PANEL_MIN_WIDTH,

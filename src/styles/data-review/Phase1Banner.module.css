@@ -3,7 +3,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-large, 24px);
-  padding: var(--space-container-padding-large, 24px) var(--space-large, 24px);
+  box-sizing: border-box;
+  padding: var(--space-medium, 16px) var(--space-large, 24px);
   background: var(--color-container-background-primary, #ffffff);
   border-bottom: 1px solid #C3CED5;
   flex-shrink: 0;
