@@ -166,12 +166,12 @@ export function deriveReviewChecklist(input: ReviewChecklistInputs): ReviewCheck
         ? 'No AI diagnostics on this return — attest compliance review manually.'
         : diagsOpen.length === 0
           ? 'All active AI diagnostics reviewed — attest your compliance check.'
-          : `${diagsOpen.length} diagnostic${diagsOpen.length === 1 ? '' : 's'} still open — review before attesting.`,
+          : `${diagsOpen.length} diagnostics remaining — review before attesting.`,
       kind: lawComplianceManual ? 'manual' : 'auto',
       required: true,
       complete: lawComplianceComplete,
       jump: firstDiag ? { type: 'diagnostic', issueKey: firstDiag } : undefined,
-      jumpLabel: 'Open AI review',
+      jumpLabel: 'Open AI diagnostics',
     },
     {
       id: 'deductions-optimization',

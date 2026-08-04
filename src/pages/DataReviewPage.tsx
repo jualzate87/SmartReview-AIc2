@@ -426,6 +426,8 @@ export default function DataReviewPage() {
   /** Right-panel width to restore when Show Summary expands again. */
   const preCollapseRightWidthRef = useRef<number | null>(null)
   const summaryToggleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Tracks prior right-rail open state for empty-canvas auto-restore. */
+  const prevRightPanelOpenRef = useRef(false)
 
   useEffect(() => () => {
     if (summaryToggleTimerRef.current) clearTimeout(summaryToggleTimerRef.current)
@@ -1471,6 +1473,43 @@ export default function DataReviewPage() {
     }, SUMMARY_TOGGLE_MS)
   }, [])
 
+  /**
+   * Lighter empty-canvas fix: when the user closes the last right-rail panel while
+   * outputs are hidden, restore Return Summary. Only fires on panel close (open→closed),
+   * not when hiding outputs with the panel already closed — preserves full-width Sources
+   * and coach-tip hide/show flows.
+   */
+  useEffect(() => {
+    const wasOpen = prevRightPanelOpenRef.current
+    const isOpen = rightPanelOpen
+    prevRightPanelOpenRef.current = isOpen
+
+    if (!wasOpen || isOpen || show1040) return
+
+    const timer = setTimeout(() => {
+      if (
+        show1040 ||
+        rightPanelMode !== 'closed' ||
+        rightPanelExiting ||
+        panelClosing ||
+        leftAnimWidth !== null
+      ) {
+        return
+      }
+      handleShowSummary()
+    }, 50)
+
+    return () => clearTimeout(timer)
+  }, [
+    rightPanelOpen,
+    show1040,
+    rightPanelMode,
+    rightPanelExiting,
+    panelClosing,
+    leftAnimWidth,
+    handleShowSummary,
+  ])
+
   // ProtoC: preparer skips welcome — lands in import phase, Return Summary full width, panels closed
   if (!entryValid) return null
 
@@ -1562,14 +1601,14 @@ export default function DataReviewPage() {
                 className={`${styles.intuitIntelBtn} ${agentPanelActive ? styles.intuitIntelBtnActive : ''}`}
                 aria-label={
                   !agentPanelActive && phase2Progress.remaining > 0
-                    ? `AI Review, ${phase2Progress.remaining} diagnostics remaining`
-                    : 'Intuit Intelligence'
+                    ? `AI diagnostics, ${phase2Progress.reviewed} of ${phase2Progress.total} diagnostics reviewed, ${phase2Progress.remaining} diagnostics remaining`
+                    : 'AI diagnostics'
                 }
                 style={{ position: 'relative' }}
                 onClick={() => handleAgentOpen()}
               >
                 <img src={intuitAssistIcon} alt="" className={styles.intuitIntelIcon} />
-                <span className={styles.intuitIntelLabel}>AI Review</span>
+                <span className={styles.intuitIntelLabel}>AI diagnostics</span>
                 {!agentPanelActive && phase2Progress.remaining > 0 && (
                   <AttentionCountBadge count={phase2Progress.remaining} className={styles.toolbarBadge} aria-hidden />
                 )}

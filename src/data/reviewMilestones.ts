@@ -314,7 +314,7 @@ export const REVIEW_MILESTONES: ReviewMilestone[] = [
     eligibleActor: 'any',
     linkedKey: 'diagnostics-cleared',
     jumpTarget: { type: 'diagnostic', issueKey: 'niit-threshold' },
-    jumpLabel: 'Open AI review',
+    jumpLabel: 'Open AI diagnostics',
     required: true,
   },
   {

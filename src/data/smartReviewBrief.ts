@@ -527,7 +527,7 @@ function buildExecutiveBrief(
         briefItem('diags', [
           { text: 'Left ' },
           { text: String(stats.openDiags), bold: true },
-          { text: ` diagnostic${stats.openDiags === 1 ? '' : 's'} for your review` },
+          { text: ' diagnostics remaining' },
         ]),
       )
     }
@@ -673,7 +673,7 @@ function buildExecutiveBrief(
           { text: preparerFirst, bold: true },
           { text: ' reviewed ' },
           { text: String(activity.diagsCleared), bold: true },
-          { text: ` first-pass AI diagnostic${activity.diagsCleared === 1 ? '' : 's'}` },
+          { text: ' diagnostics reviewed' },
         ]),
       )
     }

@@ -402,7 +402,7 @@ export function getOpenGroupToggleLabel(
     case 'import-flags':
       return n === 1 ? 'View 1 import flag' : `View ${n} import flags`
     case 'ai-diagnostics':
-      return n === 1 ? 'View 1 open AI diagnostic' : `View ${n} open AI diagnostics`
+      return n === 1 ? 'View 1 open diagnostic' : `View ${n} open diagnostics`
     case 'preparer-flags':
       return n === 1 ? 'View 1 preparer follow-up' : `View ${n} preparer follow-ups`
     case 'needs-confirmation':
@@ -448,7 +448,7 @@ export function getPreparerDoneGroupToggleLabel(
     case 'amount-edits':
       return n === 1 ? 'View 1 amount edit' : `View ${n} amount edits`
     case 'ai-diagnostics-reviewed':
-      return n === 1 ? 'View 1 reviewed AI diagnostic' : `View ${n} reviewed AI diagnostics`
+      return n === 1 ? 'View 1 reviewed diagnostic' : `View ${n} reviewed diagnostics`
     default:
       return n === 1 ? 'View 1 item' : `View ${n} items`
   }
@@ -490,7 +490,7 @@ export function jumpActionLabel(jump: HandoffJump): string {
     case 'notesPane':
       return 'Open notes'
     case 'diagnostic':
-      return 'Open AI review'
+      return 'Open AI diagnostics'
     case 'outputForm':
       return 'Open form'
     default:
@@ -609,7 +609,7 @@ export function buildHandoffSnapshot(
       id: 'ai-diagnostics',
       title: 'AI diagnostics still open',
       count: diagsOpen.length,
-      countLabel: `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}`,
+      countLabel: `${diagsOpen.length} diagnostics remaining`,
       items: diagsOpen.map(k => ({
         id: `diag-${k}`,
         label: DIAG_LABELS[k] ?? k,
@@ -618,7 +618,7 @@ export function buildHandoffSnapshot(
           : 'Not marked reviewed yet.',
         status: 'open' as const,
         jump: { type: 'diagnostic' as const, issueKey: k },
-        jumpLabel: 'Open AI review',
+        jumpLabel: 'Open AI diagnostics',
       })),
     })
   }
@@ -836,13 +836,13 @@ export function buildHandoffSnapshot(
       id: 'ai-diagnostics-reviewed',
       title: 'AI diagnostics reviewed',
       count: diagsReviewed.length,
-      countLabel: `${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'}`,
+      countLabel: `${diagsReviewed.length} diagnostics reviewed`,
       items: diagsReviewed.map(k => ({
         id: `done-diag-${k}`,
         label: DIAG_LABELS[k] ?? k,
         status: 'done' as const,
         jump: { type: 'diagnostic' as const, issueKey: k },
-        jumpLabel: 'Open AI review',
+        jumpLabel: 'Open AI diagnostics',
       })),
     })
   }
@@ -861,7 +861,7 @@ export function buildHandoffSnapshot(
       const bits: string[] = []
       if (clearedFlags.length) bits.push(`${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} cleared`)
       if (preparerVerifiedDocs.length) bits.push(`${preparerVerifiedDocs.length} doc${preparerVerifiedDocs.length === 1 ? '' : 's'} verified`)
-      if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'} reviewed`)
+      if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostics reviewed`)
       story.push(`So far they completed: ${listPhrase(bits)}.`)
     }
     if (hasOpen) {
@@ -890,7 +890,7 @@ export function buildHandoffSnapshot(
       const bits: string[] = []
       if (clearedFlags.length) bits.push(`${clearedFlags.length} import flag${clearedFlags.length === 1 ? '' : 's'} cleared`)
       if (preparerVerifiedDocs.length) bits.push(`${preparerVerifiedDocs.length} doc${preparerVerifiedDocs.length === 1 ? '' : 's'} verified`)
-      if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostic${diagsReviewed.length === 1 ? '' : 's'} reviewed`)
+      if (diagsReviewed.length) bits.push(`${diagsReviewed.length} diagnostics reviewed`)
       if (edits.length && !clearedFlags.length) bits.push(`${edits.length} amount change${edits.length === 1 ? '' : 's'}`)
       if (bits.length) story.push(`Completed so far: ${listPhrase(bits)}.`)
     }
@@ -914,7 +914,7 @@ export function buildHandoffSnapshot(
     docsAwaitingConfirmation.length
       ? `${docsAwaitingConfirmation.length} doc${docsAwaitingConfirmation.length === 1 ? '' : 's'} awaiting confirmation`
       : null,
-    diagsOpen.length ? `${diagsOpen.length} AI diagnostic${diagsOpen.length === 1 ? '' : 's'}` : null,
+    diagsOpen.length ? `${diagsOpen.length} diagnostics remaining` : null,
     unverifiedDocs.length
       ? isBriefing
         ? `${unverifiedDocs.length} doc${unverifiedDocs.length === 1 ? '' : 's'} not verified in Pass 1`
