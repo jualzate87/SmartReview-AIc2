@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CircleCheck, CircleInfo } from '@design-systems/icons'
+import { ChevronLeft, CircleCheck, CircleInfo } from '@design-systems/icons'
+import { Button } from '@ids-ts/button'
+import '@ids-ts/button/dist/main.css'
+import { DropdownButton, MenuItem } from '@ids-ts/dropdown-button'
+import '@ids-ts/dropdown-button/dist/main.css'
 import FieldPopover, { FIELD_META } from './FieldPopover'
 import TaxControlDocPopover, {
   docsToSummaryItems,
@@ -160,6 +164,12 @@ interface LeftPanel1040Props {
   /** Controlled output form / summary selection (Summary, 1040, Sch C, …) */
   outputFormId?: OutputFormId
   onOutputFormChange?: (id: OutputFormId) => void
+  /** When true, show Hide outputs in the toolbar (both Return Summary + Sources open) */
+  showHideOutputs?: boolean
+  onHideOutputs?: () => void
+  /** One-shot coach tip on Hide outputs — only when showHideOutputs */
+  hideOutputsCoachOpen?: boolean
+  onDismissHideOutputsCoach?: () => void
   /** One-shot coach tip on output form dropdown after Phase 2 diagnostics complete */
   outputFormsCoachOpen?: boolean
   onDismissOutputFormsCoach?: () => void
@@ -246,6 +256,10 @@ export default function LeftPanel1040({
   onAddFieldNote,
   outputFormId: controlledOutputFormId,
   onOutputFormChange,
+  showHideOutputs = false,
+  onHideOutputs,
+  hideOutputsCoachOpen = false,
+  onDismissHideOutputsCoach,
   outputFormsCoachOpen = false,
   onDismissOutputFormsCoach,
   outputSourcesCoachOpen = false,
@@ -283,6 +297,8 @@ export default function LeftPanel1040({
   const togglePreparer = onTogglePreparerCheck ?? onToggleChecked
   const toggleReviewer = onToggleReviewerConfirm ?? onToggleChecked
   const outputFormId = controlledOutputFormId ?? internalOutputFormId
+  const currentFormLabel =
+    OUTPUT_FORM_OPTIONS.find(opt => opt.id === outputFormId)?.label ?? 'Return Summary'
 
   const setOutputFormId = (id: OutputFormId) => {
     onOutputFormChange?.(id)
@@ -1022,12 +1038,32 @@ export default function LeftPanel1040({
   return (
     <div className={styles.leftPanel}>
 
-      {/* ── Output form navigator + per-form sign-off (reviewer) ── */}
+      {/* ── Toolbar: Hide outputs + form dropdown + per-form sign-off (reviewer) ── */}
       <div className={styles.viewToggle}>
         <div className={styles.viewToggleLeft}>
-          <label className={styles.formNavLabel} htmlFor="output-form-select">
-            View
-          </label>
+          {showHideOutputs && onHideOutputs && (
+            <CoachTip
+              open={hideOutputsCoachOpen}
+              title="Hide outputs"
+              message="Need more room for source documents? Hide outputs to collapse this panel. You can bring it back anytime with Show outputs."
+              onClose={() => onDismissHideOutputsCoach?.()}
+              position="bottom"
+              alignment="left"
+            >
+              <Button
+                priority="secondary"
+                size="small"
+                className={styles.hideOutputsBtn}
+                onClick={() => {
+                  onDismissHideOutputsCoach?.()
+                  onHideOutputs()
+                }}
+                aria-label="Hide outputs"
+              >
+                <ChevronLeft size="small" /> Hide outputs
+              </Button>
+            </CoachTip>
+          )}
           <CoachTip
             open={outputFormsCoachOpen}
             title="Review output forms"
@@ -1036,23 +1072,27 @@ export default function LeftPanel1040({
             position="bottom"
             alignment="left"
           >
-            <select
-              id="output-form-select"
-              className={styles.formNavSelect}
-              value={outputFormId}
-              onChange={e => {
-                const id = e.target.value as OutputFormId
+            <DropdownButton
+              label={currentFormLabel}
+              buttonPriority="secondary"
+              buttonSize="small"
+              automationId="output-form-select"
+              aria-label="Select return form or schedule"
+              className={styles.formNavDropdown}
+              stylePosition={{ zIndex: 10000 }}
+              onSelect={(e: { target?: { value?: string } }) => {
+                const id = e?.target?.value as OutputFormId | undefined
+                if (!id) return
                 setOutputFormId(id)
                 if (id !== 'summary') onDismissOutputFormsCoach?.()
               }}
-              aria-label="Select return form or schedule"
             >
               {OUTPUT_FORM_OPTIONS.map(opt => (
-                <option key={opt.id} value={opt.id}>
+                <MenuItem key={opt.id} value={opt.id}>
                   {opt.label}
-                </option>
+                </MenuItem>
               ))}
-            </select>
+            </DropdownButton>
           </CoachTip>
         </div>
         {isReviewerRole && onToggleFormSignOff && (

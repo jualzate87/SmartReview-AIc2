@@ -436,6 +436,7 @@ export default function DataReviewPage() {
   // Derived — single source of truth for which rail content is active
   const rightPanelOpen = rightPanelMode !== 'closed' || rightPanelExiting || panelClosing
   const rightPanelVisible = rightPanelMode === 'sources'
+  const bothPanelsOpen = show1040 && rightPanelOpen && rightPanelMode === 'sources'
   const notesOpen = rightPanelMode === 'comments'
   const summaryPanelOpen = rightPanelMode === 'summary'
   const agentPanelActive = rightPanelMode === 'ai'
@@ -560,13 +561,13 @@ export default function DataReviewPage() {
     setOutputSourcesCoach(true)
   }, [phase, show1040])
 
-  // Second tip: Hide outputs pink pointer — after first tip is dismissed (Sources stay closed)
+  // Second tip: Hide outputs — after first tip is dismissed, when Return Summary + Sources are both open
   useEffect(() => {
-    if (phase !== 'import' || !show1040) return
+    if (phase !== 'import' || !bothPanelsOpen) return
     if (readCoachTipShown('hideSummary')) return
     if (outputSourcesCoach || !readCoachTipShown('outputSourcesFirst')) return
     setCoachTip('hideSummary')
-  }, [phase, show1040, outputSourcesCoach])
+  }, [phase, bothPanelsOpen, outputSourcesCoach])
   // Continue-to-diagnostics nudge when Phase 1 is fully complete
   useEffect(() => {
     if (phase !== 'import' || !phase1FullyComplete) return
@@ -1727,29 +1728,6 @@ export default function DataReviewPage() {
             transition: panelResizing ? 'none' : undefined,
           }}
         >
-          {show1040 && (
-            <CoachTip
-              open={coachTip === 'hideSummary'}
-              title="Hide outputs"
-              message="Need more room for source documents? Hide outputs to collapse this panel. You can bring it back anytime with Show outputs."
-              onClose={() => dismissCoachTip('hideSummary')}
-              position="top"
-              alignment="left"
-            >
-              <Button
-                priority="secondary"
-                size="small"
-                className={styles.form1040HideBtn}
-                onClick={() => {
-                  if (coachTip === 'hideSummary') dismissCoachTip('hideSummary')
-                  handleHideSummary()
-                }}
-                aria-label="Hide outputs"
-              >
-                <ChevronLeft size="small" /> Hide outputs
-              </Button>
-            </CoachTip>
-          )}
           <LeftPanel1040
             selectedField={selectedField}
             highlightField={highlightField1040}
@@ -1783,6 +1761,13 @@ export default function DataReviewPage() {
             editedFields={editedFields}
             outputFormId={outputFormId}
             onOutputFormChange={setOutputFormId}
+            showHideOutputs={bothPanelsOpen}
+            onHideOutputs={() => {
+              if (coachTip === 'hideSummary') dismissCoachTip('hideSummary')
+              handleHideSummary()
+            }}
+            hideOutputsCoachOpen={coachTip === 'hideSummary' && bothPanelsOpen}
+            onDismissHideOutputsCoach={() => dismissCoachTip('hideSummary')}
             outputFormsCoachOpen={outputFormsCoach}
             onDismissOutputFormsCoach={dismissOutputFormsCoach}
             outputSourcesCoachOpen={outputSourcesCoach}

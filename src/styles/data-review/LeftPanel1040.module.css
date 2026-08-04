@@ -887,19 +887,32 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: var(--space-inline-small, 8px);
+  padding: var(--space-container-padding-x-small, 10px) var(--space-container-padding-small, 16px);
   flex-shrink: 0;
-  background: #fff;
-  border-bottom: 1px solid #e8eaed;
+  background: var(--color-container-background-primary, #fff);
+  border-bottom: 1px solid var(--color-divider-tertiary, #e8eaed);
 }
 
 .viewToggleLeft {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-inline-small, 8px);
   flex: 1;
   min-width: 0;
+}
+
+.hideOutputsBtn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: var(--space-inline-x-small, 6px);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.formNavDropdown {
+  flex-shrink: 0;
+  max-width: 360px;
 }
 
 .formNavLabel {

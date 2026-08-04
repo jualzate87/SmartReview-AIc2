@@ -14,14 +14,14 @@
   border-bottom: 1px solid #C3CED5;
 }
 
-/* Header — white bg; vertical padding so Comments / Source Documents
-   buttons aren't clipped by a fixed height */
+/* Header — 68px total height, 16px vertical padding */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: 68px;
   min-height: 68px;
-  padding: var(--space-container-padding-x-large, 32px) var(--space-medium, 16px) var(--space-container-padding-medium, 16px) 22px;
+  padding: var(--space-medium, 16px) var(--space-medium, 16px) var(--space-medium, 16px) 22px;
   background: transparent;
   border-bottom: none;
   flex-shrink: 0;
