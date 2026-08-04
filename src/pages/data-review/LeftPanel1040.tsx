@@ -1048,7 +1048,7 @@ export default function LeftPanel1040({
         label={currentFormLabel}
         buttonPriority="secondary"
         buttonPurpose="passive"
-        buttonSize="small"
+        buttonSize="medium"
         automationId="output-form-select"
         aria-label="Select return form or schedule"
         className={styles.formNavDropdown}
